@@ -1,0 +1,48 @@
+name: "Auto Clean Actions & Caches"
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup:
+    name: Clean Old Workflow Runs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Purge Old Workflow Runs (Keep latest 5 success runs)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          echo "🧹 Starting automated cleanup for $GH_REPO..."
+          WORKFLOWS=$(gh workflow list --json id -q '.[].id')
+          for wf in $WORKFLOWS; do
+            echo "🔍 Cleaning workflow $wf..."
+            gh run list --workflow="$wf" --status=success --json databaseId -q '.[5:][].databaseId' | while read -r run_id; do
+              if [ -n "$run_id" ]; then
+                echo "Deleting old success run: $run_id"
+                gh run delete "$run_id" || true
+              fi
+            done
+            gh run list --workflow="$wf" --status=failure --json databaseId -q '.[].databaseId' | while read -r run_id; do
+              if [ -n "$run_id" ]; then
+                echo "Deleting failed run: $run_id"
+                gh run delete "$run_id" || true
+              fi
+            done
+            gh run list --workflow="$wf" --status=cancelled --json databaseId -q '.[].databaseId' | while read -r run_id; do
+              if [ -n "$run_id" ]; then
+                echo "Deleting cancelled run: $run_id"
+                gh run delete "$run_id" || true
+              fi
+            done
+          done
+          echo "✨ Cleanup complete!"

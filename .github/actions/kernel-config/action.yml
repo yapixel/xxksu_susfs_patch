@@ -1,0 +1,58 @@
+name: "Inject Kernel Defconfig Flags"
+description: "Injects KSU, SuSFS (TRY_UMOUNT disabled by default), and performance flags into kernel defconfig"
+inputs:
+  defconfig_path:
+    description: "Path to .config or defconfig file"
+    required: true
+  enable_susfs:
+    description: "Whether to enable SuSFS options"
+    required: false
+    default: "true"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Inject Defconfig Configurations
+      shell: bash
+      run: |
+        DEFCONFIG="${{ inputs.defconfig_path }}"
+        if [ ! -f "$DEFCONFIG" ]; then
+          echo "❌ Error: Defconfig file $DEFCONFIG not found"
+          exit 1
+        fi
+
+        echo "⚙️ Injecting Kernel Configurations into $DEFCONFIG..."
+
+        # Base KSU Manual Security Hooks
+        cat >> "$DEFCONFIG" <<-'EOF'
+        # Base KSU & Manual Security Hooks
+        CONFIG_KSU=y
+        CONFIG_KSU_LSM_SECURITY_HOOKS=n
+        CONFIG_KSU_HOSTSREDIRECT=y
+        CONFIG_KSU_FEATURE_SULOG=y
+        CONFIG_KSU_FEATURE_ADBROOT=y
+        EOF
+
+        # SuSFS Feature Flags (TRY_UMOUNT is default disabled)
+        if [ "${{ inputs.enable_susfs }}" = "true" ]; then
+          cat >> "$DEFCONFIG" <<-'EOF'
+        # SuSFS De-inlined Kernel Features
+        CONFIG_KSU_SUSFS=y
+        CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
+        CONFIG_KSU_SUSFS_SUS_PATH=y
+        CONFIG_KSU_SUSFS_SUS_MOUNT=y
+        CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
+        CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
+        CONFIG_KSU_SUSFS_SUS_KSTAT=y
+        CONFIG_KSU_SUSFS_TRY_UMOUNT=n
+        CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=n
+        CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+        CONFIG_KSU_SUSFS_ENABLE_LOG=y
+        CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+        CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+        CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+        CONFIG_KSU_SUSFS_SUS_MAP=y
+        EOF
+        fi
+
+        echo "✅ Defconfig flags injected successfully!"

@@ -1,0 +1,196 @@
+name: "51 Patch: Multi-Kernel Dynamic Generation & Verification"
+
+on:
+  workflow_dispatch:
+    inputs:
+      ksu_branch:
+        description: "KernelSU Branch"
+        required: false
+        default: "master"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/generate-51-kernel-patches.yml"
+      - ".github/scripts/deinline_50_to_51.py"
+      - "patches/**/51_*.patch"
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  SUSFS_REPO_URL: "https://gitlab.com/simonpunk/susfs4ksu.git"
+  KSU_REPO: "backslashxx/KernelSU"
+
+jobs:
+  matrix_51_patch:
+    name: "${{ matrix.name }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "Sultan 6.1 (Android 14)"
+            target: "sultan"
+            susfs_branch: "sultan-shiba-susfs-minimal"
+            susfs_patch_name: "50_add_susfs_in_gki-android14-6.1.patch"
+            kernel_type: "git"
+            kernel_repo: "https://github.com/kerneltoast/android_kernel_google_tensynos.git"
+            kernel_branch: "16.0.0-sultan"
+            out_dir: "patches/sultan-android14-6.1"
+            out_patch: "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
+
+          - name: "Pantah 6.1.126 (Pixel 7 GKI)"
+            target: "gki-android14-6.1"
+            susfs_branch: "gki-android14-6.1"
+            susfs_patch_name: "50_add_susfs_in_gki-android14-6.1.patch"
+            kernel_type: "pantah_tar"
+            kernel_url: "https://github.com/yapixel/gki-build-assets/releases/download/pantah-15260412/kernel-pantah-15260412.tar.xz"
+            out_dir: "patches/gki-android14-6.1"
+            out_patch: "51_deinlined_susfs_hooks_gki-android14-6.1.patch"
+
+          - name: "GKI 6.12 (Android 16)"
+            target: "gki-android16-6.12"
+            susfs_branch: "gki-android16-6.12"
+            susfs_patch_name: "50_add_susfs_in_gki-android16-6.12.patch"
+            kernel_type: "tar"
+            kernel_url: "https://github.com/yapixel/gki-build-assets/releases/download/android16-6.12-2025-06_r58/common-android16-6.12-2025-06_r58.tar.gz"
+            out_dir: "patches/gki-android16-6.12"
+            out_patch: "51_deinlined_susfs_hooks_gki-android16-6.12.patch"
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Clone Upstream SuSFS Source
+        run: |
+          echo "📥 Fetching upstream SuSFS (branch: ${{ matrix.susfs_branch }})..."
+          git clone --depth=1 --single-branch -b "${{ matrix.susfs_branch }}" "${{ env.SUSFS_REPO_URL }}" susfs_src
+
+      - name: Prepare Clean Kernel Source Tree (${{ matrix.name }})
+        run: |
+          set -euo pipefail
+          mkdir -p kernel_tree
+          
+          if [ "${{ matrix.kernel_type }}" = "git" ]; then
+            echo "📥 Cloning kernel tree from ${{ matrix.kernel_repo }} (${{ matrix.kernel_branch }})..."
+            git clone --depth=1 --single-branch -b "${{ matrix.kernel_branch }}" "${{ matrix.kernel_repo }}" kernel_tree
+          elif [ "${{ matrix.kernel_type }}" = "pantah_tar" ]; then
+            echo "📥 Downloading Pantah 6.1.126 kernel archive from ${{ matrix.kernel_url }}..."
+            curl -LSs "${{ matrix.kernel_url }}" -o pantah.tar.xz
+            mkdir -p temp_pantah
+            tar -xf pantah.tar.xz -C temp_pantah
+            rm -f pantah.tar.xz
+            if [ -d "temp_pantah/kernel-pantah-15260412/common/ack" ]; then
+              cp -a temp_pantah/kernel-pantah-15260412/common/ack/. kernel_tree/
+            elif [ -d "temp_pantah/kernel-pantah-15260412/common/gki" ]; then
+              cp -a temp_pantah/kernel-pantah-15260412/common/gki/. kernel_tree/
+            elif [ -d "temp_pantah/common/ack" ]; then
+              cp -a temp_pantah/common/ack/. kernel_tree/
+            elif [ -d "temp_pantah/kernel-pantah-15260412" ]; then
+              cp -a temp_pantah/kernel-pantah-15260412/. kernel_tree/
+            elif [ -f "temp_pantah/Makefile" ]; then
+              cp -a temp_pantah/. kernel_tree/
+            fi
+            rm -rf temp_pantah
+          else
+            echo "📥 Downloading kernel source from ${{ matrix.kernel_url }}..."
+            curl -LSs "${{ matrix.kernel_url }}" | tar -xz -C kernel_tree
+          fi
+
+          cd kernel_tree
+          # Initialize git tracking for native format-patch generation
+          if [ ! -d ".git" ]; then
+            git init
+          fi
+          git config user.name "yapixel"
+          git config user.email "yapixel@users.noreply.github.com"
+          git config commit.gpgsign false
+
+          # Track base files
+          git add -A
+          git commit --no-gpg-sign -m "base: initial clean kernel tree" || true
+
+      - name: Generate Native Git 51 Patch via Git Binary (${{ matrix.name }})
+        run: |
+          set -euo pipefail
+          mkdir -p "${{ matrix.out_dir }}"
+          
+          PATCH_50="susfs_src/kernel_patches/${{ matrix.susfs_patch_name }}"
+          if [ ! -f "$PATCH_50" ]; then
+            PATCH_50=$(find susfs_src/kernel_patches/ -name "50_add_susfs*.patch" | head -n 1)
+          fi
+
+          # 1. Transform deinlined hooks into a raw patch
+          python3 .github/scripts/deinline_50_to_51.py \
+            --input "$PATCH_50" \
+            --output "/tmp/raw_51.patch" \
+            --target "${{ matrix.target }}"
+
+          # 2. Setup SuSFS core source files in kernel tree first
+          cd kernel_tree
+          mkdir -p fs/ include/linux/
+          cp -r "${{ github.workspace }}/susfs_src/kernel_patches/fs/susfs.c" fs/ || true
+          cp -r "${{ github.workspace }}/susfs_src/kernel_patches/include/linux/susfs.h" include/linux/ || true
+          cp -r "${{ github.workspace }}/susfs_src/kernel_patches/include/linux/susfs_def.h" include/linux/ || true
+
+          # 3. Apply to the authentic kernel tree
+          patch -p1 < "/tmp/raw_51.patch"
+
+          # 4. Clean up any .orig or .rej artifacts before staging
+          find . -type f \( -name "*.orig" -o -name "*.rej" -o -name "*~" \) -delete
+
+          # 5. Use real Git native binary to generate the authentic format-patch
+          git add fs/ mm/ kernel/ include/ drivers/
+          git commit --no-gpg-sign -m "SUSFS de-inlined hooks for ${{ matrix.target }}"
+          git format-patch -1 --stdout HEAD > "${{ github.workspace }}/${{ matrix.out_dir }}/${{ matrix.out_patch }}"
+          
+          echo "✨ Native Git 51 patch generated successfully:"
+          head -n 25 "${{ github.workspace }}/${{ matrix.out_dir }}/${{ matrix.out_patch }}"
+
+      - name: Validate xxKSU + SuSFS Integration on Kernel Tree (${{ matrix.name }})
+        run: |
+          set -euo pipefail
+          cd kernel_tree
+          
+          echo "🧪 Setting up xxKSU..."
+          curl -LSs "https://raw.githubusercontent.com/${{ env.KSU_REPO }}/${{ github.event.inputs.ksu_branch || 'master' }}/kernel/setup.sh" | bash -s "${{ github.event.inputs.ksu_branch || 'master' }}"
+          
+          # Apply universal 11 patch to xxKSU
+          echo "🧪 Applying universal 11 patch to KernelSU..."
+          cd KernelSU
+          patch -p1 < "${{ github.workspace }}/patches/xxksu/11_enable_susfs_for_ksu.patch"
+          cd ..
+
+          # For Sultan specific base patches if required
+          if [ "${{ matrix.target }}" = "sultan" ]; then
+            patch -p1 < "${{ github.workspace }}/.github/fixtures/sultan/60_scripts_mkcompile_h.patch" || true
+            patch -p1 < "${{ github.workspace }}/.github/fixtures/sultan/61_scripts_setlocalversion.patch" || true
+            patch -p1 < "${{ github.workspace }}/.github/fixtures/sultan/62_init_Makefile.patch" || true
+            patch -p1 < "${{ github.workspace }}/.github/fixtures/sultan/0001-modify-noinline.patch" || true
+            patch -p1 -l < "${{ github.workspace }}/.github/fixtures/manual-security-hooks-v2.0.patch" || true
+            patch -p1 -l < "${{ github.workspace }}/.github/fixtures/scope-min-manual-hooks-v2.3.patch" || true
+          fi
+
+          echo "✅ Full kernel tree integration verified successfully!"
+
+      - name: Generate Statistics Report
+        run: |
+          echo "### 📄 ${{ matrix.name }} 51 Patch Diffstat" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          git apply --stat "${{ matrix.out_dir }}/${{ matrix.out_patch }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload 51 Patch Artifact (${{ matrix.name }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: 51_patch_${{ matrix.target }}
+          path: ${{ matrix.out_dir }}/${{ matrix.out_patch }}

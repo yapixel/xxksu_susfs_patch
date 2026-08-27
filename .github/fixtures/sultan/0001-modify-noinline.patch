@@ -1,0 +1,39 @@
+From: GitHub Actions <actions@github.com>
+Date: $(date +'%Y-%m-%d')
+Subject: [PATCH] modify functions to noinline for debugging
+
+Modify do_faccessat and vfs_statx to noinline to facilitate debugging,
+tracing and performance analysis.
+
+Signed-off-by: GitHub Actions <actions@github.com>
+---
+ fs/open.c | 2 +-
+ fs/stat.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/fs/open.c b/fs/open.c
+--- a/fs/open.c
++++ b/fs/open.c
+@@ -418,7 +418,7 @@ static const struct cred *access_override_creds(void)
+ 	return old_cred;
+ }
+ 
+-static long do_faccessat(int dfd, const char __user *filename, int mode, int flags)
++static noinline long do_faccessat(int dfd, const char __user *filename, int mode, int flags)
+ {
+ 	struct path path;
+ 	struct inode *inode;
+diff --git a/fs/stat.c b/fs/stat.c
+--- a/fs/stat.c
++++ b/fs/stat.c
+@@ -214,7 +214,7 @@ int getname_statx_lookup_flags(int flags)
+  *
+  * 0 will be returned on success, and a -ve error code if unsuccessful.
+  */
+-static int vfs_statx(int dfd, struct filename *filename, int flags,
++static noinline int vfs_statx(int dfd, struct filename *filename, int flags,
+ 	      struct kstat *stat, u32 request_mask)
+ {
+ 	struct path path;
+-- 
+2.34.1

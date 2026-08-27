@@ -1,0 +1,75 @@
+name: "11 Patch: Generate & Verify for KernelSU (xxKSU)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      ksu_branch:
+        description: "KernelSU Branch to Test"
+        required: false
+        default: "master"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/generate-11-ksu-patch.yml"
+      - ".github/scripts/transform_10_to_11.py"
+      - "patches/xxksu/11_enable_susfs_for_ksu.patch"
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  KSU_REPO: "backslashxx/KernelSU"
+  SUSFS_REPO_URL: "https://gitlab.com/simonpunk/susfs4ksu.git"
+
+jobs:
+  generate_11_patch:
+    name: "Generate & Validate 11 Patch"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Generate Universal 11 Patch
+        run: |
+          mkdir -p patches/xxksu
+
+          echo "⚙️ Dynamically generating patches/xxksu/11_enable_susfs_for_ksu.patch..."
+          python3 .github/scripts/transform_10_to_11.py \
+            --output "patches/xxksu/11_enable_susfs_for_ksu.patch"
+
+      - name: Validate 11 Patch on Clean backslashxx/KernelSU
+        run: |
+          set -euo pipefail
+          echo "🧪 Testing 11 patch on clean clone of ${{ env.KSU_REPO }}..."
+          git clone --depth=1 https://github.com/${{ env.KSU_REPO }}.git test_ksu
+          cd test_ksu
+          patch -p1 < "${{ github.workspace }}/patches/xxksu/11_enable_susfs_for_ksu.patch"
+          git status --short
+          echo "Total modified files: $(git diff --name-only | wc -l)"
+          echo "✅ 11 Patch applied cleanly on backslashxx/KernelSU with 0 rejects!"
+
+      - name: Generate 11 Patch Statistics Report
+        run: |
+          echo "## 📊 Universal 11 Patch (xxKSU) Verification Report" > report_11.md
+          echo "Generated on: $(date -u)" >> report_11.md
+          echo "" >> report_11.md
+          echo "### 📄 Git Diffstat (10 Files Target)" >> report_11.md
+          echo "\`\`\`" >> report_11.md
+          git apply --stat patches/xxksu/11_enable_susfs_for_ksu.patch >> report_11.md
+          echo "\`\`\`" >> report_11.md
+          cat report_11.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload 11 Patch Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: 11_enable_susfs_for_ksu.patch
+          path: patches/xxksu/11_enable_susfs_for_ksu.patch
