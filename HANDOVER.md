@@ -53,7 +53,7 @@ V2.3.1: role-aware registry matching, relationship validation, orphan evidence s
 
 ## V2.3.1 Audit History
 
-The first independent audit found four defects: missing source-role constraints; missing `SemanticRelationship` validation; orphan evidence omitted from serialized ledger identity; and evidence identities not bound to V2.2 provenance. V2.3.1 addressed those findings. A subsequent independent re-audit still FAILED: `CandidateObservation` defaults to `SYNTHETIC`, so an observation labeled `official_50` with an arbitrary source label can resolve without verified V2.2 provenance. No historical report is rewritten.
+The first independent audit found four defects: missing source-role constraints; missing `SemanticRelationship` validation; orphan evidence omitted from serialized ledger identity; and evidence identities not bound to V2.2 provenance. V2.3.1 addressed those findings. The successful post-V2.3.1 independent re-audit remains pending; the latest independent re-audit still FAILED because `CandidateObservation` defaults to `SYNTHETIC`, so an observation labeled `official_50` with an arbitrary source label can resolve without verified V2.2 provenance. No historical report is rewritten.
 
 ## Production Inventory Status
 
