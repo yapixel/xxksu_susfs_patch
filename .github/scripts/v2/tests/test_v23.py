@@ -109,8 +109,8 @@ class SemanticInventoryTests(unittest.TestCase):
 
     def test_mixed_container_preserves_one_hunk_and_multiple_units(self):
         observations = [
-            observation(path="fs/stat.c", text="susfs_spoof_stat();", source_kind="fixture_scope_min",
-                        symbols=("susfs",), container_id="fs/stat.c:h1", mixed=True),
+            observation(path="fs/stat.c", text="kstat();", source_kind="fixture_scope_min",
+                        symbols=("kstat",), container_id="fs/stat.c:h1", mixed=True),
             observation(path="fs/stat.c", text="ksu_handle_stat();", source_kind="fixture_scope_min",
                         symbols=("ksu_handle_stat",), container_id="fs/stat.c:h1", mixed=True),
         ]
