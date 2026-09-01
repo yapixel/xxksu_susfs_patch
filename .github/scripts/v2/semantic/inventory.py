@@ -32,8 +32,9 @@ class CandidateObservation:
     start_line: Optional[int] = None
     abi: Mapping[str, Any] = field(default_factory=dict)
     role: str = "observation"
-    evidence_kind: EvidenceKind = EvidenceKind.SYNTHETIC
+    evidence_kind: EvidenceKind = EvidenceKind.UNVERIFIED
     provenance_identity: Optional[str] = None
+    prepared_source_name: Optional[str] = None
 
 
 def _symbols(text: str) -> tuple[str, ...]:
@@ -81,7 +82,8 @@ class CandidateDetector:
                                                    observation.text, observation.function, observation.source_kind, symbols,
                                                    observation.structural_anchor, observation.container_id, observation.mixed,
                                                    observation.start_line, observation.abi, observation.role,
-                                                   observation.evidence_kind, observation.provenance_identity))
+                                                   observation.evidence_kind, observation.provenance_identity,
+                                                   observation.prepared_source_name))
         return tuple(result)
 
 
@@ -103,7 +105,8 @@ class SemanticResolver:
                                   SemanticLocation(candidate.path, candidate.function, candidate.start_line, candidate.start_line, candidate.structural_anchor),
                                   fingerprint, _priority(candidate.source_kind), spec.confidence, spec.notes,
                                   {"container_id": candidate.container_id, "abi": dict(candidate.abi)},
-                                  candidate.evidence_kind, candidate.provenance_identity)
+                                  candidate.evidence_kind, candidate.provenance_identity,
+                                  candidate.prepared_source_name)
         state = CoverageState.MIXED if candidate.mixed else CoverageState.IDENTIFIED
         return SemanticUnit(spec.semantic_id, spec.kind, spec.domain,
                             SemanticLocation(candidate.path, candidate.function, candidate.start_line, candidate.start_line, candidate.structural_anchor),
@@ -112,9 +115,13 @@ class SemanticResolver:
 
 class SemanticInventory:
     def __init__(self, *, provenance_identity: str = "", provenance: Any = None,
-                 specification_version: str = "v1", registry: Optional[SemanticRegistry] = None):
+                 specification_version: str = "v1", registry: Optional[SemanticRegistry] = None,
+                 allow_synthetic: bool = False):
         self.registry = registry or default_registry()
-        self.ledger = CoverageLedger(provenance_identity=provenance_identity, specification_version=specification_version)
+        self.ledger = CoverageLedger(provenance_identity=provenance_identity,
+                                     specification_version=specification_version,
+                                     allow_synthetic=allow_synthetic,
+                                     provenance=provenance)
         self.provenance = provenance
         self.candidates: list[CandidateObservation] = []
 
@@ -133,7 +140,8 @@ class SemanticInventory:
                                                 SemanticLocation(candidate.path, candidate.function, candidate.start_line, candidate.start_line, candidate.structural_anchor),
                                                 fingerprint, _priority(candidate.source_kind), Confidence.UNKNOWN, str(exc),
                                                 {"container_id": candidate.container_id, "abi": dict(candidate.abi)},
-                                                candidate.evidence_kind, candidate.provenance_identity),),
+                                                candidate.evidence_kind, candidate.provenance_identity,
+                                                candidate.prepared_source_name),),
                                 (), Confidence.UNKNOWN, CoverageState.UNKNOWN)
         for evidence in unit.evidence:
             evidence.validate_against(self.provenance)
@@ -171,15 +179,17 @@ class SemanticInventory:
 
 
 def inventory_from_observations(observations: Iterable[CandidateObservation], *, provenance_identity: str = "",
-                                provenance: Any = None, registry=None) -> SemanticInventory:
+                                provenance: Any = None, registry=None,
+                                allow_synthetic: bool = False) -> SemanticInventory:
     return SemanticInventory(provenance_identity=provenance_identity, provenance=provenance,
-                             registry=registry).detect_and_resolve(observations)
+                             registry=registry, allow_synthetic=allow_synthetic).detect_and_resolve(observations)
 
 
 def inventory_patch(patch: Patch, *, source_identity: str, source_type: str,
-                    evidence_kind: EvidenceKind = EvidenceKind.SYNTHETIC,
-                    provenance_identity: Optional[str] = None, provenance: Any = None,
-                    registry=None) -> SemanticInventory:
+                    evidence_kind: EvidenceKind = EvidenceKind.UNVERIFIED,
+                    provenance_identity: Optional[str] = None,
+                    prepared_source_name: Optional[str] = None, provenance: Any = None,
+                    registry=None, allow_synthetic: bool = False) -> SemanticInventory:
     observations = []
     for file_patch in patch.files:
         path = file_patch.new_path or file_patch.old_path or "unknown"
@@ -196,11 +206,14 @@ def inventory_patch(patch: Patch, *, source_identity: str, source_type: str,
                                                              hunk.section_context or None, source_type, (symbol,),
                                                              f"hunk-{index}", f"{path}:{index}", len(symbols) > 1,
                                                              line.source_line, {}, _role(line.text, symbol),
-                                                             evidence_kind, provenance_identity))
+                                                             evidence_kind, provenance_identity,
+                                                             prepared_source_name))
             if not found:
                 observations.append(CandidateObservation(source_identity, source_type, path, text,
                                                          hunk.section_context or None, source_type, (),
                                                          f"hunk-{index}", f"{path}:{index}", False, hunk.source_line,
-                                                         {}, "observation", evidence_kind, provenance_identity))
-    return inventory_from_observations(observations, provenance_identity=source_identity,
-                                       provenance=provenance, registry=registry)
+                                                         {}, "observation", evidence_kind, provenance_identity,
+                                                         prepared_source_name))
+    return inventory_from_observations(observations, provenance_identity=provenance_identity or "",
+                                       provenance=provenance, registry=registry,
+                                       allow_synthetic=allow_synthetic)

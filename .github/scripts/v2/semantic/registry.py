@@ -10,6 +10,22 @@ from .model import (
 )
 
 
+ROLE_SENSITIVE_KINDS = {
+    SemanticKind.HANDLER_DEFINITION,
+    SemanticKind.HANDLER_DECLARATION,
+    SemanticKind.LINUX_CALL_SITE,
+    SemanticKind.RUNTIME_REGISTRATION,
+    SemanticKind.STATIC_KEY_GATE,
+    SemanticKind.LSM_SECURITY_HOOK,
+    SemanticKind.KPROBE,
+    SemanticKind.SYSCALL_TABLE_HOOK,
+    SemanticKind.ARM64_BRANCH_LINK,
+    SemanticKind.MANUAL_SOURCE_HOOK,
+    SemanticKind.FIXTURE_HOOK,
+    SemanticKind.TRANSPORT_WRAPPER,
+}
+
+
 @dataclass(frozen=True)
 class SemanticSpecification:
     semantic_id: SemanticId
@@ -26,6 +42,8 @@ class SemanticSpecification:
     def __post_init__(self) -> None:
         if not self.paths or not self.domain or not isinstance(self.kind, SemanticKind) or self.kind == SemanticKind.UNKNOWN:
             raise SemanticSpecificationError("specification requires domain, kind, and paths")
+        if self.kind in ROLE_SENSITIVE_KINDS and not self.source_roles:
+            raise SemanticSpecificationError("role-sensitive specification requires source roles")
         if not isinstance(self.confidence, Confidence):
             try:
                 object.__setattr__(self, "confidence", Confidence(self.confidence))
@@ -105,25 +123,25 @@ def default_registry() -> SemanticRegistry:
         s("transport.exec.linux_call", SemanticKind.LINUX_CALL_SITE, "exec", ("fs/exec.c",), symbols=("ksu_handle_execveat",), source_kinds=("official_50",), roles=("caller",), confidence=Confidence.HIGH),
         s("transport.exec.manual_fixture", SemanticKind.MANUAL_SOURCE_HOOK, "exec", ("fs/exec.c",), symbols=("ksu_handle_execveat",), source_kinds=("fixture_scope_min",), roles=("caller",), confidence=Confidence.HIGH),
         s("transport.exec.fixture_declaration", SemanticKind.HANDLER_DECLARATION, "exec", ("fs/exec.c",), symbols=("ksu_handle_execveat",), source_kinds=("fixture_scope_min",), roles=("declaration",), confidence=Confidence.HIGH),
-        s("transport.exec.branch_link", SemanticKind.ARM64_BRANCH_LINK, "exec", ("kernel/hook/branch_link_hook_arm64.c",), symbols=("ksu_do_execveat_common",), source_kinds=("xxksu",), confidence=Confidence.HIGH),
-        s("official_only.exec.sucompat", SemanticKind.HANDLER_DEFINITION, "exec", ("kernel/feature/sucompat.c",), symbols=("ksu_handle_execveat_sucompat",), source_kinds=("official_10",), confidence=Confidence.HIGH, notes="official interface; absent from actual xxKSU"),
+        s("transport.exec.branch_link", SemanticKind.ARM64_BRANCH_LINK, "exec", ("kernel/hook/branch_link_hook_arm64.c",), symbols=("ksu_do_execveat_common",), source_kinds=("xxksu",), roles=("definition",), confidence=Confidence.HIGH),
+        s("official_only.exec.sucompat", SemanticKind.HANDLER_DEFINITION, "exec", ("kernel/feature/sucompat.c",), symbols=("ksu_handle_execveat_sucompat",), source_kinds=("official_10",), roles=("definition",), confidence=Confidence.HIGH, notes="official interface; absent from actual xxKSU"),
         s("transport.access.linux_call", SemanticKind.LINUX_CALL_SITE, "access", ("fs/open.c",), symbols=("ksu_handle_faccessat",), source_kinds=("official_50",), roles=("caller",), confidence=Confidence.HIGH),
         s("transport.access.manual_fixture", SemanticKind.MANUAL_SOURCE_HOOK, "access", ("fs/open.c",), symbols=("ksu_handle_faccessat",), source_kinds=("fixture_scope_min",), roles=("caller",), confidence=Confidence.HIGH),
         s("transport.access.fixture_declaration", SemanticKind.HANDLER_DECLARATION, "access", ("fs/open.c",), symbols=("ksu_handle_faccessat",), source_kinds=("fixture_scope_min",), roles=("declaration",), confidence=Confidence.HIGH),
-        s("transport.access.branch_link", SemanticKind.ARM64_BRANCH_LINK, "access", ("kernel/hook/branch_link_hook_arm64.c",), symbols=("ksu_vfs_faccessat",), source_kinds=("xxksu",), confidence=Confidence.HIGH),
+        s("transport.access.branch_link", SemanticKind.ARM64_BRANCH_LINK, "access", ("kernel/hook/branch_link_hook_arm64.c",), symbols=("ksu_vfs_faccessat",), source_kinds=("xxksu",), roles=("definition",), confidence=Confidence.HIGH),
         s("transport.stat.linux_call", SemanticKind.LINUX_CALL_SITE, "stat", ("fs/stat.c",), symbols=("ksu_handle_stat",), source_kinds=("official_50",), roles=("caller",), confidence=Confidence.HIGH),
         s("transport.stat.manual_fixture", SemanticKind.MANUAL_SOURCE_HOOK, "stat", ("fs/stat.c",), symbols=("ksu_handle_stat",), source_kinds=("fixture_scope_min",), roles=("caller",), confidence=Confidence.HIGH),
         s("transport.stat.fixture_declaration", SemanticKind.HANDLER_DECLARATION, "stat", ("fs/stat.c",), symbols=("ksu_handle_stat",), source_kinds=("fixture_scope_min",), roles=("declaration",), confidence=Confidence.HIGH),
-        s("transport.stat.branch_link", SemanticKind.ARM64_BRANCH_LINK, "stat", ("kernel/hook/branch_link_hook_arm64.c",), symbols=("ksu_vfs_fstatat",), source_kinds=("xxksu",), confidence=Confidence.HIGH),
+        s("transport.stat.branch_link", SemanticKind.ARM64_BRANCH_LINK, "stat", ("kernel/hook/branch_link_hook_arm64.c",), symbols=("ksu_vfs_fstatat",), source_kinds=("xxksu",), roles=("definition",), confidence=Confidence.HIGH),
         s("transport.fstat_return.definition", SemanticKind.HANDLER_DEFINITION, "fstat-return", ("kernel/runtime/ksud.c",), symbols=("ksu_handle_newfstat_ret", "ksu_handle_fstat64_ret"), source_kinds=("xxksu",), roles=("definition",), confidence=Confidence.HIGH),
         s("transport.fstat_return.manual_fixture", SemanticKind.MANUAL_SOURCE_HOOK, "fstat-return", ("fs/stat.c",), symbols=("ksu_handle_newfstat_ret", "ksu_handle_fstat64_ret"), source_kinds=("fixture_scope_min",), roles=("caller",), confidence=Confidence.HIGH),
         s("transport.fstat_return.fixture_declaration", SemanticKind.HANDLER_DECLARATION, "fstat-return", ("fs/stat.c",), symbols=("ksu_handle_newfstat_ret", "ksu_handle_fstat64_ret"), source_kinds=("fixture_scope_min",), roles=("declaration",), confidence=Confidence.HIGH),
         s("transport.fstat_return.internal_fallback", SemanticKind.SYSCALL_TABLE_HOOK, "fstat-return", ("kernel/hook/syscall_table_hook_arm64.c",), source_kinds=("xxksu",), roles=("fallback",), confidence=Confidence.HIGH),
-        s("official_only.fstat.definition", SemanticKind.HANDLER_DEFINITION, "fstat-return", ("kernel/runtime/ksud.c",), symbols=("ksu_handle_vfs_fstat",), source_kinds=("official_10",), confidence=Confidence.HIGH, notes="official interface; actual xxKSU uses return handlers"),
+        s("official_only.fstat.definition", SemanticKind.HANDLER_DEFINITION, "fstat-return", ("kernel/runtime/ksud.c",), symbols=("ksu_handle_vfs_fstat",), source_kinds=("official_10",), roles=("definition",), confidence=Confidence.HIGH, notes="official interface; actual xxKSU uses return handlers"),
         s("transport.read.linux_call", SemanticKind.LINUX_CALL_SITE, "read", ("fs/read_write.c",), symbols=("ksu_handle_sys_read",), source_kinds=("official_50",), roles=("caller",), confidence=Confidence.HIGH),
         s("transport.read.manual_fixture", SemanticKind.MANUAL_SOURCE_HOOK, "read", ("security/security.c",), symbols=("ksu_file_permission",), source_kinds=("fixture_manual_security",), roles=("caller",), confidence=Confidence.HIGH),
         s("transport.read.internal_fallback", SemanticKind.SYSCALL_TABLE_HOOK, "read", ("kernel/hook/syscall_table_hook_arm64.c",), symbols=("ksu_handle_sys_read_fd",), source_kinds=("xxksu",), roles=("fallback",), confidence=Confidence.HIGH),
-        s("official_only.read.definition", SemanticKind.HANDLER_DEFINITION, "read", ("kernel/runtime/ksud.c",), symbols=("ksu_handle_sys_read",), source_kinds=("official_10",), confidence=Confidence.HIGH, notes="official interface; actual xxKSU uses install-RC behavior"),
+        s("official_only.read.definition", SemanticKind.HANDLER_DEFINITION, "read", ("kernel/runtime/ksud.c",), symbols=("ksu_handle_sys_read",), source_kinds=("official_10",), roles=("definition",), confidence=Confidence.HIGH, notes="official interface; actual xxKSU uses install-RC behavior"),
         s("transport.reboot.definition", SemanticKind.HANDLER_DEFINITION, "reboot", ("kernel/supercall/supercall.c",), symbols=("ksu_handle_sys_reboot",), source_kinds=("xxksu",), roles=("definition",), confidence=Confidence.HIGH),
         s("transport.reboot.linux_call", SemanticKind.LINUX_CALL_SITE, "reboot", ("kernel/reboot.c",), symbols=("ksu_handle_sys_reboot",), source_kinds=("official_50",), roles=("caller",), confidence=Confidence.HIGH),
         s("transport.reboot.manual_fixture", SemanticKind.MANUAL_SOURCE_HOOK, "reboot", ("kernel/reboot.c",), symbols=("ksu_handle_sys_reboot",), source_kinds=("fixture_scope_min",), roles=("caller",), confidence=Confidence.HIGH),
@@ -138,14 +156,14 @@ def default_registry() -> SemanticRegistry:
         s("transport.rename.fixture_declaration", SemanticKind.HANDLER_DECLARATION, "rename", ("security/security.c",), symbols=("ksu_inode_rename",), source_kinds=("fixture_manual_security",), roles=("declaration",), confidence=Confidence.HIGH),
         s("transport.setprocattr.manual_fixture", SemanticKind.MANUAL_SOURCE_HOOK, "setprocattr", ("security/security.c",), symbols=("ksu_hide_setprocattr",), source_kinds=("fixture_manual_security",), roles=("caller",), confidence=Confidence.MEDIUM),
         s("transport.setprocattr.fixture_declaration", SemanticKind.HANDLER_DECLARATION, "setprocattr", ("security/security.c",), symbols=("ksu_hide_setprocattr",), source_kinds=("fixture_manual_security",), roles=("declaration",), confidence=Confidence.MEDIUM),
-        s("transport.setuid.lsm", SemanticKind.LSM_SECURITY_HOOK, "setuid", ("kernel/hook/lsm_hooks_list.c", "kernel/hook/lsm_hooks_static.c"), symbols=("security_task_fix_setuid",), source_kinds=("xxksu",), confidence=Confidence.HIGH),
-        s("transport.input.official_assumption", SemanticKind.LINUX_CALL_SITE, "input", ("drivers/input/input.c",), symbols=("ksu_handle_input_handle_event",), source_kinds=("official_50",), confidence=Confidence.HIGH),
-        s("transport.input.registration", SemanticKind.RUNTIME_REGISTRATION, "input", ("kernel/feature/vol_detector.c",), symbols=("input_register_handler", "vol_detector_event"), source_kinds=("xxksu",), confidence=Confidence.HIGH),
-        s("official_only.input.definition", SemanticKind.HANDLER_DEFINITION, "input", ("kernel/runtime/ksud.c",), symbols=("ksu_handle_input_handle_event",), source_kinds=("official_10",), confidence=Confidence.HIGH, notes="official interface; actual xxKSU registers volume detector"),
-        s("transport.ksud.kprobe", SemanticKind.KPROBE, "transport", ("kernel/hook/kp_ksud.c",), symbols=("register_kprobe", "register_kretprobe"), source_kinds=("xxksu",), confidence=Confidence.HIGH),
-        s("transport.bl.branch_link", SemanticKind.ARM64_BRANCH_LINK, "transport", ("kernel/hook/branch_link_hook_arm64.c",), symbols=("branch_link",), source_kinds=("xxksu",), confidence=Confidence.HIGH),
-        s("transport.bl.internal_fallback", SemanticKind.SYSCALL_TABLE_HOOK, "transport", ("kernel/hook/syscall_table_hook_arm64.c",), symbols=("syscall_table",), source_kinds=("xxksu",), confidence=Confidence.HIGH),
-        s("transport.bl.composite", SemanticKind.TRANSPORT_WRAPPER, "transport", ("kernel/hook/branch_link_hook_arm64.c", "kernel/hook/syscall_table_hook_arm64.c"), symbols=("branch_link", "syscall_table"), source_kinds=("xxksu",), confidence=Confidence.HIGH),
+        s("transport.setuid.lsm", SemanticKind.LSM_SECURITY_HOOK, "setuid", ("kernel/hook/lsm_hooks_list.c", "kernel/hook/lsm_hooks_static.c"), symbols=("security_task_fix_setuid",), source_kinds=("xxksu",), roles=("caller",), confidence=Confidence.HIGH),
+        s("transport.input.official_assumption", SemanticKind.LINUX_CALL_SITE, "input", ("drivers/input/input.c",), symbols=("ksu_handle_input_handle_event",), source_kinds=("official_50",), roles=("caller",), confidence=Confidence.HIGH),
+        s("transport.input.registration", SemanticKind.RUNTIME_REGISTRATION, "input", ("kernel/feature/vol_detector.c",), symbols=("input_register_handler", "vol_detector_event"), source_kinds=("xxksu",), roles=("caller", "definition"), confidence=Confidence.HIGH),
+        s("official_only.input.definition", SemanticKind.HANDLER_DEFINITION, "input", ("kernel/runtime/ksud.c",), symbols=("ksu_handle_input_handle_event",), source_kinds=("official_10",), roles=("definition",), confidence=Confidence.HIGH, notes="official interface; actual xxKSU registers volume detector"),
+        s("transport.ksud.kprobe", SemanticKind.KPROBE, "transport", ("kernel/hook/kp_ksud.c",), symbols=("register_kprobe", "register_kretprobe"), source_kinds=("xxksu",), roles=("caller",), confidence=Confidence.HIGH),
+        s("transport.bl.branch_link", SemanticKind.ARM64_BRANCH_LINK, "transport", ("kernel/hook/branch_link_hook_arm64.c",), symbols=("branch_link",), source_kinds=("xxksu",), roles=("caller", "definition"), confidence=Confidence.HIGH),
+        s("transport.bl.internal_fallback", SemanticKind.SYSCALL_TABLE_HOOK, "transport", ("kernel/hook/syscall_table_hook_arm64.c",), symbols=("syscall_table",), source_kinds=("xxksu",), roles=("caller", "fallback"), confidence=Confidence.HIGH),
+        s("transport.bl.composite", SemanticKind.TRANSPORT_WRAPPER, "transport", ("kernel/hook/branch_link_hook_arm64.c", "kernel/hook/syscall_table_hook_arm64.c"), symbols=("branch_link", "syscall_table"), source_kinds=("xxksu",), roles=("caller", "definition", "fallback"), confidence=Confidence.HIGH),
         s("selinux.avc.replace", SemanticKind.SELINUX_BEHAVIOR, "selinux", ("kernel/feature/selinux_hide.c", "kernel/downstream/slow_avc_audit_defs.h"), symbols=("slow_avc_audit",), source_kinds=("xxksu",), confidence=Confidence.HIGH),
         s("selinux.fake_status", SemanticKind.SELINUX_BEHAVIOR, "selinux", ("kernel/feature/selinux_hide.c",), symbols=("ksu_fake_status_page",), source_kinds=("xxksu",), confidence=Confidence.HIGH),
         s("selinux.setprocattr", SemanticKind.SELINUX_BEHAVIOR, "selinux", ("kernel/feature/selinux_hide.c",), symbols=("ksu_hide_setprocattr",), source_kinds=("xxksu", "fixture_manual_security"), confidence=Confidence.MEDIUM),

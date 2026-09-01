@@ -27,9 +27,12 @@ class LedgerEntry:
 
 
 class CoverageLedger:
-    def __init__(self, *, provenance_identity: str = "", specification_version: str = "v1"):
+    def __init__(self, *, provenance_identity: str = "", specification_version: str = "v1",
+                 allow_synthetic: bool = False, provenance: Any = None):
         self.provenance_identity = provenance_identity
         self.specification_version = specification_version
+        self.allow_synthetic = allow_synthetic
+        self.provenance = provenance
         self._entries: dict[str, LedgerEntry] = {}
         self._orphan_evidence: list[EvidenceRecord] = []
 
@@ -93,6 +96,7 @@ class CoverageLedger:
     def to_dict(self) -> dict[str, Any]:
         return {"schema": "xxksu-susfs-ledger/v1", "provenance_identity": self.provenance_identity,
                 "specification_version": self.specification_version,
+                "allow_synthetic": self.allow_synthetic,
                 "entries": [entry.to_dict() for entry in self.entries],
                 "orphan_evidence": sorted((item.to_dict() for item in self._orphan_evidence), key=canonical_json)}
 
@@ -109,9 +113,23 @@ class CoverageLedger:
             raise InventoryIncomplete(f"{self.unknown_count} relevant unknown semantic units")
         if self._orphan_evidence:
             raise LedgerIncomplete("orphan evidence remains")
-        if any(item.evidence_kind == EvidenceKind.UNVERIFIED
-               for entry in self.entries for item in entry.unit.evidence):
+        evidence = tuple(
+            item
+            for entry in self.entries
+            for item in (entry.unit.evidence + tuple(
+                relation_evidence
+                for relationship in entry.unit.relationships
+                for relation_evidence in relationship.evidence
+            ))
+        )
+        evidence_kinds = {item.evidence_kind for item in evidence}
+        if EvidenceKind.UNVERIFIED in evidence_kinds:
             raise InventoryIncomplete("unverified evidence remains")
+        for item in evidence:
+            if item.evidence_kind == EvidenceKind.VERIFIED:
+                item.validate_against(self.provenance)
+        if EvidenceKind.SYNTHETIC in evidence_kinds and not self.allow_synthetic:
+            raise InventoryIncomplete("synthetic evidence is not production-complete")
         known = set(self._entries)
         for entry in self.entries:
             for relationship in entry.unit.relationships:

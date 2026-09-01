@@ -76,6 +76,16 @@ class EvidenceKind(str, Enum):
     UNVERIFIED = "UNVERIFIED"
 
 
+_PREPARED_SOURCE_CONTRACTS = {
+    "target_kernel": ({"kernel"}, {"git", "repository", "tree", "archive", "local"}),
+    "xxksu": ({"xxksu"}, {"git", "repository", "tree", "archive", "local"}),
+    "official_10": ({"official-10"}, {"patch", "local"}),
+    "official_50": ({"official-50"}, {"patch", "local"}),
+    "fixture_scope_min": ({"scope-min-manual-hooks-v2.3.patch"}, {"fixture", "patch", "local"}),
+    "fixture_manual_security": ({"manual-security-hooks-v2.0.patch"}, {"fixture", "patch", "local"}),
+}
+
+
 class SemanticKind(str, Enum):
     SUSFS_BEHAVIOR = "SUSFS_BEHAVIOR"
     HANDLER_DEFINITION = "HANDLER_DEFINITION"
@@ -212,6 +222,7 @@ class EvidenceRecord:
     attributes: Mapping[str, Any] = field(default_factory=dict)
     evidence_kind: EvidenceKind = EvidenceKind.UNVERIFIED
     provenance_identity: Optional[str] = None
+    prepared_source_name: Optional[str] = None
 
     def __post_init__(self) -> None:
         if not self.source_identity or not 1 <= self.priority <= 8:
@@ -228,23 +239,38 @@ class EvidenceRecord:
                 object.__setattr__(self, "evidence_kind", EvidenceKind(self.evidence_kind))
             except ValueError as exc:
                 raise InvalidEvidence("invalid evidence kind") from exc
-        if self.evidence_kind == EvidenceKind.VERIFIED and not self.provenance_identity:
-            raise InvalidEvidence("verified evidence requires V2.2 provenance identity")
+        if self.evidence_kind == EvidenceKind.VERIFIED:
+            if not self.provenance_identity:
+                raise InvalidEvidence("verified evidence requires V2.2 provenance identity")
+            if not self.prepared_source_name:
+                raise InvalidEvidence("verified evidence requires a prepared source name")
 
     def validate_against(self, provenance: Any) -> None:
-        """Bind verified evidence to a V2.2 Provenance or PreparedInput."""
+        """Bind verified evidence to one exact V2.2 PreparedSource."""
         if self.evidence_kind != EvidenceKind.VERIFIED:
             return
         candidate = getattr(provenance, "provenance", provenance)
         expected_identity = str(getattr(candidate, "identity", ""))
         if not expected_identity or self.provenance_identity != expected_identity:
             raise InvalidEvidence("evidence provenance identity mismatch")
-        source_ids = {expected_identity}
-        for prepared in getattr(candidate, "inputs", ()):
-            source_ids.add(str(getattr(prepared, "content_hash", "")))
-            source_ids.add(str(getattr(prepared, "cache_object", "")))
+        if self.source_identity == expected_identity:
+            raise InvalidEvidence("aggregate provenance identity is not a source identity")
+        prepared_sources = tuple(getattr(candidate, "inputs", ()))
+        if not prepared_sources:
+            raise InvalidEvidence("verified evidence requires non-empty prepared provenance")
+        matches = tuple(item for item in prepared_sources
+                        if getattr(getattr(item, "reference", None), "name", None) == self.prepared_source_name)
+        if len(matches) != 1:
+            raise InvalidEvidence("prepared source name is missing or ambiguous")
+        prepared = matches[0]
+        source_kind = self.fingerprint.source_kind
+        contract = _PREPARED_SOURCE_CONTRACTS.get(source_kind)
+        reference = prepared.reference
+        if contract is None or reference.name not in contract[0] or reference.kind not in contract[1]:
+            raise InvalidEvidence("evidence source family does not match prepared source")
+        source_ids = {str(prepared.content_hash), str(prepared.cache_object)}
         if self.source_identity not in source_ids:
-            raise InvalidEvidence("evidence source is not present in prepared provenance")
+            raise InvalidEvidence("evidence identity does not match prepared source")
 
     def to_dict(self) -> dict[str, Any]:
         return {"source_identity": self.source_identity, "source_type": self.source_type,
@@ -252,7 +278,8 @@ class EvidenceRecord:
                 "fingerprint_digest": str(self.fingerprint.digest), "priority": self.priority,
                 "confidence": self.confidence.value, "notes": self.notes, "attributes": dict(self.attributes),
                 "evidence_kind": self.evidence_kind.value,
-                "provenance_identity": self.provenance_identity}
+                "provenance_identity": self.provenance_identity,
+                "prepared_source_name": self.prepared_source_name}
 
 
 @dataclass(frozen=True)

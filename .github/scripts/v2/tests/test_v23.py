@@ -14,18 +14,19 @@ from v2.semantic import (
     EvidenceKind,
     CoverageState, EvidenceRecord, InvalidEvidence, InvalidRelationship, InventoryIncomplete,
     OrphanEvidence, RelationshipType, SemanticFingerprint, SemanticId, SemanticIdCollision,
-    SemanticInventory, SemanticKind, SemanticLocation, SemanticRelationship, SemanticUnit,
+    SemanticInventory, SemanticKind, SemanticLocation, SemanticRelationship, SemanticResolver, SemanticUnit,
     UnknownSemanticUnit, default_registry, inventory_from_observations, inventory_patch,
 )
 from v2.semantic.model import UnsupportedSemanticSchema, SemanticSpecificationError
-from v2.semantic.registry import SemanticSpecification
-from v2.model.provenance import HashDigest, Provenance, canonical_json
+from v2.semantic.registry import ROLE_SENSITIVE_KINDS, SemanticSpecification
+from v2.model.provenance import HashDigest, InputRef, PreparedSource, Provenance, canonical_json
 
 
 def observation(path="fs/exec.c", text="ksu_handle_execveat();", source_kind="official_50", source_id="sha256:" + "a" * 64, **kwargs):
     return CandidateObservation(source_id, "patch", path, text, source_kind=source_kind,
                                 symbols=kwargs.pop("symbols", ("ksu_handle_execveat",)),
-                                role=kwargs.pop("role", "caller"), **kwargs)
+                                role=kwargs.pop("role", "caller"),
+                                evidence_kind=kwargs.pop("evidence_kind", EvidenceKind.SYNTHETIC), **kwargs)
 
 
 class SemanticModelTests(unittest.TestCase):
@@ -142,12 +143,35 @@ class SemanticInventoryTests(unittest.TestCase):
         self.assertIn(("declaration", SemanticKind.HANDLER_DECLARATION), kinds_by_role)
         self.assertIn(("caller", SemanticKind.MANUAL_SOURCE_HOOK), kinds_by_role)
 
+    def test_role_sensitive_registry_and_wrong_role_matrix(self):
+        self.assertTrue(all(spec.source_roles for spec in default_registry()
+                            if spec.kind in ROLE_SENSITIVE_KINDS))
+        wrong_roles = (
+            ("kernel/feature/sucompat.c", "ksu_handle_execveat_sucompat", "official_10", "declaration"),
+            ("kernel/runtime/ksud.c", "ksu_handle_vfs_fstat", "official_10", "declaration"),
+            ("kernel/runtime/ksud.c", "ksu_handle_sys_read", "official_10", "declaration"),
+            ("drivers/input/input.c", "ksu_handle_input_handle_event", "official_50", "declaration"),
+            ("kernel/runtime/ksud.c", "ksu_handle_input_handle_event", "official_10", "declaration"),
+            ("fs/exec.c", "ksu_handle_execveat", "official_50", "definition"),
+        )
+        for path, symbol, source_kind, role in wrong_roles:
+            with self.subTest(path=path, symbol=symbol, role=role):
+                with self.assertRaises(UnknownSemanticUnit):
+                    SemanticResolver().resolve(observation(path=path, text=symbol, source_kind=source_kind,
+                                                           symbols=(symbol,), role=role))
+        declaration, caller = inventory_from_observations((
+            observation(path="fs/exec.c", text="extern int ksu_handle_execveat(...);",
+                        source_kind="fixture_scope_min", role="declaration"),
+            observation(path="fs/exec.c", text="ksu_handle_execveat();",
+                        source_kind="fixture_scope_min", role="caller"),
+        )).units
+        self.assertEqual({declaration.kind, caller.kind},
+                         {SemanticKind.HANDLER_DECLARATION, SemanticKind.MANUAL_SOURCE_HOOK})
+
     def test_ambiguous_and_collision_fail_closed(self):
         registry = default_registry()
         with self.assertRaises(AmbiguousSemanticMatch):
-            from v2.semantic.registry import SemanticSpecification
-            registry.add(SemanticSpecification(SemanticId("ambiguous"), SemanticKind.LINUX_CALL_SITE, "exec", ("fs/exec.c",), symbols=("ksu_handle_execveat",), source_kinds=("official_50",)))
-            from v2.semantic import SemanticResolver
+            registry.add(SemanticSpecification(SemanticId("ambiguous"), SemanticKind.LINUX_CALL_SITE, "exec", ("fs/exec.c",), symbols=("ksu_handle_execveat",), source_kinds=("official_50",), source_roles=("caller",)))
             SemanticResolver(registry).resolve(observation())
         ledger = CoverageLedger()
         unit = SemanticUnit(SemanticId("collision"), SemanticKind.SUSFS_BEHAVIOR, "a", SemanticLocation("fs/a.c"))
@@ -247,20 +271,107 @@ class SemanticRealEvidenceTests(unittest.TestCase):
         self.assertEqual(unit.evidence[0].attributes["abi"]["return"], "int")
         self.assertEqual(unit.evidence[0].priority, 3)
 
-    def test_verified_evidence_binds_to_v22_provenance(self):
+    def test_production_evidence_requires_exact_prepared_source(self):
+        official_hash = HashDigest("sha256", "1" * 64)
+        kernel_hash = HashDigest("sha256", "2" * 64)
+        official = PreparedSource(InputRef("official-50", "patch", "local", content_hash=official_hash),
+                                  official_hash, official_hash)
+        kernel = PreparedSource(InputRef("kernel", "tree", "local", resolved_commit="a" * 40,
+                                        content_hash=kernel_hash), kernel_hash, kernel_hash)
         provenance = Provenance("xxksu-susfs-provenance/v1", "gki-android14-6.1", None,
-                                HashDigest("sha256", "1" * 64))
-        verified = observation(source_id=str(provenance.identity), evidence_kind=EvidenceKind.VERIFIED,
-                               provenance_identity=str(provenance.identity))
-        inventory = inventory_from_observations([verified], provenance=provenance)
+                                HashDigest("sha256", "3" * 64), (official, kernel))
+        verified = observation(source_id=str(official_hash), evidence_kind=EvidenceKind.VERIFIED,
+                               provenance_identity=str(provenance.identity),
+                               prepared_source_name="official-50")
+        inventory = inventory_from_observations([verified], provenance=provenance).validate_complete()
         self.assertEqual(inventory.units[0].evidence[0].evidence_kind, EvidenceKind.VERIFIED)
-        wrong = observation(source_id=str(provenance.identity), evidence_kind=EvidenceKind.VERIFIED,
-                            provenance_identity="sha256:" + "2" * 64)
+        unbound_ledger = CoverageLedger(provenance_identity=str(provenance.identity))
+        unbound_ledger.add(SemanticResolver().resolve(verified))
         with self.assertRaises(InvalidEvidence):
-            inventory_from_observations([wrong], provenance=provenance)
-        unverified = observation(evidence_kind=EvidenceKind.UNVERIFIED)
+            unbound_ledger.validate_complete()
+
+        failures = (
+            observation(source_id=str(official_hash), evidence_kind=EvidenceKind.VERIFIED,
+                        provenance_identity=str(provenance.identity)),
+            observation(source_id=str(provenance.identity), evidence_kind=EvidenceKind.VERIFIED,
+                        provenance_identity=str(provenance.identity), prepared_source_name="official-50"),
+            observation(source_id=str(kernel_hash), evidence_kind=EvidenceKind.VERIFIED,
+                        provenance_identity=str(provenance.identity), prepared_source_name="official-50"),
+            observation(source_id=str(kernel_hash), evidence_kind=EvidenceKind.VERIFIED,
+                        provenance_identity=str(provenance.identity), prepared_source_name="kernel"),
+            observation(source_id=str(official_hash), evidence_kind=EvidenceKind.VERIFIED,
+                        provenance_identity="sha256:" + "4" * 64, prepared_source_name="official-50"),
+        )
+        for candidate in failures:
+            with self.assertRaises(InvalidEvidence):
+                inventory_from_observations([candidate], provenance=provenance)
+
+        empty = Provenance("xxksu-susfs-provenance/v1", "gki-android14-6.1", None,
+                           HashDigest("sha256", "5" * 64))
+        with self.assertRaises(InvalidEvidence):
+            inventory_from_observations([
+                observation(source_id=":".join(("sha256", "6" * 64)), evidence_kind=EvidenceKind.VERIFIED,
+                            provenance_identity=str(empty.identity), prepared_source_name="official-50")
+            ], provenance=empty)
+
+        wrong_kind_source = PreparedSource(InputRef("official-50", "tree", "local",
+                                                    resolved_commit="b" * 40,
+                                                    content_hash=official_hash), official_hash, official_hash)
+        wrong_kind = Provenance("xxksu-susfs-provenance/v1", "gki-android14-6.1", None,
+                                HashDigest("sha256", "7" * 64), (wrong_kind_source,))
+        with self.assertRaises(InvalidEvidence):
+            inventory_from_observations([
+                observation(source_id=str(official_hash), evidence_kind=EvidenceKind.VERIFIED,
+                            provenance_identity=str(wrong_kind.identity), prepared_source_name="official-50")
+            ], provenance=wrong_kind)
+
+    def test_production_completeness_rejects_default_and_synthetic_evidence(self):
+        default = CandidateObservation("arbitrary", "patch", "fs/exec.c", "ksu_handle_execveat();",
+                                       source_kind="official_50", symbols=("ksu_handle_execveat",), role="caller")
+        self.assertEqual(default.evidence_kind, EvidenceKind.UNVERIFIED)
         with self.assertRaises(InventoryIncomplete):
-            inventory_from_observations([unverified]).validate_complete()
+            inventory_from_observations([default]).validate_complete()
+        synthetic = observation(evidence_kind=EvidenceKind.SYNTHETIC)
+        with self.assertRaises(InventoryIncomplete):
+            inventory_from_observations([synthetic]).validate_complete()
+        inventory_from_observations([synthetic], allow_synthetic=True).validate_complete()
+
+    def test_relationship_evidence_uses_the_production_trust_gate(self):
+        official_hash = HashDigest("sha256", "8" * 64)
+        kernel_hash = HashDigest("sha256", "9" * 64)
+        official = PreparedSource(InputRef("official-50", "patch", "local", content_hash=official_hash),
+                                  official_hash, official_hash)
+        kernel = PreparedSource(InputRef("kernel", "tree", "local", resolved_commit="c" * 40,
+                                        content_hash=kernel_hash), kernel_hash, kernel_hash)
+        provenance = Provenance("xxksu-susfs-provenance/v1", "gki-android14-6.1", None,
+                                HashDigest("sha256", "a" * 64), (official, kernel))
+        verified = observation(source_id=str(official_hash), evidence_kind=EvidenceKind.VERIFIED,
+                               provenance_identity=str(provenance.identity),
+                               prepared_source_name="official-50")
+        source = SemanticResolver().resolve(verified)
+        target = SemanticUnit(SemanticId("relationship.target"), SemanticKind.SUSFS_BEHAVIOR,
+                              "test", SemanticLocation("fs/target.c"))
+
+        def ledger_with(evidence):
+            ledger = CoverageLedger(provenance_identity=str(provenance.identity), provenance=provenance)
+            ledger.add(source)
+            ledger.add(target)
+            ledger.add_relationship(SemanticRelationship(RelationshipType.RELATED_TO,
+                                                         source.semantic_id, target.semantic_id, (evidence,)))
+            return ledger
+
+        ledger_with(source.evidence[0]).validate_complete()
+        unverified = SemanticResolver().resolve(observation(evidence_kind=EvidenceKind.UNVERIFIED)).evidence[0]
+        synthetic = SemanticResolver().resolve(observation(evidence_kind=EvidenceKind.SYNTHETIC)).evidence[0]
+        cross_source = SemanticResolver().resolve(observation(
+            source_id=str(kernel_hash), evidence_kind=EvidenceKind.VERIFIED,
+            provenance_identity=str(provenance.identity), prepared_source_name="kernel")).evidence[0]
+        with self.assertRaises(InventoryIncomplete):
+            ledger_with(unverified).validate_complete()
+        with self.assertRaises(InventoryIncomplete):
+            ledger_with(synthetic).validate_complete()
+        with self.assertRaises(InvalidEvidence):
+            ledger_with(cross_source).validate_complete()
 
 
 if __name__ == "__main__":

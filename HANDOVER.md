@@ -9,11 +9,12 @@ Legacy scripts generate xxKSU/SuSFS patches (11 and target 51 artifacts). The V2
 - V2.1: COMPLETE: typed patch models, unified-diff parser/emitter, 16 tests.
 - V2.2: COMPLETE: provenance, hashing, cache, fetch/prepare boundary, manifests, 16 tests.
 - V2.3: COMPLETE as a policy-neutral semantic engine; 15 tests added.
-- V2.3.1: corrective implementation COMPLETE, but independent re-audit FAILED on provenance binding.
-- V2.4: NOT STARTED and not authorized.
-- Current complete V2 suite: 50 tests PASS.
+- V2.3.1: corrective implementation COMPLETE; its independent re-audit exposed remaining role/provenance defects.
+- V2.3.2: corrective implementation and fresh adversarial re-audit COMPLETE.
+- V2.4: NOT STARTED and not authorized in this checkpoint.
+- Current complete V2 suite: 53 tests PASS.
 
-The next gate is to resolve the provenance trust defect and pass an independent read-only V2.3/V2.3.1 re-audit. Do not authorize V2.4 before that gate.
+The V2.3 semantic gate is closed. V2.4 may be considered only after explicit human authorization; this checkpoint does not start or authorize it.
 
 ## Non-Negotiable Architecture
 
@@ -49,11 +50,15 @@ V2.2: `model/provenance.py`, `model/manifest.py`, `source/{hashing,identity,cach
 
 V2.3: `semantic/{model,registry,inventory,ledger}.py` provide stable IDs separate from fingerprints, traceable evidence/relationships, role-aware candidate detection/resolution, explicit mechanism taxonomy, deterministic accounting, and fatal relevant UNKNOWN. Report: `XXKSU_SUSFS_V2_3_REPORT.md`; no transformation, ABI, ownership, or complete production inventory.
 
-V2.3.1: role-aware registry matching, relationship validation, orphan evidence serialization/identity, and explicit V2.2 evidence-kind/provenance references. Report: `XXKSU_SUSFS_V2_3_1_REPORT.md`; implementation tests pass, but trust validation remains defective as described below.
+V2.3.1: role-aware registry matching, relationship validation, orphan evidence serialization/identity, and explicit V2.2 evidence-kind/provenance references. Report: `XXKSU_SUSFS_V2_3_1_REPORT.md`.
 
-## V2.3.1 Audit History
+V2.3.2: registry-wide role constraints, default-unverified observations, exact V2.2 `PreparedSource` binding, production rejection of synthetic evidence, and ledger-level trust revalidation. Report: `XXKSU_SUSFS_V2_3_2_REPORT.md`.
 
-The first independent audit found four defects: missing source-role constraints; missing `SemanticRelationship` validation; orphan evidence omitted from serialized ledger identity; and evidence identities not bound to V2.2 provenance. V2.3.1 addressed those findings. The successful post-V2.3.1 independent re-audit remains pending; the latest independent re-audit still FAILED because `CandidateObservation` defaults to `SYNTHETIC`, so an observation labeled `official_50` with an arbitrary source label can resolve without verified V2.2 provenance. No historical report is rewritten.
+## V2.3 Corrective Audit History
+
+The first independent audit found four defects: missing source-role constraints; missing `SemanticRelationship` validation; orphan evidence omitted from serialized ledger identity; and evidence identities not bound to V2.2 provenance. V2.3.1 addressed those findings, but its re-audit found incomplete role constraints and a fail-open synthetic/aggregate provenance path.
+
+V2.3.2 closes both remaining defects. Every role-sensitive registry kind now requires explicit source roles. Production evidence defaults to `UNVERIFIED`, rejects synthetic completeness, and binds to one exact V2.2 `PreparedSource`; aggregate provenance and cross-source identities fail closed. The complete 53-test suite and fresh adversarial counterexample audit pass, including relationship-evidence trust checks. Historical reports remain unchanged.
 
 ## Production Inventory Status
 
@@ -77,7 +82,7 @@ The agreed direction is continuous phased development with machine gates, critic
 
 ## Next Required Action
 
-Resolve the provenance trust defect, rerun the independent read-only V2.3/V2.3.1 audit, and only after PASS consider authorizing V2.4.
+Review the V2.3.2 checkpoint. Do not start V2.4 without explicit human authorization.
 
 ## Files Pi Must Read First
 
@@ -90,7 +95,8 @@ Resolve the provenance trust defect, rerun the independent read-only V2.3/V2.3.1
 7. `XXKSU_SUSFS_V2_3_TASK.md`
 8. `XXKSU_SUSFS_V2_3_REPORT.md`
 9. `XXKSU_SUSFS_V2_3_1_REPORT.md`
-10. `.github/scripts/v2/**` and all V2 tests
+10. `XXKSU_SUSFS_V2_3_2_REPORT.md`
+11. `.github/scripts/v2/**` and all V2 tests
 
 ## Forbidden Shortcuts
 
