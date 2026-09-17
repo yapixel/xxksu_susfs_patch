@@ -20,6 +20,21 @@ from .base import (
 from .gki_android14_6_1 import GKIAndroid14_6_1Adapter
 from .gki_android16_6_12 import GKIAndroid16_6_12Adapter
 from .sultan_android14_6_1 import SultanAndroid14_6_1Adapter
+from .fixtures import (
+    FIXED_FIXTURES,
+    ADAPTATION_PLAN_SCHEMA,
+    Placement,
+    AdaptationOperation,
+    FixtureAdaptationPlan,
+    FixtureAdaptationError,
+    IncompatibleFixtureTarget,
+    DuplicateAdaptationOperation,
+    MissingFixtureSource,
+    AmbiguousFixtureMatch,
+    FixtureContractViolation,
+    adapt_fixture_for_adapter,
+    adapt_fixtures_for_adapter,
+)
 
 
 _ADAPTER_REGISTRY: Mapping[str, Type[TargetAdapter]] = {
@@ -52,4 +67,17 @@ __all__ = [
     "GKIAndroid16_6_12Adapter",
     "SultanAndroid14_6_1Adapter",
     "get_adapter",
+    "FIXED_FIXTURES",
+    "ADAPTATION_PLAN_SCHEMA",
+    "Placement",
+    "AdaptationOperation",
+    "FixtureAdaptationPlan",
+    "FixtureAdaptationError",
+    "IncompatibleFixtureTarget",
+    "DuplicateAdaptationOperation",
+    "MissingFixtureSource",
+    "AmbiguousFixtureMatch",
+    "FixtureContractViolation",
+    "adapt_fixture_for_adapter",
+    "adapt_fixtures_for_adapter",
 ]

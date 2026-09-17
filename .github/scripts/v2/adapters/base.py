@@ -314,3 +314,15 @@ class TargetAdapter:
 
     def get_anchor_spec(self, key: str) -> AnchorSpec:
         raise KeyError(f"unknown anchor key: {key}")
+
+    def get_fixture_anchor_spec(self, fixture_name: str, operation_id: str) -> Optional[AnchorSpec]:
+        return None
+
+    def adapt_fixture(self, bundle: SourceBundle, fixture_name: str) -> Any:
+        from .fixtures import adapt_fixture_for_adapter
+        return adapt_fixture_for_adapter(self, bundle, fixture_name)
+
+    def adapt_fixtures(self, bundle: SourceBundle, fixture_names: Any = None) -> Any:
+        from .fixtures import FIXED_FIXTURES, adapt_fixtures_for_adapter
+        fnames = FIXED_FIXTURES if fixture_names is None else fixture_names
+        return adapt_fixtures_for_adapter(self, bundle, fnames)

@@ -54,3 +54,8 @@ class GKIAndroid16_6_12Adapter(TargetAdapter):
             return self._KNOWN_ANCHORS[key]
         except KeyError:
             raise KeyError(f"unknown anchor key {key!r} for adapter {self.adapter_id}")
+
+    def get_fixture_anchor_spec(self, fixture_name: str, operation_id: str) -> AnchorSpec | None:
+        if operation_id == "manual.security.bprm":
+            return self._KNOWN_ANCHORS.get("security_bprm")
+        return None

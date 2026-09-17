@@ -166,13 +166,19 @@ class SourceBundle:
             )
         return True
 
-    def with_file_content(self, path: str, content: str) -> "SourceBundle":
+    def with_file_content(self, path: str, content: str, *, update_hash: bool = False) -> "SourceBundle":
         norm = validate_relative_path(path)
         new_files = []
         found = False
+        content_bytes = content.encode("utf-8")
         for f in self.files:
             if f.path == norm:
-                new_files.append(SourceBundleFile(f.path, f.content_hash, f.size, content=content))
+                if update_hash:
+                    new_hash = HashDigest("sha256", hashlib.sha256(content_bytes).hexdigest())
+                    new_size = len(content_bytes)
+                    new_files.append(SourceBundleFile(f.path, new_hash, new_size, content=content))
+                else:
+                    new_files.append(SourceBundleFile(f.path, f.content_hash, f.size, content=content))
                 found = True
             else:
                 new_files.append(f)
@@ -185,6 +191,9 @@ class SourceBundle:
             schema=self.schema,
             metadata=self.metadata,
         )
+
+    def with_updated_file(self, path: str, content: str) -> "SourceBundle":
+        return self.with_file_content(path, content, update_hash=True)
 
 
 def create_source_bundle(
