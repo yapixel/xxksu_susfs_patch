@@ -137,6 +137,21 @@ class PolicyLedgerMismatch(ValidationError):
     pass
 
 
+class FinalConfigMismatch(ValidationError):
+    """Raised when resolved .config diverges from expected profile configuration."""
+    pass
+
+
+class KconfigConflict(FinalConfigMismatch):
+    """Raised when conflicting or mutually exclusive Kconfig options are detected."""
+    pass
+
+
+class MissingPrerequisite(ValidationError):
+    """Raised when architectural or kernel prerequisites (e.g. arm64, KALLSYMS) are unmet."""
+    pass
+
+
 @dataclass(frozen=True)
 class ValidationResult:
     validator_id: str

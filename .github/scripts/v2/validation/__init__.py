@@ -14,9 +14,12 @@ from ..model.result import (
     DoubleSideEffect,
     DoubleTransport,
     DuplicateOwner,
+    FinalConfigMismatch,
     HandlerABIConflict,
     IncompatibleOwner,
+    KconfigConflict,
     MissingAbiEvidence,
+    MissingPrerequisite,
     MissingRequiredSymbol,
     MissingSymbolEvidence,
     NoOwner,
@@ -42,6 +45,7 @@ from .abi import (
     validate_abi,
     validate_signature_against_contract,
 )
+from .config import parse_kconfig, validate_config
 from .ownership import (
     PATH_ALIASES,
     TRANSPORT_SENSITIVE_PATHS,
@@ -148,6 +152,8 @@ def validate_all(
     bundle: Optional[SourceBundle] = None,
     patch: Optional[Union[str, Patch]] = None,
     ledger: Optional[PolicyCoverageLedger] = None,
+    config: Optional[Union[str, Mapping[str, str]]] = None,
+    expected_config: Optional[Mapping[str, str]] = None,
     mode: str = "manual",
     claims: Optional[Sequence[OwnershipClaim]] = None,
     contracts_symbols: Sequence[SymbolContract] = DEFAULT_SYMBOL_CONTRACTS,
@@ -203,7 +209,17 @@ def validate_all(
         )
         results.extend(ownership_results)
 
-    # 6. Runtime required gate tracking (classified, not silently passed)
+    # 6. Final config validation
+    if config is not None and expected_config is not None:
+        config_res = validate_config(
+            expected=expected_config,
+            resolved=config,
+            mode=mode,
+            raise_on_failure=raise_on_failure,
+        )
+        results.append(config_res)
+
+    # 7. Runtime required gate tracking (classified, not silently passed)
     if runtime_probes_required:
         results.append(ValidationResult(
             validator_id="validation.runtime.probe",
@@ -233,6 +249,8 @@ __all__ = [
     "validate_ownership",
     "validate_bundle_integrity",
     "validate_ledger_integrity",
+    "validate_config",
+    "parse_kconfig",
     "validate_all",
     "validate_signature_against_contract",
     # Result models
@@ -259,6 +277,9 @@ __all__ = [
     "UndeclaredCoexistence",
     "SourceBundleIdentityMismatch",
     "PolicyLedgerMismatch",
+    "FinalConfigMismatch",
+    "KconfigConflict",
+    "MissingPrerequisite",
     # Contracts & specifications
     "SymbolContract",
     "BANNED_OFFICIAL_SYMBOLS",

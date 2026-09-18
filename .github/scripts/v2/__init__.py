@@ -13,6 +13,11 @@ from .semantic import SemanticInventory, SemanticUnit, SemanticId, SemanticFinge
 from .validation import (
     ValidationStatus, ValidationResult, ValidationReport, ValidationError,
     validate_symbols, validate_abi, validate_ownership, validate_all,
+    validate_config, parse_kconfig, FinalConfigMismatch, KconfigConflict, MissingPrerequisite,
+)
+from .profiles import (
+    ProfileDefinition, ProfileCompositionResult, compose_profile, compose_all_profiles,
+    get_profile_definition, get_profile_manifest, list_profile_definitions,
 )
 
 __all__ = ["parse_patch", "emit_patch", "load_manifest_set", "load_profile_manifest",
@@ -21,4 +26,8 @@ __all__ = ["parse_patch", "emit_patch", "load_manifest_set", "load_profile_manif
            "prepare", "fetch", "GitIdentity", "canonical_repository_url", "SemanticInventory",
            "SemanticUnit", "SemanticId", "SemanticFingerprint", "CoverageLedger", "EvidenceKind",
            "ValidationStatus", "ValidationResult", "ValidationReport", "ValidationError",
-           "validate_symbols", "validate_abi", "validate_ownership", "validate_all"]
+           "validate_symbols", "validate_abi", "validate_ownership", "validate_all",
+           "validate_config", "parse_kconfig", "FinalConfigMismatch", "KconfigConflict",
+           "MissingPrerequisite", "ProfileDefinition", "ProfileCompositionResult",
+           "compose_profile", "compose_all_profiles", "get_profile_definition",
+           "get_profile_manifest", "list_profile_definitions"]
