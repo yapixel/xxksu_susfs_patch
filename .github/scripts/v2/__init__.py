@@ -10,9 +10,15 @@ from .source.prepare import prepare
 from .source.fetch import fetch
 from .source.identity import GitIdentity, canonical_repository_url
 from .semantic import SemanticInventory, SemanticUnit, SemanticId, SemanticFingerprint, CoverageLedger, EvidenceKind
+from .validation import (
+    ValidationStatus, ValidationResult, ValidationReport, ValidationError,
+    validate_symbols, validate_abi, validate_ownership, validate_all,
+)
 
 __all__ = ["parse_patch", "emit_patch", "load_manifest_set", "load_profile_manifest",
            "load_target_manifest", "HashDigest", "InputRef", "PreparedInput", "Provenance",
            "canonical_json", "ContentAddressedCache", "hash_bytes", "hash_file", "hash_tree",
            "prepare", "fetch", "GitIdentity", "canonical_repository_url", "SemanticInventory",
-           "SemanticUnit", "SemanticId", "SemanticFingerprint", "CoverageLedger", "EvidenceKind"]
+           "SemanticUnit", "SemanticId", "SemanticFingerprint", "CoverageLedger", "EvidenceKind",
+           "ValidationStatus", "ValidationResult", "ValidationReport", "ValidationError",
+           "validate_symbols", "validate_abi", "validate_ownership", "validate_all"]
