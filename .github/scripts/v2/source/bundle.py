@@ -46,6 +46,10 @@ class DuplicateBundleFile(SourceBundleError):
 
 
 def _validate_target_version(target_id: str, kernel_version: str) -> None:
+    if target_id == "xxksu":
+        if not kernel_version or not isinstance(kernel_version, str):
+            raise UnsupportedKernelVersion("kernel version must be a non-empty string")
+        return
     if target_id not in KNOWN_TARGETS:
         raise UnsupportedTarget(f"unknown or unsupported target: {target_id}")
     if not kernel_version or not isinstance(kernel_version, str):

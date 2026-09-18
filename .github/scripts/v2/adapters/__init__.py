@@ -35,12 +35,20 @@ from .fixtures import (
     adapt_fixture_for_adapter,
     adapt_fixtures_for_adapter,
 )
+from .xxksu import (
+    XxksuAdapter,
+    build_xxksu_adaptation_plan,
+    apply_patch11_to_bundle,
+    generate_patch11,
+    get_xxksu_adapter,
+)
 
 
 _ADAPTER_REGISTRY: Mapping[str, Type[TargetAdapter]] = {
     "gki-android14-6.1": GKIAndroid14_6_1Adapter,
     "gki-android16-6.12": GKIAndroid16_6_12Adapter,
     "sultan-android14-6.1": SultanAndroid14_6_1Adapter,
+    "xxksu": XxksuAdapter,
 }
 
 
@@ -80,4 +88,9 @@ __all__ = [
     "FixtureContractViolation",
     "adapt_fixture_for_adapter",
     "adapt_fixtures_for_adapter",
+    "XxksuAdapter",
+    "build_xxksu_adaptation_plan",
+    "apply_patch11_to_bundle",
+    "generate_patch11",
+    "get_xxksu_adapter",
 ]
