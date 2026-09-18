@@ -19,6 +19,11 @@ from .profiles import (
     ProfileDefinition, ProfileCompositionResult, compose_profile, compose_all_profiles,
     get_profile_definition, get_profile_manifest, list_profile_definitions,
 )
+from .build import (
+    BuildPlan, BuildToolchainSpec, BuildStatus, BuildResult,
+    create_build_plan, create_all_canonical_plans, export_ci_matrix,
+    execute_dry_run, execute_all_dry_runs, FailureCategory, classify_failure,
+)
 
 __all__ = ["parse_patch", "emit_patch", "load_manifest_set", "load_profile_manifest",
            "load_target_manifest", "HashDigest", "InputRef", "PreparedInput", "Provenance",
@@ -30,4 +35,7 @@ __all__ = ["parse_patch", "emit_patch", "load_manifest_set", "load_profile_manif
            "validate_config", "parse_kconfig", "FinalConfigMismatch", "KconfigConflict",
            "MissingPrerequisite", "ProfileDefinition", "ProfileCompositionResult",
            "compose_profile", "compose_all_profiles", "get_profile_definition",
-           "get_profile_manifest", "list_profile_definitions"]
+           "get_profile_manifest", "list_profile_definitions",
+           "BuildPlan", "BuildToolchainSpec", "BuildStatus", "BuildResult",
+           "create_build_plan", "create_all_canonical_plans", "export_ci_matrix",
+           "execute_dry_run", "execute_all_dry_runs", "FailureCategory", "classify_failure"]

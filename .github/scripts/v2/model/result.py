@@ -152,6 +152,11 @@ class MissingPrerequisite(ValidationError):
     pass
 
 
+class BuildFailure(ValidationError):
+    """Raised when kernel build orchestration, planning, or compilation fails."""
+    pass
+
+
 @dataclass(frozen=True)
 class ValidationResult:
     validator_id: str

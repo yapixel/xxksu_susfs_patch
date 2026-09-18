@@ -11,6 +11,7 @@ from ..model.result import (
     AbiLinkageConflict,
     AbiSignatureMismatch,
     AmbiguousAbiMapping,
+    BuildFailure,
     DoubleSideEffect,
     DoubleTransport,
     DuplicateOwner,
@@ -242,6 +243,12 @@ def validate_all(
     return report
 
 
+from .build import (
+    validate_build_plan,
+    validate_build_result,
+    validate_plan_isolation,
+)
+
 __all__ = [
     # Facade functions
     "validate_symbols",
@@ -253,6 +260,9 @@ __all__ = [
     "parse_kconfig",
     "validate_all",
     "validate_signature_against_contract",
+    "validate_build_plan",
+    "validate_build_result",
+    "validate_plan_isolation",
     # Result models
     "ValidationStatus",
     "ValidationResult",
@@ -280,6 +290,7 @@ __all__ = [
     "FinalConfigMismatch",
     "KconfigConflict",
     "MissingPrerequisite",
+    "BuildFailure",
     # Contracts & specifications
     "SymbolContract",
     "BANNED_OFFICIAL_SYMBOLS",
