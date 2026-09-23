@@ -1,0 +1,76 @@
+{
+  "blocker_reason": "Upstream r58 archive preimage divergence against stored patch-51; synthetic fixtures cannot establish production authority; baseline reconstruction from patch context forbidden",
+  "fixtures": {
+    "manual-security-hooks-v2.0.patch": "sha256:183f5bc323ad9e8b4b3dc874b7b52761c94187656a51d3d7cb5832d908370934",
+    "scope-min-manual-hooks-v2.3.patch": "sha256:2168daaed174a4e64dc133bca7c39c49a75bb9e2fcc62df726e1b66604368c72"
+  },
+  "kernel_version": "6.12",
+  "patch_51": {
+    "patch_file": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_gki-android16-6.12.patch",
+    "patch_sha256": "sha256:194421dcf350b9755197e3b4921c3c148d56c23b64b1d497868aff598be90a7c",
+    "strict_apply": "FAILED_PREIMAGE_MISMATCH"
+  },
+  "retained_file_hashes": {
+    "divergence_report": {
+      "drivers/input/input.c": {
+        "archive_actual": "c51858f1cdc556939c2ee1bd21669c71c169d84e",
+        "match": false,
+        "patch_expected": "78be582b5766"
+      },
+      "fs/namei.c": {
+        "archive_actual": "ce03b3d91",
+        "match": false,
+        "patch_expected": "bdc243fc4"
+      },
+      "fs/namespace.c": {
+        "archive_actual": "100f5e7bc",
+        "match": false,
+        "patch_expected": "6739e1c04"
+      },
+      "fs/notify/fdinfo.c": {
+        "archive_actual": "e933f9c65",
+        "match": false,
+        "patch_expected": "d2aa8985c"
+      },
+      "fs/proc/task_mmu.c": {
+        "archive_actual": "41c179ff5",
+        "match": false,
+        "patch_expected": "7cd33b742"
+      },
+      "kernel/sys.c": {
+        "archive_actual": "4a87dc5fa",
+        "match": false,
+        "patch_expected": "1a154c425"
+      },
+      "mm/memory.c": {
+        "archive_actual": "353e4e8ae",
+        "match": false,
+        "patch_expected": "8db0f2a1a"
+      }
+    }
+  },
+  "schema": "xxksu-susfs-baseline/v1",
+  "source_bundle": {
+    "reason": "Production authority blocked pending uncorrupted patch-51 matching upstream 6.12 archive",
+    "status": "BLOCKED"
+  },
+  "status": "BLOCKED",
+  "susfs": {
+    "patch_50": "50_add_susfs_in_gki-android16-6.12.patch",
+    "ref": "gki-android16-6.12",
+    "repository": "https://gitlab.com/simonpunk/susfs4ksu",
+    "resolved_commit": "698aa6a4ddca6fa5359871daf13f93583fb8282a"
+  },
+  "target_id": "gki-android16-6.12",
+  "upstream": {
+    "archive_sha256": "fe0a86b314670cbda98342446ef916121ca3175fa880f492d8bdaacdba2f0d8b",
+    "historical_archive_url": "https://github.com/yapixel/gki-build-assets/releases/download/android16-6.12-2025-06_r58/common-android16-6.12-2025-06_r58.tar.gz",
+    "ref": "android16-6.12",
+    "repository": "https://android.googlesource.com/kernel/common",
+    "resolved_commit": "c8909f7cf1380810b285cbeee347dd01a8c9ec5c"
+  },
+  "validation_results": {
+    "gki-android16-6.12-lsm_bl": "BLOCKED",
+    "gki-android16-6.12-manual": "BLOCKED"
+  }
+}

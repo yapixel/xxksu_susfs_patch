@@ -1,0 +1,62 @@
+{
+  "fixtures": {
+    "manual-security-hooks-v2.0.patch": "sha256:183f5bc323ad9e8b4b3dc874b7b52761c94187656a51d3d7cb5832d908370934",
+    "scope-min-manual-hooks-v2.3.patch": "sha256:2168daaed174a4e64dc133bca7c39c49a75bb9e2fcc62df726e1b66604368c72"
+  },
+  "kernel_version": "6.1",
+  "patch_51": {
+    "patch_file": "patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch",
+    "patch_sha256": "sha256:d862ca5fefb680743d9271850bf0b9da83124db7c0c8dba49038853f0bcf4ae5",
+    "strict_apply": "PASS"
+  },
+  "retained_file_hashes": {
+    "drivers/input/input.c": "sha256:7abd1f9538b70f28f8ab4b2235ac12358ded477e9005aa151b19da3784312022",
+    "fs/Makefile": "sha256:bcbf1ceefdb1ba673fab8830a4ac7b7a8715415a171461e34fdcc3c7e45959b7",
+    "fs/exec.c": "sha256:605093c0e50d47ced04d819a742341a260ed5664b2718ab06e0764b7934b5f70",
+    "fs/namei.c": "sha256:1a669778d8a4b2738f2313f9cdc0c07db842353c24be7c98feacd9650fccee1e",
+    "fs/namespace.c": "sha256:bf9e20020ac8268104bb9cdbb2a6640a64ebc9f47e7cafc88199e707b750908f",
+    "fs/notify/fdinfo.c": "sha256:7ede5c377c451a07a09cfcf80bee5e588d2c05eab93a1326a10c18e0b1eb33be",
+    "fs/open.c": "sha256:5a8e10c93fbdea50ab8b0f428ea8541ac69579e2762a077c21cc4f34a62e9591",
+    "fs/proc/base.c": "sha256:66a7887a2afc7511b2fa9b9a087f166d4502bfe5d94e5f05beb5171d701344e6",
+    "fs/proc/bootconfig.c": "sha256:e1cc73c3160f7a80afb85f9da6aaa6aca898c97bf6f2155d17b897421faba811",
+    "fs/proc/fd.c": "sha256:39d1faa4f3555d804a877666da63511af39d7a0ca928b0769f9293a021496d29",
+    "fs/proc/task_mmu.c": "sha256:07b1f9fe5c623b00af82357b1d678bd1155338ece07e2a3dcc9fb482fcba38eb",
+    "fs/proc_namespace.c": "sha256:6c5decc8766fbf015a090a828a70b7cf0ffbc7948ef30059b010b43e83b607a3",
+    "fs/readdir.c": "sha256:d23cf50d782112337cf11c3d74c9d1b73c0a36a50da5316fa337b5f6b1432880",
+    "fs/stat.c": "sha256:42518bc30ac17bd3c9d177a76fe5266c3e8ab7822459adf9581b5bfbf20f48dc",
+    "fs/statfs.c": "sha256:100e9195fd0654480062620b018a9a2cdfb5106ab61207e1a8205ee85d6028f8",
+    "fs/susfs.c": "sha256:c556c644dcb345bbe7814812c6ff084e22762d4d0381c8ee331ada1b25cd6770",
+    "include/linux/susfs.h": "sha256:05d4ec96ba75d459612d6269614bc7e1948c4e7b1ecd4dfaf47fbd4ec4a3fcfb",
+    "kernel/kallsyms.c": "sha256:e9126cbecfc154849b404b3d4942925c22575af8f3776b4dc4472c25239c40a5",
+    "kernel/reboot.c": "sha256:2ac6cc43f7b33f0153b031e441de7aa126c1c89936c544226fe8706fcb01913a",
+    "kernel/sys.c": "sha256:274c7f7d945eb91b34421732420641e9ed511f173ffc08847f4b43400feb03a3",
+    "mm/memory.c": "sha256:c74fae2de00f36b03795fdd1d0b9593be8e4b06fdabbbce020f50a5e16bd2474",
+    "security/security.c": "sha256:4fab84c846993279824491709105bf8294fa3771e75cb1adf373f6191dec2ff7"
+  },
+  "schema": "xxksu-susfs-baseline/v1",
+  "source_bundle": {
+    "artifact_path": ".github/fixtures/v2/v29-baselines/sultan-android14-6.1.json",
+    "file_count": 22,
+    "identity": "sha256:d18baa4ef68952ecef11f689e9af0f0a848cc84d3d54a5e5437bc96f06f831f2",
+    "schema": "xxksu-susfs-source-bundle/v1"
+  },
+  "status": "VERIFIED",
+  "susfs": {
+    "patch_50": "50_add_susfs_in_gki-android14-6.1.patch",
+    "ref": "sultan-shiba-susfs-minimal",
+    "repository": "https://gitlab.com/simonpunk/susfs4ksu",
+    "resolved_commit": "7fd1da8e0cc8d1b572c97c5fe4a27d0ec6e3e2f1"
+  },
+  "target_id": "sultan-android14-6.1",
+  "upstream": {
+    "archive_sha256": "a029eeff4237ceb7092a3699d5a944c6e4e68f1b89fbb38c5f2d7b5ff3570895",
+    "archive_url": "https://github.com/kerneltoast/android_kernel_google_tensynos/archive/af5c65b9547a9f33c5f566430d0434aecab5a8b5.tar.gz",
+    "ref": "16.0.0-sultan",
+    "repository": "https://github.com/kerneltoast/android_kernel_google_tensynos",
+    "resolved_commit": "af5c65b9547a9f33c5f566430d0434aecab5a8b5"
+  },
+  "validation_results": {
+    "sultan-android14-6.1-lsm_bl": "PASS",
+    "sultan-android14-6.1-manual": "PASS"
+  }
+}

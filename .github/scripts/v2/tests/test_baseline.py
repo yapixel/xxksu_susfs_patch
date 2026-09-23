@@ -1,0 +1,156 @@
+"""Unit and verification tests for V2 authoritative baseline records."""
+
+from __future__ import annotations
+
+import copy
+import json
+from pathlib import Path
+import unittest
+
+from v2.model.manifest import KNOWN_TARGETS, MANUAL_FIXTURES
+from v2.model.provenance import HashDigest
+from v2.model.result import ValidationStatus
+from v2.profiles.matrix import get_profile_definition
+from v2.source.baseline import (
+    BASELINE_SCHEMA,
+    BaselineRecord,
+    InvalidBaselineContract,
+    UnsupportedBaselineSchema,
+    get_baseline_path,
+    load_authoritative_bundle,
+    load_baseline_record,
+)
+from v2.source.bundle import SourceBundle
+from v2.source.hashing import hash_file
+from v2.source.patch_apply import apply_patch_to_bundle
+from v2.validation import validate_all
+
+REPO_ROOT = Path(__file__).resolve().parents[4]
+
+
+class BaselineRecordContractTests(unittest.TestCase):
+    """Verify strict validation and fail-closed behavior of BaselineRecord."""
+
+    def setUp(self) -> None:
+        self.sultan_path = get_baseline_path("sultan-android14-6.1", REPO_ROOT)
+        self.gki_path = get_baseline_path("gki-android16-6.12", REPO_ROOT)
+
+    def test_both_baseline_files_exist(self) -> None:
+        self.assertTrue(self.sultan_path.is_file(), f"missing {self.sultan_path}")
+        self.assertTrue(self.gki_path.is_file(), f"missing {self.gki_path}")
+
+    def test_sultan_baseline_record_validates(self) -> None:
+        record = load_baseline_record(self.sultan_path)
+        self.assertEqual(record.schema, BASELINE_SCHEMA)
+        self.assertEqual(record.target_id, "sultan-android14-6.1")
+        self.assertEqual(record.kernel_version, "6.1")
+        self.assertEqual(record.status, "VERIFIED")
+        self.assertEqual(record.upstream["resolved_commit"], "af5c65b9547a9f33c5f566430d0434aecab5a8b5")
+        self.assertEqual(record.susfs["resolved_commit"], "7fd1da8e0cc8d1b572c97c5fe4a27d0ec6e3e2f1")
+        self.assertEqual(record.validation_results["sultan-android14-6.1-manual"], "PASS")
+        self.assertEqual(record.validation_results["sultan-android14-6.1-lsm_bl"], "PASS")
+        self.assertIsInstance(record.identity, HashDigest)
+
+    def test_gki_baseline_record_validates_as_blocked(self) -> None:
+        record = load_baseline_record(self.gki_path)
+        self.assertEqual(record.schema, BASELINE_SCHEMA)
+        self.assertEqual(record.target_id, "gki-android16-6.12")
+        self.assertEqual(record.kernel_version, "6.12")
+        self.assertEqual(record.status, "BLOCKED")
+        self.assertIsNotNone(record.blocker_reason)
+        self.assertEqual(record.validation_results["gki-android16-6.12-manual"], "BLOCKED")
+        self.assertEqual(record.validation_results["gki-android16-6.12-lsm_bl"], "BLOCKED")
+        self.assertIsInstance(record.identity, HashDigest)
+
+    def test_invalid_schema_fails_closed(self) -> None:
+        raw = json.loads(self.sultan_path.read_text(encoding="utf-8"))
+        raw["schema"] = "invalid/v99"
+        with self.assertRaises(UnsupportedBaselineSchema):
+            load_baseline_record(raw)
+
+    def test_retired_target_fails_closed(self) -> None:
+        raw = json.loads(self.sultan_path.read_text(encoding="utf-8"))
+        raw["target_id"] = "gki-android14-6.1"
+        with self.assertRaises(InvalidBaselineContract):
+            load_baseline_record(raw)
+
+    def test_verified_record_without_archive_sha_fails_closed(self) -> None:
+        raw = json.loads(self.sultan_path.read_text(encoding="utf-8"))
+        del raw["upstream"]["archive_sha256"]
+        with self.assertRaises(InvalidBaselineContract):
+            load_baseline_record(raw)
+
+    def test_verified_record_without_bundle_identity_fails_closed(self) -> None:
+        raw = json.loads(self.sultan_path.read_text(encoding="utf-8"))
+        raw["source_bundle"]["identity"] = None
+        with self.assertRaises(InvalidBaselineContract):
+            load_baseline_record(raw)
+
+    def test_blocked_record_without_reason_fails_closed(self) -> None:
+        raw = json.loads(self.gki_path.read_text(encoding="utf-8"))
+        raw["blocker_reason"] = None
+        with self.assertRaises(InvalidBaselineContract):
+            load_baseline_record(raw)
+
+    def test_missing_fixture_fails_closed(self) -> None:
+        raw = json.loads(self.sultan_path.read_text(encoding="utf-8"))
+        raw["fixtures"] = {}
+        with self.assertRaises(InvalidBaselineContract):
+            load_baseline_record(raw)
+
+
+class AuthoritativeBundleVerificationTests(unittest.TestCase):
+    """Verify loading and quality-gate verification of authoritative bundles."""
+
+    def test_gki_authoritative_bundle_is_none(self) -> None:
+        bundle = load_authoritative_bundle("gki-android16-6.12", REPO_ROOT)
+        self.assertIsNone(bundle, "GKI 6.12 authoritative bundle must be None while blocked")
+
+    def test_sultan_authoritative_bundle_loads(self) -> None:
+        bundle = load_authoritative_bundle("sultan-android14-6.1", REPO_ROOT)
+        self.assertIsNotNone(bundle)
+        self.assertIsInstance(bundle, SourceBundle)
+        self.assertEqual(bundle.target_id, "sultan-android14-6.1")
+        self.assertEqual(bundle.kernel_version, "6.1.25")
+        self.assertEqual(len(bundle.files), 22)
+
+    def test_sultan_patch_51_strict_application_succeeds(self) -> None:
+        bundle = load_authoritative_bundle("sultan-android14-6.1", REPO_ROOT)
+        patch_path = REPO_ROOT / "patches" / "sultan-android14-6.1" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
+        patch_text = patch_path.read_text(encoding="utf-8")
+        patched = apply_patch_to_bundle(bundle, patch_text)
+        self.assertIsInstance(patched, SourceBundle)
+        self.assertEqual(len(patched.files), 22)
+
+    def test_sultan_both_profiles_validate_positive(self) -> None:
+        bundle = load_authoritative_bundle("sultan-android14-6.1", REPO_ROOT)
+        patch_path = REPO_ROOT / "patches" / "sultan-android14-6.1" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
+        patch_text = patch_path.read_text(encoding="utf-8")
+        patched = apply_patch_to_bundle(bundle, patch_text)
+
+        # 1. Manual profile
+        prof_manual = get_profile_definition("sultan-android14-6.1-manual")
+        adapter = prof_manual.get_adapter()
+        plan = adapter.adapt_fixtures(patched, prof_manual.fixtures)
+        composed_manual = plan.apply_to_bundle(patched)
+        report_manual = validate_all(
+            bundle=composed_manual,
+            mode="manual",
+            claims=prof_manual.get_ownership_claims(),
+            raise_on_failure=True,
+        )
+        self.assertEqual(report_manual.status, ValidationStatus.PASS)
+
+        # 2. LSM_BL profile
+        prof_lsm = get_profile_definition("sultan-android14-6.1-lsm_bl")
+        report_lsm = validate_all(
+            bundle=patched,
+            mode="lsm_bl",
+            claims=prof_lsm.get_ownership_claims(),
+            raise_on_failure=True,
+        )
+        self.assertEqual(report_lsm.status, ValidationStatus.PASS)
+
+
+if __name__ == "__main__":
+    unittest.main()
