@@ -11,7 +11,7 @@ _TARGET_DATA = {
     "gki-android16-6.12": {
         "kernel": ("https://android.googlesource.com/kernel/common", "android16-6.12"),
         "susfs50": ("https://gitlab.com/simonpunk/susfs4ksu", "gki-android16-6.12"),
-        "susfs50_commit": "698aa6a4ddca6fa5359871daf13f93583fb8282a",
+        "susfs50_commit": "c8f64e41e3dea2cd44754d7472d3cd0bc0b40784",
     },
     "sultan-android14-6.1": {
         "kernel": ("https://github.com/kerneltoast/android_kernel_google_tensynos", "16.0.0-sultan"),
