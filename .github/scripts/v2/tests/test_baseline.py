@@ -51,15 +51,16 @@ class BaselineRecordContractTests(unittest.TestCase):
         self.assertEqual(record.validation_results["sultan-android14-6.1-lsm_bl"], "PASS")
         self.assertIsInstance(record.identity, HashDigest)
 
-    def test_gki_baseline_record_validates_as_blocked(self) -> None:
+    def test_gki_baseline_record_validates(self) -> None:
         record = load_baseline_record(self.gki_path)
         self.assertEqual(record.schema, BASELINE_SCHEMA)
         self.assertEqual(record.target_id, "gki-android16-6.12")
         self.assertEqual(record.kernel_version, "6.12")
-        self.assertEqual(record.status, "BLOCKED")
-        self.assertIsNotNone(record.blocker_reason)
-        self.assertEqual(record.validation_results["gki-android16-6.12-manual"], "BLOCKED")
-        self.assertEqual(record.validation_results["gki-android16-6.12-lsm_bl"], "BLOCKED")
+        self.assertEqual(record.status, "VERIFIED")
+        self.assertEqual(record.upstream["resolved_commit"], "c8909f7cf1380810b285cbeee347dd01a8c9ec5c")
+        self.assertEqual(record.susfs["resolved_commit"], "c8f64e41e3dea2cd44754d7472d3cd0bc0b40784")
+        self.assertEqual(record.validation_results["gki-android16-6.12-manual"], "PASS")
+        self.assertEqual(record.validation_results["gki-android16-6.12-lsm_bl"], "PASS")
         self.assertIsInstance(record.identity, HashDigest)
 
     def test_invalid_schema_fails_closed(self) -> None:
@@ -87,8 +88,13 @@ class BaselineRecordContractTests(unittest.TestCase):
             load_baseline_record(raw)
 
     def test_blocked_record_without_reason_fails_closed(self) -> None:
-        raw = json.loads(self.gki_path.read_text(encoding="utf-8"))
+        raw = json.loads(self.sultan_path.read_text(encoding="utf-8"))
+        raw["status"] = "BLOCKED"
         raw["blocker_reason"] = None
+        raw["validation_results"] = {
+            "sultan-android14-6.1-manual": "BLOCKED",
+            "sultan-android14-6.1-lsm_bl": "BLOCKED",
+        }
         with self.assertRaises(InvalidBaselineContract):
             load_baseline_record(raw)
 
@@ -102,9 +108,51 @@ class BaselineRecordContractTests(unittest.TestCase):
 class AuthoritativeBundleVerificationTests(unittest.TestCase):
     """Verify loading and quality-gate verification of authoritative bundles."""
 
-    def test_gki_authoritative_bundle_is_none(self) -> None:
+    def test_gki_authoritative_bundle_loads(self) -> None:
         bundle = load_authoritative_bundle("gki-android16-6.12", REPO_ROOT)
-        self.assertIsNone(bundle, "GKI 6.12 authoritative bundle must be None while blocked")
+        self.assertIsNotNone(bundle)
+        self.assertIsInstance(bundle, SourceBundle)
+        self.assertEqual(bundle.target_id, "gki-android16-6.12")
+        self.assertEqual(bundle.kernel_version, "6.12")
+        self.assertEqual(len(bundle.files), 22)
+
+    def test_gki_patch_51_strict_application_succeeds(self) -> None:
+        bundle = load_authoritative_bundle("gki-android16-6.12", REPO_ROOT)
+        patch_path = REPO_ROOT / "patches" / "gki-android16-6.12" / "51_deinlined_susfs_hooks_gki-android16-6.12.patch"
+        patch_text = patch_path.read_text(encoding="utf-8")
+        patched = apply_patch_to_bundle(bundle, patch_text)
+        self.assertIsInstance(patched, SourceBundle)
+        self.assertEqual(len(patched.files), 22)
+
+    def test_gki_both_profiles_validate_positive(self) -> None:
+        bundle = load_authoritative_bundle("gki-android16-6.12", REPO_ROOT)
+        patch_path = REPO_ROOT / "patches" / "gki-android16-6.12" / "51_deinlined_susfs_hooks_gki-android16-6.12.patch"
+        patch_text = patch_path.read_text(encoding="utf-8")
+        patched = apply_patch_to_bundle(bundle, patch_text)
+
+        # 1. Manual profile
+        prof_manual = get_profile_definition("gki-android16-6.12-manual")
+        adapter = prof_manual.get_adapter()
+        plan = adapter.adapt_fixtures(patched, prof_manual.fixtures)
+        composed_manual = plan.apply_to_bundle(patched)
+        report_manual = validate_all(
+            bundle=composed_manual,
+            mode="manual",
+            claims=prof_manual.get_ownership_claims(),
+            raise_on_failure=True,
+        )
+        self.assertEqual(report_manual.status, ValidationStatus.PASS)
+
+        # 2. LSM_BL profile
+        prof_lsm = get_profile_definition("gki-android16-6.12-lsm_bl")
+        report_lsm = validate_all(
+            bundle=patched,
+            mode="lsm_bl",
+            claims=prof_lsm.get_ownership_claims(),
+            raise_on_failure=True,
+        )
+        self.assertEqual(report_lsm.status, ValidationStatus.PASS)
+
 
     def test_sultan_authoritative_bundle_loads(self) -> None:
         bundle = load_authoritative_bundle("sultan-android14-6.1", REPO_ROOT)

@@ -1,5 +1,4 @@
 {
-  "blocker_reason": "Upstream r58 archive preimage divergence against stored patch-51; synthetic fixtures cannot establish production authority; baseline reconstruction from patch context forbidden",
   "fixtures": {
     "manual-security-hooks-v2.0.patch": "sha256:183f5bc323ad9e8b4b3dc874b7b52761c94187656a51d3d7cb5832d908370934",
     "scope-min-manual-hooks-v2.3.patch": "sha256:2168daaed174a4e64dc133bca7c39c49a75bb9e2fcc62df726e1b66604368c72"
@@ -7,70 +6,58 @@
   "kernel_version": "6.12",
   "patch_51": {
     "patch_file": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_gki-android16-6.12.patch",
-    "patch_sha256": "sha256:194421dcf350b9755197e3b4921c3c148d56c23b64b1d497868aff598be90a7c",
-    "strict_apply": "FAILED_PREIMAGE_MISMATCH"
+    "patch_sha256": "sha256:563a7650efb2e44bcb6b8da95076f79098d00c94511ed25bf70952e7af5bc2f6",
+    "strict_apply": "PASS"
   },
   "retained_file_hashes": {
-    "divergence_report": {
-      "drivers/input/input.c": {
-        "archive_actual": "c51858f1cdc556939c2ee1bd21669c71c169d84e",
-        "match": false,
-        "patch_expected": "78be582b5766"
-      },
-      "fs/namei.c": {
-        "archive_actual": "ce03b3d91",
-        "match": false,
-        "patch_expected": "bdc243fc4"
-      },
-      "fs/namespace.c": {
-        "archive_actual": "100f5e7bc",
-        "match": false,
-        "patch_expected": "6739e1c04"
-      },
-      "fs/notify/fdinfo.c": {
-        "archive_actual": "e933f9c65",
-        "match": false,
-        "patch_expected": "d2aa8985c"
-      },
-      "fs/proc/task_mmu.c": {
-        "archive_actual": "41c179ff5",
-        "match": false,
-        "patch_expected": "7cd33b742"
-      },
-      "kernel/sys.c": {
-        "archive_actual": "4a87dc5fa",
-        "match": false,
-        "patch_expected": "1a154c425"
-      },
-      "mm/memory.c": {
-        "archive_actual": "353e4e8ae",
-        "match": false,
-        "patch_expected": "8db0f2a1a"
-      }
-    }
+    "drivers/input/input.c": "sha256:117d587a0fa0cbbe30e104602ff3e5eecd4c7a9263bb5fbaf2d4915441b36036",
+    "fs/Makefile": "sha256:ecf3e37cca0203de36a13719098fed0cd69537e24972daf5fa45d70521b9f176",
+    "fs/exec.c": "sha256:1f3a1ba299229052290230ae095182d108679b3d6d7bcf0d6ac56c6b4dad2ee3",
+    "fs/namei.c": "sha256:67d14148272210e960ec9a89c8651a19d0f61252afa8f294a7c91fd5c5d16024",
+    "fs/namespace.c": "sha256:ca1f76aa81143b8671322c9b7587a314c366fd7486b9708fb8740142b0bbaf64",
+    "fs/notify/fdinfo.c": "sha256:ebdd4a78bc5d38750a8999b43634e9b4c7d3ae9eb3e9f19b5d9fc16fc9aa8920",
+    "fs/open.c": "sha256:6c444d668794cdea5b842bab2283d6fbe55112687bf49f3bd63808df041695fc",
+    "fs/proc/base.c": "sha256:c60b5dea4017b7a92fb49ef7e0e36073826d441b258480a0981194b6bf40d7f2",
+    "fs/proc/bootconfig.c": "sha256:506f440d9f763bb43db8b44de37629a924ceaaec9da8ea650af1e5dce4f04303",
+    "fs/proc/fd.c": "sha256:72d4ce6b4cfef31b7366baf467c42f363b86e1bc0e55e443c178584cf68534ef",
+    "fs/proc/task_mmu.c": "sha256:8dda27aa1bc57cd3fee69b0b6478a20790388d190140a016db7abc9fa9dbb75b",
+    "fs/proc_namespace.c": "sha256:539bd283ab8bd351b32db51e21cfe6abaad6e6e4a5c2de34f3cac016aec9410c",
+    "fs/readdir.c": "sha256:6985af5159f094beab3d8c9c8ca870fd67907596a415230eb9b09b062bb17b56",
+    "fs/stat.c": "sha256:53cafc68502adbf426a7d38827bbb52e0cb4b57c0cc772a759073706964fb587",
+    "fs/statfs.c": "sha256:4ec54edbf4ba35ddb30ab3329711cc1c0a2911d01671b0605b3866e861037c3f",
+    "fs/susfs.c": "sha256:dd1487860b673b1a57a171577a7e7b2fcc58b8b46f8018a68180a2ec97acc938",
+    "include/linux/susfs.h": "sha256:e755bf34538b8f2eec1e401d2d6b18811d82931770f56cf98448eaad5757cb79",
+    "kernel/kallsyms.c": "sha256:5778a736c4ea840bde420a2aa8b63566500b8b15d650d518ef56657488ef5529",
+    "kernel/reboot.c": "sha256:24a9631059d666b1cb8f8c03d0691f817eff74a2308ee6775f1cc2852c977f94",
+    "kernel/sys.c": "sha256:7494b9bf3987a29b510947531db0d7a2e35e916cb1814ad4ff139e5ed2ee8868",
+    "mm/memory.c": "sha256:a09e0e38e140c61eebdb61be5257ae77919a916647f3ee0ca9af6d05270d4cbc",
+    "security/security.c": "sha256:09e6dc9b2ff7732c93efe0b52b313bc40c05aad229ef48a9896ced7c91b030d1"
   },
   "schema": "xxksu-susfs-baseline/v1",
   "source_bundle": {
-    "reason": "Production authority blocked pending uncorrupted patch-51 matching upstream 6.12 archive",
-    "status": "BLOCKED"
+    "artifact_path": ".github/fixtures/v2/v29-baselines/gki-android16-6.12.json",
+    "file_count": 22,
+    "identity": "sha256:b29c4eff277bdd0ea2422f96ac90f7fe931ca3f390c2fcc3f4ac55f90bad7cb9",
+    "schema": "xxksu-susfs-source-bundle/v1"
   },
-  "status": "BLOCKED",
+  "status": "VERIFIED",
   "susfs": {
     "patch_50": "50_add_susfs_in_gki-android16-6.12.patch",
     "ref": "gki-android16-6.12",
     "repository": "https://gitlab.com/simonpunk/susfs4ksu",
-    "resolved_commit": "698aa6a4ddca6fa5359871daf13f93583fb8282a"
+    "resolved_commit": "c8f64e41e3dea2cd44754d7472d3cd0bc0b40784"
   },
   "target_id": "gki-android16-6.12",
   "upstream": {
-    "archive_sha256": "fe0a86b314670cbda98342446ef916121ca3175fa880f492d8bdaacdba2f0d8b",
-    "historical_archive_url": "https://github.com/yapixel/gki-build-assets/releases/download/android16-6.12-2025-06_r58/common-android16-6.12-2025-06_r58.tar.gz",
+    "archive_sha256": "a06d5a7505fe5437ee7fcec0b07e62fb725c689579bbc4d4ec51d68060971e97",
+    "archive_url": "https://android.googlesource.com/kernel/common/+archive/c8909f7cf1380810b285cbeee347dd01a8c9ec5c.tar.gz",
     "ref": "android16-6.12",
     "repository": "https://android.googlesource.com/kernel/common",
-    "resolved_commit": "c8909f7cf1380810b285cbeee347dd01a8c9ec5c"
+    "resolved_commit": "c8909f7cf1380810b285cbeee347dd01a8c9ec5c",
+    "tree": "4ce1cd677e86aed8188e040fcd2971a95b1cd5f4"
   },
   "validation_results": {
-    "gki-android16-6.12-lsm_bl": "BLOCKED",
-    "gki-android16-6.12-manual": "BLOCKED"
+    "gki-android16-6.12-lsm_bl": "PASS",
+    "gki-android16-6.12-manual": "PASS"
   }
 }
