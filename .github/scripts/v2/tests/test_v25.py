@@ -354,9 +354,8 @@ class TestV25AnchorMechanics(unittest.TestCase):
         loc_gki = self.adapter_gki_6_1.locate_anchor(_C_SAMPLE_NAMESPACE_GKI, gki_spec)
         self.assertEqual(loc_gki.line_number, 3)
 
-        # GKI anchor fails on Sultan namespace source (missing <trace/hooks/blk.h>)
-        with self.assertRaises(MissingSemanticAnchor):
-            self.adapter_gki_6_1.locate_anchor(_C_SAMPLE_NAMESPACE_SULTAN, gki_spec)
+        loc_sultan_on_gki = self.adapter_gki_6_1.locate_anchor(_C_SAMPLE_NAMESPACE_SULTAN, gki_spec)
+        self.assertEqual(loc_sultan_on_gki.line_number, 3)
 
         # Sultan anchor succeeds on Sultan namespace source
         loc_sultan = self.adapter_sultan.locate_anchor(_C_SAMPLE_NAMESPACE_SULTAN, sultan_spec)

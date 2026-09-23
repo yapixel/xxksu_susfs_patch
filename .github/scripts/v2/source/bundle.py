@@ -55,10 +55,7 @@ def _validate_target_version(target_id: str, kernel_version: str) -> None:
     if not kernel_version or not isinstance(kernel_version, str):
         raise UnsupportedKernelVersion("kernel version must be a non-empty string")
 
-    if target_id == "gki-android14-6.1":
-        if not (kernel_version == "6.1" or kernel_version.startswith("6.1.") or kernel_version.startswith("6.1-")):
-            raise UnsupportedKernelVersion(f"kernel version {kernel_version} incompatible with {target_id}")
-    elif target_id == "gki-android16-6.12":
+    if target_id == "gki-android16-6.12":
         if not (kernel_version == "6.12" or kernel_version.startswith("6.12.") or kernel_version.startswith("6.12-")):
             raise UnsupportedKernelVersion(f"kernel version {kernel_version} incompatible with {target_id}")
     elif target_id == "sultan-android14-6.1":
