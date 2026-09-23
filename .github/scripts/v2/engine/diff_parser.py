@@ -176,6 +176,8 @@ def parse_patch(text: str) -> Patch:
                 if current_hunk is None or not current_hunk.lines:
                     raise InvalidHunkLine("no-newline marker without preceding line", line=line_no)
                 current_hunk.lines.append(NoNewlineMarker(source_line=line_no))
+            elif line == "" and current_hunk.calculated_counts() != (current_hunk.old_count, current_hunk.new_count):
+                current_hunk.lines.append(ContextLine("", line_no))
             elif (line.startswith("-- ") or line == "") and current_hunk.calculated_counts() == (current_hunk.old_count, current_hunk.new_count):
                 finish_hunk(line_no)
                 state = "TRAILER"

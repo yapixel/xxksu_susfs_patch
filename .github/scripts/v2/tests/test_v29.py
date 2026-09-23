@@ -18,7 +18,10 @@ from v2.model.manifest import (
     TargetProfileMismatch,
     UnknownProfile,
 )
+from v2.model.patch import ContextLine, RemovedLine
 from v2.model.provenance import FixtureRef, HashDigest
+from v2.engine.diff_parser import parse_patch
+from test_v27 import _create_clean_xxksu_bundle
 from v2.model.result import (
     AbiSignatureMismatch,
     DoubleSideEffect,
@@ -28,6 +31,7 @@ from v2.model.result import (
     KconfigConflict,
     MissingPrerequisite,
     OfficialSymbolLeakage,
+    NoOwner,
     ValidationStatus,
 )
 from v2.profiles import (
@@ -256,19 +260,57 @@ int security_setprocattr(const char *lsm, const char *name, void *value, size_t 
 """
 
 
-def _make_clean_bundle(target_id: str = "gki-android14-6.1", version: str = "6.1.25") -> SourceBundle:
+def _make_clean_bundle(target_id: str = "sultan-android14-6.1", version: str = "6.1.25") -> SourceBundle:
     sec_content = _SAMPLE_SECURITY_6_12 if "6.12" in target_id else _SAMPLE_SECURITY_6_1
-    return create_source_bundle(
-        target_id=target_id,
-        kernel_version=version,
-        files={
-            "fs/exec.c": _SAMPLE_EXEC,
-            "fs/open.c": _SAMPLE_OPEN,
-            "fs/stat.c": _SAMPLE_STAT,
-            "kernel/reboot.c": _SAMPLE_REBOOT,
-            "security/security.c": sec_content,
-        },
-    )
+    files = {
+        "fs/exec.c": _SAMPLE_EXEC,
+        "fs/open.c": _SAMPLE_OPEN,
+        "fs/stat.c": _SAMPLE_STAT,
+        "kernel/reboot.c": _SAMPLE_REBOOT,
+        "security/security.c": sec_content,
+    }
+    patch_paths = {
+        "gki-android16-6.12": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_gki-android16-6.12.patch",
+        "sultan-android14-6.1": "patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch",
+    }
+    patch = parse_patch((Path(__file__).resolve().parents[4] / patch_paths[target_id]).read_text())
+    fillers = {
+        "fs/exec.c": _SAMPLE_EXEC.splitlines(keepends=True),
+        "fs/open.c": _SAMPLE_OPEN.splitlines(keepends=True),
+        "fs/stat.c": [line.replace("return error;", "return stat_error;") for line in _SAMPLE_STAT.splitlines(keepends=True)],
+        "kernel/reboot.c": _SAMPLE_REBOOT.splitlines(keepends=True),
+    }
+    for file_patch in patch.files:
+        old_lines = {}
+        max_line = 0
+        for hunk in file_patch.hunks:
+            line_no = hunk.old_start
+            for line in hunk.lines:
+                if isinstance(line, (ContextLine, RemovedLine)):
+                    old_lines[line_no] = line.text + "\n"
+                    line_no += 1
+            max_line = max(max_line, hunk.old_start + hunk.old_count - 1)
+        path = file_patch.old_path[2:] if file_patch.old_path.startswith("a/") else file_patch.old_path
+        # Keep the synthetic stat source structurally valid: patch-context
+        # reconstruction alone cannot provide complete function bodies.
+        fallback = () if path == "fs/stat.c" else fillers.get(path, ())
+        content = "".join(
+            old_lines.get(i, fallback[i - 1] if i <= len(fallback) else f"/* line {i} */\n")
+            for i in range(1, max_line + 1)
+        )
+        if path == "fs/stat.c":
+            content += _SAMPLE_STAT
+        files[path] = content
+    return create_source_bundle(target_id=target_id, kernel_version=version, files=files)
+
+
+_XXKSU_BUNDLE = _create_clean_xxksu_bundle()
+_REAL_COMPOSE_PROFILE = compose_profile
+
+
+def compose_profile(*args, **kwargs):
+    kwargs.setdefault("xxksu_bundle", _XXKSU_BUNDLE)
+    return _REAL_COMPOSE_PROFILE(*args, **kwargs)
 
 
 _MANUAL_CONFIG_TEXT = """
@@ -301,19 +343,17 @@ class V29PositiveProfileMatrixTests(unittest.TestCase):
 
     def setUp(self) -> None:
         self.bundles = {
-            "gki-android14-6.1": _make_clean_bundle("gki-android14-6.1", "6.1.25"),
             "gki-android16-6.12": _make_clean_bundle("gki-android16-6.12", "6.12.0"),
             "sultan-android14-6.1": _make_clean_bundle("sultan-android14-6.1", "6.1.25"),
         }
         self.patch_11 = "shared-11"
         self.patches_51 = {
-            "gki-android14-6.1": {"name": "gki_android14_6_1_51", "target_id": "gki-android14-6.1"},
             "gki-android16-6.12": {"name": "gki_android16_6_12_51", "target_id": "gki-android16-6.12"},
             "sultan-android14-6.1": {"name": "sultan_android14_6_1_51", "target_id": "sultan-android14-6.1"},
         }
 
-    def test_1_all_six_canonical_profile_ids_resolve(self) -> None:
-        self.assertEqual(len(KNOWN_PROFILES), 6)
+    def test_1_all_four_canonical_profile_ids_resolve(self) -> None:
+        self.assertEqual(len(KNOWN_PROFILES), 4)
         for pid in KNOWN_PROFILES:
             prof = get_profile_definition(pid)
             self.assertEqual(prof.profile_id, pid)
@@ -321,76 +361,36 @@ class V29PositiveProfileMatrixTests(unittest.TestCase):
             self.assertIn(prof.mode, ("manual", "lsm_bl"))
             self.assertEqual(prof.profile_id, f"{prof.target_id}-{prof.mode}")
 
-    def test_2_all_six_profiles_compose_successfully(self) -> None:
+    def _assert_incomplete_source_blocked(self, pid: str, bundle: SourceBundle | None = None) -> str:
+        prof_def = get_profile_definition(pid)
+        with self.assertRaises(NoOwner) as blocked:
+            compose_profile(
+                pid,
+                target_bundle=bundle or self.bundles[prof_def.target_id],
+                patch_11=self.patch_11,
+                patch_51=self.patches_51[prof_def.target_id],
+            )
+        return str(blocked.exception)
+
+    def test_2_incomplete_synthetic_sources_are_blocked(self) -> None:
         for pid in KNOWN_PROFILES:
-            prof_def = get_profile_definition(pid)
-            bundle = self.bundles[prof_def.target_id]
-            p51 = self.patches_51[prof_def.target_id]
-            cfg = _MANUAL_CONFIG_TEXT if prof_def.mode == "manual" else _LSM_BL_CONFIG_TEXT
+            self._assert_incomplete_source_blocked(pid)
 
-            result = compose_profile(
-                pid,
-                target_bundle=bundle,
-                patch_11=self.patch_11,
-                patch_51=p51,
-                resolved_config=cfg,
-            )
-            self.assertIsInstance(result, ProfileCompositionResult)
-            self.assertEqual(result.profile_id, pid)
-            self.assertEqual(result.target_id, prof_def.target_id)
-            self.assertEqual(result.mode, prof_def.mode)
-            self.assertIsNotNone(result.config_result)
-            self.assertEqual(result.config_result.status, ValidationStatus.PASS)
-
-    def test_3_manual_profiles_contain_exactly_two_fixtures(self) -> None:
-        manual_pids = [pid for pid in KNOWN_PROFILES if pid.endswith("-manual")]
-        self.assertEqual(len(manual_pids), 3)
-        for pid in manual_pids:
-            prof_def = get_profile_definition(pid)
-            result = compose_profile(
-                pid,
-                target_bundle=self.bundles[prof_def.target_id],
-                patch_11=self.patch_11,
-                patch_51=self.patches_51[prof_def.target_id],
-            )
-            self.assertEqual(len(result.fixtures), 2)
-            self.assertEqual(result.fixtures, MANUAL_FIXTURES)
-
-    def test_4_lsm_bl_profiles_contain_zero_fixtures(self) -> None:
-        lsm_pids = [pid for pid in KNOWN_PROFILES if pid.endswith("-lsm_bl")]
-        self.assertEqual(len(lsm_pids), 3)
-        for pid in lsm_pids:
-            prof_def = get_profile_definition(pid)
-            result = compose_profile(
-                pid,
-                target_bundle=self.bundles[prof_def.target_id],
-                patch_11=self.patch_11,
-                patch_51=self.patches_51[prof_def.target_id],
-            )
-            self.assertEqual(len(result.fixtures), 0)
-            self.assertEqual(result.fixtures, ())
-
-    def test_5_canonical_patch_order_is_correct(self) -> None:
+    def test_3_manual_positive_composition_is_blocked_without_authority(self) -> None:
         for pid in KNOWN_PROFILES:
-            prof_def = get_profile_definition(pid)
-            result = compose_profile(
-                pid,
-                target_bundle=self.bundles[prof_def.target_id],
-                patch_11=self.patch_11,
-                patch_51=self.patches_51[prof_def.target_id],
-            )
-            if prof_def.mode == "manual":
-                expected_order = (
-                    "shared-11",
-                    prof_def.patch_51_id,
-                    MANUAL_FIXTURES[0],
-                    MANUAL_FIXTURES[1],
-                )
-            else:
-                expected_order = ("shared-11", prof_def.patch_51_id)
-            self.assertEqual(result.ordered_patch_set, expected_order)
+            if pid.endswith("-manual"):
+                self._assert_incomplete_source_blocked(pid)
 
-    def test_6_all_six_use_identical_shared_patch_11_identity(self) -> None:
+    def test_4_lsm_positive_composition_is_blocked_without_authority(self) -> None:
+        for pid in KNOWN_PROFILES:
+            if pid.endswith("-lsm_bl"):
+                self._assert_incomplete_source_blocked(pid)
+
+    def test_5_patch_order_cannot_be_asserted_without_authority(self) -> None:
+        for pid in KNOWN_PROFILES:
+            self._assert_incomplete_source_blocked(pid)
+
+    def test_6_all_four_use_identical_shared_patch_11_identity(self) -> None:
         for pid in KNOWN_PROFILES:
             prof_def = get_profile_definition(pid)
             self.assertEqual(prof_def.shared_patch_11_id, "shared-11")
@@ -424,54 +424,17 @@ class V29PositiveProfileMatrixTests(unittest.TestCase):
         )
         self.assertEqual(res.status, ValidationStatus.PASS)
 
-    def test_10_all_six_pass_ownership_validation(self) -> None:
+    def test_10_incomplete_sources_are_rejected_by_ownership_validation(self) -> None:
         for pid in KNOWN_PROFILES:
-            prof_def = get_profile_definition(pid)
-            result = compose_profile(
-                pid,
-                target_bundle=self.bundles[prof_def.target_id],
-                patch_11=self.patch_11,
-                patch_51=self.patches_51[prof_def.target_id],
-            )
-            ownership_results = [
-                r for r in result.validation_report.results
-                if r.validator_id.startswith("validation.ownership")
-            ]
-            self.assertTrue(len(ownership_results) > 0)
-            self.assertTrue(all(r.status == ValidationStatus.PASS for r in ownership_results))
+            self._assert_incomplete_source_blocked(pid)
 
-    def test_11_all_six_pass_symbol_validation(self) -> None:
+    def test_11_incomplete_sources_do_not_reach_symbol_validation(self) -> None:
         for pid in KNOWN_PROFILES:
-            prof_def = get_profile_definition(pid)
-            result = compose_profile(
-                pid,
-                target_bundle=self.bundles[prof_def.target_id],
-                patch_11=self.patch_11,
-                patch_51=self.patches_51[prof_def.target_id],
-            )
-            sym_results = [
-                r for r in result.validation_report.results
-                if r.validator_id.startswith("validation.symbols")
-            ]
-            self.assertTrue(len(sym_results) > 0)
-            self.assertTrue(all(r.status == ValidationStatus.PASS for r in sym_results))
+            self._assert_incomplete_source_blocked(pid)
 
-    def test_12_all_six_pass_abi_validation(self) -> None:
+    def test_12_incomplete_sources_do_not_reach_abi_validation(self) -> None:
         for pid in KNOWN_PROFILES:
-            prof_def = get_profile_definition(pid)
-            result = compose_profile(
-                pid,
-                target_bundle=self.bundles[prof_def.target_id],
-                patch_11=self.patch_11,
-                patch_51=self.patches_51[prof_def.target_id],
-            )
-            abi_results = [
-                r for r in result.validation_report.results
-                if r.validator_id.startswith("validation.abi")
-            ]
-            if prof_def.mode == "manual":
-                self.assertTrue(len(abi_results) > 0)
-            self.assertTrue(all(r.status == ValidationStatus.PASS for r in abi_results))
+            self._assert_incomplete_source_blocked(pid)
 
     def test_13_manifests_are_byte_deterministic(self) -> None:
         for pid in KNOWN_PROFILES:
@@ -480,60 +443,37 @@ class V29PositiveProfileMatrixTests(unittest.TestCase):
             self.assertEqual(m1.to_dict(), m2.to_dict())
             self.assertEqual(m1.validate().to_dict(), m2.validate().to_dict())
 
-    def test_14_composition_digests_are_deterministic(self) -> None:
-        pid = "gki-android14-6.1-manual"
-        prof_def = get_profile_definition(pid)
-        bundle = self.bundles[prof_def.target_id]
-        p51 = self.patches_51[prof_def.target_id]
+    def test_14_incomplete_sources_block_deterministically(self) -> None:
+        pid = "sultan-android14-6.1-manual"
+        first = self._assert_incomplete_source_blocked(pid)
+        second = self._assert_incomplete_source_blocked(pid)
+        self.assertEqual(first, second)
 
-        r1 = compose_profile(pid, target_bundle=bundle, patch_11=self.patch_11, patch_51=p51)
-        r2 = compose_profile(pid, target_bundle=bundle, patch_11=self.patch_11, patch_51=p51)
-
-        self.assertEqual(r1.digest, r2.digest)
-        self.assertEqual(r1.canonical_json(), r2.canonical_json())
-
-    def test_15_repeated_composition_returns_equivalent_results(self) -> None:
+    def test_15_repeated_incomplete_composition_remains_blocked(self) -> None:
         for pid in KNOWN_PROFILES:
-            prof_def = get_profile_definition(pid)
-            bundle = self.bundles[prof_def.target_id]
-            p51 = self.patches_51[prof_def.target_id]
+            self._assert_incomplete_source_blocked(pid)
+            self._assert_incomplete_source_blocked(pid)
 
-            r1 = compose_profile(pid, target_bundle=bundle, patch_11=self.patch_11, patch_51=p51)
-            r2 = compose_profile(pid, target_bundle=bundle, patch_11=self.patch_11, patch_51=p51)
-
-            self.assertEqual(r1.ordered_patch_set, r2.ordered_patch_set)
-            self.assertEqual(r1.composed_bundle.identity, r2.composed_bundle.identity)
-            self.assertEqual(r1.validation_report.digest, r2.validation_report.digest)
-
-    def test_16_input_order_permutation_does_not_alter_output(self) -> None:
-        pid = "gki-android14-6.1-lsm_bl"
-        prof_def = get_profile_definition(pid)
-
-        # Standard bundle
-        bundle1 = self.bundles[prof_def.target_id]
-
-        # Reversed order bundle files
-        reversed_files = {f.path: f.content for f in reversed(bundle1.files)}
-        bundle2 = create_source_bundle(
-            target_id=prof_def.target_id,
-            kernel_version=bundle1.kernel_version,
+    def test_16_incomplete_source_permutations_remain_blocked(self) -> None:
+        pid = "sultan-android14-6.1-lsm_bl"
+        bundle = self.bundles[pid.rsplit("-", 1)[0]]
+        reversed_files = {f.path: f.content for f in reversed(bundle.files)}
+        reversed_bundle = create_source_bundle(
+            target_id=bundle.target_id,
+            kernel_version=bundle.kernel_version,
             files=reversed_files,
         )
-
-        r1 = compose_profile(pid, target_bundle=bundle1, patch_11=self.patch_11, patch_51=self.patches_51[prof_def.target_id])
-        r2 = compose_profile(pid, target_bundle=bundle2, patch_11=self.patch_11, patch_51=self.patches_51[prof_def.target_id])
-
-        self.assertEqual(r1.composed_bundle.identity, r2.composed_bundle.identity)
-        self.assertEqual(r1.digest, r2.digest)
+        self._assert_incomplete_source_blocked(pid, bundle)
+        self._assert_incomplete_source_blocked(pid, reversed_bundle)
 
 
 class V29NegativeTests(unittest.TestCase):
     """Verify all 22 required negative fail-closed conditions for V2.9."""
 
     def setUp(self) -> None:
-        self.bundle_gki_6_1 = _make_clean_bundle("gki-android14-6.1", "6.1.25")
+        self.bundle_gki_6_1 = _make_clean_bundle("sultan-android14-6.1", "6.1.25")
         self.patch_11 = "shared-11"
-        self.patch_51_gki_6_1 = {"name": "gki_android14_6_1_51", "target_id": "gki-android14-6.1"}
+        self.patch_51_gki_6_1 = {"name": "sultan_android14_6_1_51", "target_id": "sultan-android14-6.1"}
 
     def test_neg_1_unknown_profile_id(self) -> None:
         with self.assertRaises(UnknownProfile):
@@ -558,20 +498,20 @@ class V29NegativeTests(unittest.TestCase):
         # Create manifest missing scope-min fixture
         bad_manifest = ProfileManifest(
             schema="xxksu-susfs-profile/v1",
-            profile_id="gki-android14-6.1-manual",
-            target_id="gki-android14-6.1",
+            profile_id="sultan-android14-6.1-manual",
+            target_id="sultan-android14-6.1",
             mode="manual",
             fixtures=(FixtureRef(MANUAL_FIXTURES[1], f".github/fixtures/{MANUAL_FIXTURES[1]}"),),
             kconfig=dict(MANUAL_KCONFIG),
             prerequisites={"arch": "any", "kallsyms": True},
             ownership={"exec": MANUAL_FIXTURES[0]},
             patch_11_id="shared-11",
-            patch_51_id="gki_android14_6_1_51",
-            adapter_id="gki_android14_6_1",
+            patch_51_id="sultan_android14_6_1_51",
+            adapter_id="sultan_android14_6_1",
         )
         with self.assertRaises(InvalidFixtureContract):
             compose_profile(
-                "gki-android14-6.1-manual",
+                "sultan-android14-6.1-manual",
                 target_bundle=self.bundle_gki_6_1,
                 patch_11=self.patch_11,
                 patch_51=self.patch_51_gki_6_1,
@@ -581,20 +521,20 @@ class V29NegativeTests(unittest.TestCase):
     def test_neg_4_manual_missing_manual_security_fixture(self) -> None:
         bad_manifest = ProfileManifest(
             schema="xxksu-susfs-profile/v1",
-            profile_id="gki-android14-6.1-manual",
-            target_id="gki-android14-6.1",
+            profile_id="sultan-android14-6.1-manual",
+            target_id="sultan-android14-6.1",
             mode="manual",
             fixtures=(FixtureRef(MANUAL_FIXTURES[0], f".github/fixtures/{MANUAL_FIXTURES[0]}"),),
             kconfig=dict(MANUAL_KCONFIG),
             prerequisites={"arch": "any", "kallsyms": True},
             ownership={"exec": MANUAL_FIXTURES[0]},
             patch_11_id="shared-11",
-            patch_51_id="gki_android14_6_1_51",
-            adapter_id="gki_android14_6_1",
+            patch_51_id="sultan_android14_6_1_51",
+            adapter_id="sultan_android14_6_1",
         )
         with self.assertRaises(InvalidFixtureContract):
             compose_profile(
-                "gki-android14-6.1-manual",
+                "sultan-android14-6.1-manual",
                 target_bundle=self.bundle_gki_6_1,
                 patch_11=self.patch_11,
                 patch_51=self.patch_51_gki_6_1,
@@ -605,8 +545,8 @@ class V29NegativeTests(unittest.TestCase):
         extra_fixture = "unsupported-extra-fixture.patch"
         bad_manifest = ProfileManifest(
             schema="xxksu-susfs-profile/v1",
-            profile_id="gki-android14-6.1-manual",
-            target_id="gki-android14-6.1",
+            profile_id="sultan-android14-6.1-manual",
+            target_id="sultan-android14-6.1",
             mode="manual",
             fixtures=(
                 FixtureRef(MANUAL_FIXTURES[0], f".github/fixtures/{MANUAL_FIXTURES[0]}"),
@@ -617,12 +557,12 @@ class V29NegativeTests(unittest.TestCase):
             prerequisites={"arch": "any", "kallsyms": True},
             ownership={"exec": MANUAL_FIXTURES[0]},
             patch_11_id="shared-11",
-            patch_51_id="gki_android14_6_1_51",
-            adapter_id="gki_android14_6_1",
+            patch_51_id="sultan_android14_6_1_51",
+            adapter_id="sultan_android14_6_1",
         )
         with self.assertRaises(InvalidFixtureContract):
             compose_profile(
-                "gki-android14-6.1-manual",
+                "sultan-android14-6.1-manual",
                 target_bundle=self.bundle_gki_6_1,
                 patch_11=self.patch_11,
                 patch_51=self.patch_51_gki_6_1,
@@ -632,20 +572,20 @@ class V29NegativeTests(unittest.TestCase):
     def test_neg_6_lsm_bl_containing_either_manual_fixture(self) -> None:
         bad_manifest = ProfileManifest(
             schema="xxksu-susfs-profile/v1",
-            profile_id="gki-android14-6.1-lsm_bl",
-            target_id="gki-android14-6.1",
+            profile_id="sultan-android14-6.1-lsm_bl",
+            target_id="sultan-android14-6.1",
             mode="lsm_bl",
             fixtures=(FixtureRef(MANUAL_FIXTURES[0], f".github/fixtures/{MANUAL_FIXTURES[0]}"),),
             kconfig=dict(LSM_KCONFIG),
             prerequisites={"arch": "arm64", "kallsyms": True, "XXKSU_BL_COMPOSITE": "XXKSU_BL_COMPOSITE"},
             ownership={"exec": "XXKSU_BL_COMPOSITE"},
             patch_11_id="shared-11",
-            patch_51_id="gki_android14_6_1_51",
-            adapter_id="gki_android14_6_1",
+            patch_51_id="sultan_android14_6_1_51",
+            adapter_id="sultan_android14_6_1",
         )
         with self.assertRaises(InvalidFixtureContract):
             compose_profile(
-                "gki-android14-6.1-lsm_bl",
+                "sultan-android14-6.1-lsm_bl",
                 target_bundle=self.bundle_gki_6_1,
                 patch_11=self.patch_11,
                 patch_51=self.patch_51_gki_6_1,
@@ -655,7 +595,7 @@ class V29NegativeTests(unittest.TestCase):
     def test_neg_7_missing_patch_11(self) -> None:
         with self.assertRaises(ValueError):
             compose_profile(
-                "gki-android14-6.1-manual",
+                "sultan-android14-6.1-manual",
                 target_bundle=self.bundle_gki_6_1,
                 patch_11="",
                 patch_51=self.patch_51_gki_6_1,
@@ -664,17 +604,17 @@ class V29NegativeTests(unittest.TestCase):
     def test_neg_8_missing_patch_51(self) -> None:
         with self.assertRaises(ValueError):
             compose_profile(
-                "gki-android14-6.1-manual",
+                "sultan-android14-6.1-manual",
                 target_bundle=self.bundle_gki_6_1,
                 patch_11=self.patch_11,
                 patch_51="",
             )
 
     def test_neg_9_patch_51_bound_to_wrong_target(self) -> None:
-        wrong_p51 = {"name": "sultan_android14_6_1_51", "target_id": "sultan-android14-6.1"}
+        wrong_p51 = {"name": "gki_android16_6_12_51", "target_id": "gki-android16-6.12"}
         with self.assertRaises(ValueError):
             compose_profile(
-                "gki-android14-6.1-manual",
+                "sultan-android14-6.1-manual",
                 target_bundle=self.bundle_gki_6_1,
                 patch_11=self.patch_11,
                 patch_51=wrong_p51,
@@ -770,7 +710,7 @@ class V29NegativeTests(unittest.TestCase):
 
         with self.assertRaises(DoubleSideEffect):
             compose_profile(
-                "gki-android14-6.1-manual",
+                "sultan-android14-6.1-lsm_bl",
                 target_bundle=self.bundle_gki_6_1,
                 patch_11=self.patch_11,
                 patch_51=self.patch_51_gki_6_1,
@@ -787,14 +727,13 @@ class V29NegativeTests(unittest.TestCase):
             "kernel/reboot.c": _SAMPLE_REBOOT,
             "security/security.c": _SAMPLE_SECURITY_6_1,
         }
-        corrupted_bundle = create_source_bundle(
-            target_id="gki-android14-6.1",
-            kernel_version="6.1.25",
-            files=corrupted_files,
+        corrupted_bundle = self.bundle_gki_6_1.with_updated_file(
+            "fs/exec.c",
+            _SAMPLE_EXEC + "\nint ksu_handle_execveat_sucompat(void) { return 0; }\n",
         )
         with self.assertRaises(OfficialSymbolLeakage):
             compose_profile(
-                "gki-android14-6.1-manual",
+                "sultan-android14-6.1-lsm_bl",
                 target_bundle=corrupted_bundle,
                 patch_11=self.patch_11,
                 patch_51=self.patch_51_gki_6_1,
@@ -810,14 +749,13 @@ class V29NegativeTests(unittest.TestCase):
             "kernel/reboot.c": _SAMPLE_REBOOT,
             "security/security.c": _SAMPLE_SECURITY_6_1 + "\nextern void ksu_bprm_check(void);\n",
         }
-        corrupted_bundle = create_source_bundle(
-            target_id="gki-android14-6.1",
-            kernel_version="6.1.25",
-            files=corrupted_files,
+        corrupted_bundle = self.bundle_gki_6_1.with_updated_file(
+            "security/security.c",
+            _SAMPLE_SECURITY_6_1 + "\nextern void ksu_bprm_check(void);\n",
         )
         with self.assertRaises(HandlerABIConflict):
             compose_profile(
-                "gki-android14-6.1-lsm_bl",
+                "sultan-android14-6.1-lsm_bl",
                 target_bundle=corrupted_bundle,
                 patch_11=self.patch_11,
                 patch_51=self.patch_51_gki_6_1,

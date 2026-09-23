@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+from pathlib import Path
 from typing import Any, Mapping, Optional, Sequence, Tuple, Union
 
 from ..model.manifest import (
@@ -12,6 +13,7 @@ from ..model.manifest import (
     TargetProfileMismatch,
     UnknownProfile,
 )
+from ..model.patch import PatchError
 from ..model.provenance import HashDigest, canonical_json
 from ..model.result import (
     SourceBundleIdentityMismatch,
@@ -21,6 +23,8 @@ from ..model.result import (
     ValidationStatus,
 )
 from ..source.bundle import SourceBundle
+from ..source.patch_apply import SourceBundlePatchError, apply_patch_to_bundle, load_patch_text
+from ..adapters.xxksu import apply_patch11_to_bundle
 from ..validation import (
     OwnershipClaim,
     validate_all,
@@ -41,6 +45,7 @@ class ProfileCompositionResult:
     ordered_patch_set: Tuple[str, ...]
     fixtures: Tuple[str, ...]
     composed_bundle: SourceBundle
+    xxksu_bundle: SourceBundle
     expected_config: Mapping[str, str]
     config_result: Optional[ValidationResult]
     validation_report: ValidationReport
@@ -56,6 +61,7 @@ class ProfileCompositionResult:
             "ordered_patch_set": list(self.ordered_patch_set),
             "fixtures": list(self.fixtures),
             "composed_bundle_identity": str(self.composed_bundle.identity),
+            "xxksu_bundle_identity": str(self.xxksu_bundle.identity) if self.xxksu_bundle else None,
             "manifest": self.manifest.to_dict(),
             "expected_config": dict(sorted(self.expected_config.items())),
             "validation_report_digest": str(self.validation_report.digest),
@@ -73,6 +79,7 @@ def compose_profile(
     target_bundle: SourceBundle,
     patch_11: Union[str, Any],
     patch_51: Union[str, Any],
+    xxksu_bundle: Optional[SourceBundle] = None,
     resolved_config: Optional[Union[str, Mapping[str, str]]] = None,
     requested_config: Optional[Mapping[str, str]] = None,
     manifest: Optional[ProfileManifest] = None,
@@ -108,7 +115,18 @@ def compose_profile(
                 f"manifest target_id '{eff_manifest.target_id}' does not match '{target_id}'"
             )
 
-    # 4. Validate patch 11 identity
+    # 4. Materialize shared 11 in its separate xxKSU source domain.
+    if xxksu_bundle is None:
+        raise SourceBundleIdentityMismatch("xxksu_bundle is required for shared-11 composition")
+    if xxksu_bundle.target_id != "xxksu":
+        raise TargetProfileMismatch("shared-11 requires an xxksu source bundle")
+    validate_bundle_integrity(xxksu_bundle, raise_on_failure=True)
+    try:
+        composed_xxksu_bundle = apply_patch11_to_bundle(xxksu_bundle)
+    except Exception as exc:
+        raise SourceBundleIdentityMismatch(f"shared-11 application failed: {exc}") from exc
+
+    # 5. Resolve and strictly apply the existing target-specific 51 artifact.
     if not patch_11:
         raise ValueError("missing shared patch 11")
     p11_name = getattr(patch_11, "name", None) or (
@@ -119,15 +137,29 @@ def compose_profile(
     if isinstance(patch_11, str) and ("\n" in patch_11 or patch_11.startswith("---") or patch_11.startswith("From ")):
         validate_symbols(patch=patch_11, raise_on_failure=True)
 
-    # 5. Validate patch 51 target binding & transport neutrality
+    p51_paths = {
+        "gki_android16_6_12_51": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_gki-android16-6.12.patch",
+        "sultan_android14_6_1_51": "patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch",
+    }
     if not patch_51:
         raise ValueError("missing target patch 51")
     p51_target = getattr(patch_51, "target_id", None) or (
         patch_51.get("target_id") if isinstance(patch_51, dict) else None
     )
     if p51_target and p51_target != target_id:
-        raise ValueError(f"patch 51 target '{p51_target}' does not match profile target '{target_id}'")
+        raise TargetProfileMismatch(f"patch 51 target '{p51_target}' does not match profile target '{target_id}'")
 
+    p51_id = prof_def.patch_51_id
+    try:
+        patch_51_text = load_patch_text(
+            patch_51,
+            {key: str(Path(__file__).resolve().parents[4] / path) for key, path in p51_paths.items()},
+        )
+        composed_target_bundle = apply_patch_to_bundle(target_bundle, patch_51_text)
+    except (OSError, PatchError, SourceBundlePatchError) as exc:
+        raise SourceBundleIdentityMismatch(f"patch-51 application failed: {exc}") from exc
+
+    # 6. Enforce fixture contract
     p51_id = getattr(patch_51, "name", None) or getattr(patch_51, "patch_51_id", None) or (
         patch_51.get("name") if isinstance(patch_51, dict) else (
             patch_51.get("patch_51_id") if isinstance(patch_51, dict) else None
@@ -136,7 +168,7 @@ def compose_profile(
     if "manual" in str(p51_id) or "lsm_bl" in str(p51_id):
         raise ValueError(f"patch 51 must be transport-neutral, got: {p51_id}")
 
-    # 6. Enforce fixture contract
+    # 7. Enforce fixture contract
     manifest_fixtures = tuple(ref.name.rsplit("/", 1)[-1] for ref in eff_manifest.fixtures)
     if mode == "manual":
         if set(manifest_fixtures) != set(prof_def.fixtures):
@@ -151,21 +183,33 @@ def compose_profile(
                 f"lsm_bl profiles strictly forbid manual fixtures, got {len(manifest_fixtures)}"
             )
 
-    # 7. Adapt fixtures using V2.6 when mode == manual
+    # 7. Adapt manual fixtures after patch 51 has been materialized.
     if mode == "manual":
         adapter = prof_def.get_adapter()
-        plan = adapter.adapt_fixtures(target_bundle, prof_def.fixtures)
-        composed_bundle = plan.apply_to_bundle(target_bundle)
+        plan = adapter.adapt_fixtures(composed_target_bundle, prof_def.fixtures)
+        composed_bundle = plan.apply_to_bundle(composed_target_bundle)
     else:
-        composed_bundle = target_bundle
+        composed_bundle = composed_target_bundle
 
-    # 8. Post-composition quality gates: run V2.8 validators
+    # 8. Post-composition quality gates: run V2.8 validators on both domains.
     ownership_claims = claims if claims is not None else prof_def.get_ownership_claims()
     v28_report = validate_all(
         bundle=composed_bundle,
         mode=mode,
         claims=ownership_claims,
         raise_on_failure=raise_on_failure,
+    )
+    xxksu_report = validate_all(
+        bundle=composed_xxksu_bundle,
+        mode=mode,
+        claims=None,
+        contracts_symbols=(),
+        contracts_abi=(),
+        raise_on_failure=raise_on_failure,
+    )
+    v28_report = ValidationReport(
+        results=v28_report.results + xxksu_report.results,
+        metadata={"domains": ["kernel", "xxksu"]},
     )
 
     # 9. Final config validation if supplied
@@ -189,6 +233,7 @@ def compose_profile(
         "ordered_patch_set": list(prof_def.ordered_patch_set),
         "fixtures": list(prof_def.fixtures),
         "composed_bundle_identity": str(composed_bundle.identity),
+        "xxksu_bundle_identity": str(composed_xxksu_bundle.identity),
         "manifest": eff_manifest.to_dict(),
         "expected_config": dict(sorted(prof_def.expected_config.items())),
         "validation_report_digest": str(v28_report.digest),
@@ -203,6 +248,7 @@ def compose_profile(
         ordered_patch_set=prof_def.ordered_patch_set,
         fixtures=prof_def.fixtures,
         composed_bundle=composed_bundle,
+        xxksu_bundle=composed_xxksu_bundle,
         expected_config=prof_def.expected_config,
         config_result=config_result,
         validation_report=v28_report,
@@ -216,9 +262,10 @@ def compose_all_profiles(
     patch_11: Union[str, Any],
     target_patches_51: Mapping[str, Any],
     resolved_configs: Optional[Mapping[str, Union[str, Mapping[str, str]]]] = None,
+    xxksu_bundle: Optional[SourceBundle] = None,
     raise_on_failure: bool = True,
 ) -> Tuple[ProfileCompositionResult, ...]:
-    """Compose all six canonical profiles in canonical order."""
+    """Compose all four canonical profiles in canonical order."""
     results: list[ProfileCompositionResult] = []
     for prof_def in list_profile_definitions():
         target_id = prof_def.target_id
@@ -231,6 +278,7 @@ def compose_all_profiles(
         res = compose_profile(
             prof_def.profile_id,
             target_bundle=target_bundles[target_id],
+            xxksu_bundle=xxksu_bundle,
             patch_11=patch_11,
             patch_51=target_patches_51[target_id],
             resolved_config=cfg,
