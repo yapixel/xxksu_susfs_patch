@@ -8,7 +8,7 @@ from v2.adapters import (
     AmbiguousSemanticMatch,
     AnchorLocation,
     AnchorSpec,
-    GKIAndroid14_6_1Adapter,
+    SultanAndroid14_6_1Adapter,
     GKIAndroid16_6_12Adapter,
     MissingSemanticAnchor,
     MultipleSemanticAnchors,
@@ -125,18 +125,18 @@ class TestV25SourceBundle(unittest.TestCase):
             "fs/open.c": _C_SAMPLE_OPEN,
             "fs/exec.c": _C_SAMPLE_EXEC,
         }
-        bundle_a = create_source_bundle("gki-android14-6.1", "6.1.25", files_a)
-        bundle_b = create_source_bundle("gki-android14-6.1", "6.1.25", files_b)
+        bundle_a = create_source_bundle("sultan-android14-6.1", "6.1.25", files_a)
+        bundle_b = create_source_bundle("sultan-android14-6.1", "6.1.25", files_b)
 
         self.assertEqual(bundle_a.identity, bundle_b.identity)
         self.assertEqual(bundle_a.canonical_json(), bundle_b.canonical_json())
         self.assertTrue(str(bundle_a.identity).startswith("sha256:"))
 
     def test_source_bundle_differing_inputs_different_identity(self):
-        bundle1 = create_source_bundle("gki-android14-6.1", "6.1.25", {"fs/open.c": _C_SAMPLE_OPEN})
-        bundle2 = create_source_bundle("gki-android14-6.1", "6.1.68", {"fs/open.c": _C_SAMPLE_OPEN})
-        bundle3 = create_source_bundle("sultan-android14-6.1", "6.1.25", {"fs/open.c": _C_SAMPLE_OPEN})
-        bundle4 = create_source_bundle("gki-android14-6.1", "6.1.25", {"fs/open.c": "/* different */"})
+        bundle1 = create_source_bundle("sultan-android14-6.1", "6.1.25", {"fs/open.c": _C_SAMPLE_OPEN})
+        bundle2 = create_source_bundle("sultan-android14-6.1", "6.1.68", {"fs/open.c": _C_SAMPLE_OPEN})
+        bundle3 = create_source_bundle("gki-android16-6.12", "6.12.0", {"fs/open.c": _C_SAMPLE_OPEN})
+        bundle4 = create_source_bundle("sultan-android14-6.1", "6.1.25", {"fs/open.c": "/* different */"})
 
         self.assertNotEqual(bundle1.identity, bundle2.identity)
         self.assertNotEqual(bundle1.identity, bundle3.identity)
@@ -149,26 +149,26 @@ class TestV25SourceBundle(unittest.TestCase):
     def test_source_bundle_kernel_version_validation(self):
         # 6.12 on 6.1 target
         with self.assertRaises(UnsupportedKernelVersion):
-            create_source_bundle("gki-android14-6.1", "6.12.0", {"fs/open.c": "code"})
+            create_source_bundle("sultan-android14-6.1", "6.12.0", {"fs/open.c": "code"})
         # 6.1 on 6.12 target
         with self.assertRaises(UnsupportedKernelVersion):
             create_source_bundle("gki-android16-6.12", "6.1.25", {"fs/open.c": "code"})
         # Empty version
         with self.assertRaises(UnsupportedKernelVersion):
-            create_source_bundle("gki-android14-6.1", "", {"fs/open.c": "code"})
+            create_source_bundle("sultan-android14-6.1", "", {"fs/open.c": "code"})
 
     def test_source_bundle_schema_validation(self):
-        bundle = create_source_bundle("gki-android14-6.1", "6.1.25", {"fs/open.c": "code"})
+        bundle = create_source_bundle("sultan-android14-6.1", "6.1.25", {"fs/open.c": "code"})
         with self.assertRaises(UnsupportedBundleSchema):
             SourceBundle(
-                target_id="gki-android14-6.1",
+                target_id="sultan-android14-6.1",
                 kernel_version="6.1.25",
                 files=bundle.files,
                 schema="invalid-schema/v2",
             )
 
     def test_source_bundle_corrupted_file_detected(self):
-        bundle = create_source_bundle("gki-android14-6.1", "6.1.25", {"fs/open.c": "real content"})
+        bundle = create_source_bundle("sultan-android14-6.1", "6.1.25", {"fs/open.c": "real content"})
         real_file = bundle.files[0]
         # Hash mismatch
         with self.assertRaises(CorruptedSourceBundle):
@@ -188,7 +188,7 @@ class TestV25SourceBundle(unittest.TestCase):
             )
 
     def test_source_bundle_file_lookup_and_verification(self):
-        bundle = create_source_bundle("gki-android14-6.1", "6.1.25", {
+        bundle = create_source_bundle("sultan-android14-6.1", "6.1.25", {
             "fs/open.c": _C_SAMPLE_OPEN,
             "fs/exec.c": _C_SAMPLE_EXEC,
         })
@@ -208,18 +208,18 @@ class TestV25SourceBundle(unittest.TestCase):
             bundle.verify_file("fs/open.c", "modified content")
 
     def test_source_bundle_duplicate_file_rejected(self):
-        bundle = create_source_bundle("gki-android14-6.1", "6.1.25", {"fs/open.c": "content"})
+        bundle = create_source_bundle("sultan-android14-6.1", "6.1.25", {"fs/open.c": "content"})
         f = bundle.files[0]
         with self.assertRaises(DuplicateBundleFile):
-            SourceBundle("gki-android14-6.1", "6.1.25", (f, f))
+            SourceBundle("sultan-android14-6.1", "6.1.25", (f, f))
 
     def test_source_bundle_path_escaping_rejected(self):
         with self.assertRaises(ValueError):
-            create_source_bundle("gki-android14-6.1", "6.1.25", {"../escape.c": "content"})
+            create_source_bundle("sultan-android14-6.1", "6.1.25", {"../escape.c": "content"})
 
     def test_source_bundle_json_roundtrip(self):
         bundle = create_source_bundle(
-            "gki-android14-6.1", "6.1.25",
+            "sultan-android14-6.1", "6.1.25",
             {"fs/open.c": _C_SAMPLE_OPEN, "fs/exec.c": _C_SAMPLE_EXEC},
             metadata={"builder": "test"},
         )
@@ -236,10 +236,10 @@ class TestV25SourceBundle(unittest.TestCase):
 class TestV25TargetAdapters(unittest.TestCase):
 
     def test_adapter_factory_and_identification(self):
-        a1 = get_adapter("gki-android14-6.1")
-        self.assertIsInstance(a1, GKIAndroid14_6_1Adapter)
-        self.assertEqual(a1.target_id, "gki-android14-6.1")
-        self.assertEqual(a1.adapter_id, "gki_android14_6_1")
+        a1 = get_adapter("sultan-android14-6.1")
+        self.assertIsInstance(a1, SultanAndroid14_6_1Adapter)
+        self.assertEqual(a1.target_id, "sultan-android14-6.1")
+        self.assertEqual(a1.adapter_id, "sultan_android14_6_1")
 
         a2 = get_adapter("gki-android16-6.12")
         self.assertIsInstance(a2, GKIAndroid16_6_12Adapter)
@@ -255,7 +255,7 @@ class TestV25TargetAdapters(unittest.TestCase):
             get_adapter("unknown-target")
 
     def test_adapter_version_validation(self):
-        a1 = get_adapter("gki-android14-6.1")
+        a1 = get_adapter("sultan-android14-6.1")
         a1.validate_kernel_version("6.1")
         a1.validate_kernel_version("6.1.25")
         a1.validate_kernel_version("6.1-android14")
@@ -274,7 +274,7 @@ class TestV25TargetAdapters(unittest.TestCase):
 class TestV25AnchorMechanics(unittest.TestCase):
 
     def setUp(self):
-        self.adapter_gki_6_1 = get_adapter("gki-android14-6.1")
+        self.adapter_gki_6_1 = get_adapter("gki-android16-6.12")
         self.adapter_gki_6_12 = get_adapter("gki-android16-6.12")
         self.adapter_sultan = get_adapter("sultan-android14-6.1")
 
@@ -374,7 +374,7 @@ class TestV25AnchorMechanics(unittest.TestCase):
             self.adapter_gki_6_12.locate_anchor(_C_SAMPLE_STAT_6_1, stat_6_12_spec)
 
     def test_adapter_locate_anchor_in_bundle(self):
-        bundle = create_source_bundle("gki-android14-6.1", "6.1.25", {
+        bundle = create_source_bundle("gki-android16-6.12", "6.12.0", {
             "fs/open.c": _C_SAMPLE_OPEN,
             "fs/exec.c": _C_SAMPLE_EXEC,
         })

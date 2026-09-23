@@ -28,7 +28,6 @@ from ..validation.ownership import (
 )
 
 TARGET_KERNEL_VERSIONS: Mapping[str, str] = {
-    "gki-android14-6.1": "6.1",
     "gki-android16-6.12": "6.12",
     "sultan-android14-6.1": "6.1",
 }
@@ -158,7 +157,7 @@ def get_profile_definition(profile_id: str) -> ProfileDefinition:
 
 
 def list_profile_definitions() -> Tuple[ProfileDefinition, ...]:
-    """List all six canonical profile definitions in deterministic order."""
+    """List the four canonical profile definitions in deterministic order."""
     return tuple(CANONICAL_PROFILES.values())
 
 

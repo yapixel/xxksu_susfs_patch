@@ -9,7 +9,7 @@ from v2.adapters import (
     DuplicateAdaptationOperation,
     FixtureAdaptationPlan,
     FixtureContractViolation,
-    GKIAndroid14_6_1Adapter,
+    SultanAndroid14_6_1Adapter,
     GKIAndroid16_6_12Adapter,
     IncompatibleFixtureTarget,
     MissingFixtureSource,
@@ -232,7 +232,7 @@ int security_setprocattr(const char *lsm, const char *name, void *value, size_t 
 """
 
 
-def _make_clean_bundle(target_id="gki-android14-6.1", version="6.1.25"):
+def _make_clean_bundle(target_id="sultan-android14-6.1", version="6.1.25"):
     sec_content = _SAMPLE_SECURITY_6_12 if "6.12" in target_id else _SAMPLE_SECURITY_6_1
     return create_source_bundle(
         target_id=target_id,
@@ -250,10 +250,10 @@ def _make_clean_bundle(target_id="gki-android14-6.1", version="6.1.25"):
 class TestV26FixtureAdaptation(unittest.TestCase):
 
     def setUp(self):
-        self.adapter_gki_6_1 = get_adapter("gki-android14-6.1")
+        self.adapter_gki_6_1 = get_adapter("sultan-android14-6.1")
         self.adapter_gki_6_12 = get_adapter("gki-android16-6.12")
         self.adapter_sultan = get_adapter("sultan-android14-6.1")
-        self.bundle_gki_6_1 = _make_clean_bundle("gki-android14-6.1", "6.1.25")
+        self.bundle_gki_6_1 = _make_clean_bundle("sultan-android14-6.1", "6.1.25")
         self.bundle_gki_6_12 = _make_clean_bundle("gki-android16-6.12", "6.12.0")
         self.bundle_sultan = _make_clean_bundle("sultan-android14-6.1", "6.1.25")
 
@@ -302,7 +302,7 @@ class TestV26FixtureAdaptation(unittest.TestCase):
     def test_missing_source_fails_closed(self):
         # Bundle missing fs/exec.c
         incomplete_bundle = create_source_bundle(
-            target_id="gki-android14-6.1",
+            target_id="sultan-android14-6.1",
             kernel_version="6.1.25",
             files={
                 "fs/open.c": _SAMPLE_OPEN,
@@ -317,7 +317,7 @@ class TestV26FixtureAdaptation(unittest.TestCase):
     def test_missing_anchor_in_source_fails_closed(self):
         # fs/open.c without do_faccessat anchor
         altered_bundle = create_source_bundle(
-            target_id="gki-android14-6.1",
+            target_id="sultan-android14-6.1",
             kernel_version="6.1.25",
             files={
                 "fs/exec.c": _SAMPLE_EXEC,
@@ -337,7 +337,7 @@ class TestV26FixtureAdaptation(unittest.TestCase):
             "if (IS_ERR(filename))\n\tif (IS_ERR(filename))",
         )
         ambiguous_bundle = create_source_bundle(
-            target_id="gki-android14-6.1",
+            target_id="sultan-android14-6.1",
             kernel_version="6.1.25",
             files={
                 "fs/exec.c": dup_exec,
@@ -355,7 +355,7 @@ class TestV26FixtureAdaptation(unittest.TestCase):
         first_op = plan.operations[0]
         with self.assertRaises(DuplicateAdaptationOperation):
             FixtureAdaptationPlan(
-                target_id="gki-android14-6.1",
+                target_id="sultan-android14-6.1",
                 bundle_identity=str(self.bundle_gki_6_1.identity),
                 operations=(first_op, first_op),
             )

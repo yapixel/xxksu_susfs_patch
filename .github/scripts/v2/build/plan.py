@@ -338,7 +338,7 @@ def create_all_canonical_plans(
     result_path_template: str = "build/results/{profile_id}.json",
     toolchain_requirements: Optional[BuildToolchainSpec] = None,
 ) -> Tuple[BuildPlan, ...]:
-    """Create all six canonical BuildPlan objects in canonical matrix order."""
+    """Create the four canonical BuildPlan objects in canonical matrix order."""
     return tuple(
         create_build_plan_from_definition(
             prof_def,

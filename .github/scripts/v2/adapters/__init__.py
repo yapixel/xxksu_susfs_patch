@@ -17,7 +17,6 @@ from .base import (
     UnsupportedTarget,
     find_function_span,
 )
-from .gki_android14_6_1 import GKIAndroid14_6_1Adapter
 from .gki_android16_6_12 import GKIAndroid16_6_12Adapter
 from .sultan_android14_6_1 import SultanAndroid14_6_1Adapter
 from .fixtures import (
@@ -45,7 +44,6 @@ from .xxksu import (
 
 
 _ADAPTER_REGISTRY: Mapping[str, Type[TargetAdapter]] = {
-    "gki-android14-6.1": GKIAndroid14_6_1Adapter,
     "gki-android16-6.12": GKIAndroid16_6_12Adapter,
     "sultan-android14-6.1": SultanAndroid14_6_1Adapter,
     "xxksu": XxksuAdapter,

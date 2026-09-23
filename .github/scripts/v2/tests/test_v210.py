@@ -49,16 +49,14 @@ from v2.model.result import (
 from v2.profiles.matrix import get_profile_definition, list_profile_definitions
 
 
-class TestV210SixBuildPlans(unittest.TestCase):
-    """Verify that all six canonical BuildPlan objects are generated deterministically."""
+class TestV210FourBuildPlans(unittest.TestCase):
+    """Verify that all four canonical BuildPlan objects are generated deterministically."""
 
-    def test_canonical_matrix_six_plans(self):
+    def test_canonical_matrix_four_plans(self):
         plans = create_all_canonical_plans()
-        self.assertEqual(len(plans), 6)
+        self.assertEqual(len(plans), 4)
 
         expected_profiles = (
-            "gki-android14-6.1-manual",
-            "gki-android14-6.1-lsm_bl",
             "gki-android16-6.12-manual",
             "gki-android16-6.12-lsm_bl",
             "sultan-android14-6.1-manual",
@@ -101,8 +99,6 @@ class TestV210DefconfigAndFlags(unittest.TestCase):
 
         # GKI profiles must use gki_defconfig
         gki_profiles = [
-            "gki-android14-6.1-manual",
-            "gki-android14-6.1-lsm_bl",
             "gki-android16-6.12-manual",
             "gki-android16-6.12-lsm_bl",
         ]
@@ -142,7 +138,7 @@ class TestV210DefconfigAndFlags(unittest.TestCase):
 
 
 class TestV210PathIsolation(unittest.TestCase):
-    """Verify mutual path isolation across all six profiles."""
+    """Verify mutual path isolation across all four profiles."""
 
     def test_disjoint_paths(self):
         plans = create_all_canonical_plans()
@@ -167,10 +163,10 @@ class TestV210PathIsolation(unittest.TestCase):
             log_dirs.add(l)
             result_paths.add(r)
 
-        self.assertEqual(len(worktrees), 6)
-        self.assertEqual(len(out_dirs), 6)
-        self.assertEqual(len(log_dirs), 6)
-        self.assertEqual(len(result_paths), 6)
+        self.assertEqual(len(worktrees), 4)
+        self.assertEqual(len(out_dirs), 4)
+        self.assertEqual(len(log_dirs), 4)
+        self.assertEqual(len(result_paths), 4)
 
     def test_path_isolation_validator(self):
         plans = create_all_canonical_plans()
@@ -225,7 +221,7 @@ class TestV210Determinism(unittest.TestCase):
 
         data = json.loads(matrix1)
         self.assertIn("include", data)
-        self.assertEqual(len(data["include"]), 6)
+        self.assertEqual(len(data["include"]), 4)
         # Verify ordering is deterministic by profile_id
         profile_ids = [item["profile_id"] for item in data["include"]]
         self.assertEqual(profile_ids, sorted(profile_ids))
@@ -247,13 +243,14 @@ class TestV210ArtifactsAndConfigFragment(unittest.TestCase):
             self.assertIn("CONFIG_KSU=y", p.config_fragment)
             self.assertIn("CONFIG_KSU_SUSFS=y", p.config_fragment)
 
+        manual_plan = plans["sultan-android14-6.1-manual"]
+        lsm_plan = plans["sultan-android14-6.1-lsm_bl"]
+
         # Manual profiles: no LSM / BL
-        manual_plan = plans["gki-android14-6.1-manual"]
         self.assertIn("# CONFIG_KSU_LSM_SECURITY_HOOKS is not set", manual_plan.config_fragment)
         self.assertIn("# CONFIG_KSU_HACK_ARM64_BRANCH_LINK is not set", manual_plan.config_fragment)
 
         # LSM_BL profiles: LSM / BL enabled
-        lsm_plan = plans["gki-android14-6.1-lsm_bl"]
         self.assertIn("CONFIG_KSU_LSM_SECURITY_HOOKS=y", lsm_plan.config_fragment)
         self.assertIn("CONFIG_KSU_HACK_ARM64_BRANCH_LINK=y", lsm_plan.config_fragment)
 
@@ -295,7 +292,7 @@ class TestV210DryRunAndExecutionGuards(unittest.TestCase):
     def test_dry_run_all_six_profiles(self):
         plans = create_all_canonical_plans()
         results = execute_all_dry_runs(plans)
-        self.assertEqual(len(results), 6)
+        self.assertEqual(len(results), 4)
 
         for res in results:
             self.assertTrue(isinstance(res, BuildResult))
@@ -432,7 +429,7 @@ class TestV210FailureClassification(unittest.TestCase):
 class TestV210BuildValidators(unittest.TestCase):
     """Verify build plan and result validators."""
 
-    def test_validate_all_six_build_plans(self):
+    def test_validate_all_four_build_plans(self):
         for plan in create_all_canonical_plans():
             res = validate_build_plan(plan)
             self.assertEqual(res.status, ValidationStatus.PASS)
@@ -503,10 +500,10 @@ class TestV210ZeroBuildBinariesExecuted(unittest.TestCase):
     def test_zero_build_tool_invocations(self, mock_system, mock_call, mock_popen, mock_run):
         # Execute the entire suite of build planning, dry runs, matrix exports, validations
         plans = create_all_canonical_plans()
-        self.assertEqual(len(plans), 6)
+        self.assertEqual(len(plans), 4)
 
         results = execute_all_dry_runs(plans)
-        self.assertEqual(len(results), 6)
+        self.assertEqual(len(results), 4)
 
         ci_matrix = export_ci_matrix(plans)
         self.assertTrue(ci_matrix)

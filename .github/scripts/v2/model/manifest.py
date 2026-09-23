@@ -40,7 +40,7 @@ class InvalidConfigContract(InvalidProfileContract):
     pass
 
 
-KNOWN_TARGETS = ("gki-android14-6.1", "gki-android16-6.12", "sultan-android14-6.1")
+KNOWN_TARGETS = ("gki-android16-6.12", "sultan-android14-6.1")
 KNOWN_PROFILES = tuple(f"{target}-{mode}" for target in KNOWN_TARGETS for mode in ("manual", "lsm_bl"))
 TARGET_SCHEMAS = {"xxksu-susfs-target/v1"}
 PROFILE_SCHEMAS = {"xxksu-susfs-profile/v1"}
@@ -51,7 +51,7 @@ MANUAL_KCONFIG = {"CONFIG_KSU": "y", "CONFIG_KSU_SUSFS": "y", "CONFIG_KSU_LSM_SE
 LSM_KCONFIG = {"CONFIG_KSU": "y", "CONFIG_KSU_SUSFS": "y", "CONFIG_KSU_LSM_SECURITY_HOOKS": "y",
                "CONFIG_KSU_HACK_ARM64_BRANCH_LINK": "y", "CONFIG_KSU_TAMPER_SYSCALL_TABLE": "n",
                "CONFIG_KSU_KPROBES_KSUD": "n"}
-ADAPTERS = {"gki-android14-6.1": "gki_android14_6_1", "gki-android16-6.12": "gki_android16_6_12",
+ADAPTERS = {"gki-android16-6.12": "gki_android16_6_12",
             "sultan-android14-6.1": "sultan_android14_6_1"}
 
 

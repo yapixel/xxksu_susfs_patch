@@ -8,11 +8,6 @@ from ..model.provenance import FixtureRef, InputRef, PatchRef, RepositoryRef
 
 
 _TARGET_DATA = {
-    "gki-android14-6.1": {
-        "kernel": ("https://android.googlesource.com/kernel/common", "android14-6.1"),
-        "susfs50": ("https://gitlab.com/simonpunk/susfs4ksu", "gki-android14-6.1"),
-        "susfs50_commit": "598370fe434a7825bfe0f41d3029d102e3cfaec4",
-    },
     "gki-android16-6.12": {
         "kernel": ("https://android.googlesource.com/kernel/common", "android16-6.12"),
         "susfs50": ("https://gitlab.com/simonpunk/susfs4ksu", "gki-android16-6.12"),

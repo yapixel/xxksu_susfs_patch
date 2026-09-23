@@ -91,10 +91,10 @@ class V22HashCacheTests(unittest.TestCase):
 
 
 class V22ManifestTests(unittest.TestCase):
-    def test_all_six_profiles_validate_independently(self):
+    def test_all_four_profiles_validate_independently(self):
         manifests = build_manifest_sets()
-        self.assertEqual(len(manifests), 3)
-        self.assertEqual(sum(len(item.profiles) for item in manifests), 6)
+        self.assertEqual(len(manifests), 2)
+        self.assertEqual(sum(len(item.profiles) for item in manifests), 4)
         for manifest_set in manifests:
             for profile in manifest_set.profiles:
                 profile.validate(manifest_set.target)

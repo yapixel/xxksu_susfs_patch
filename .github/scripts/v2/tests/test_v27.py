@@ -360,7 +360,7 @@ class XxksuAdapterTests(unittest.TestCase):
 
     def test_incompatible_target_fails_closed(self):
         wrong_bundle = SourceBundle(
-            "gki-android14-6.1", "6.1", self.clean_bundle.files,
+            "sultan-android14-6.1", "6.1", self.clean_bundle.files,
         )
         with self.assertRaises(IncompatibleFixtureTarget):
             self.adapter.build_adaptation_plan(wrong_bundle)
