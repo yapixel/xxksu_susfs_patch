@@ -6,22 +6,22 @@
       "backslashxx_kernelsu": {
         "repository": "https://github.com/backslashxx/KernelSU.git",
         "ref": "master",
-        "commit": "0b138d6a9cfe4dc163aa05c21b1e6a14ff868230",
-        "relevant_content_hash": "sha256:ebb3ae93c587f9ce575c7e418073bc5d89f1f8cec1f88e7cc867b4977c253231",
+        "commit": "41c73d28d054f74eabe8a3ba494f14dc3402b3f8",
+        "relevant_content_hash": "sha256:ba9ee4ad613eded773bf19b1fe15cd4bb3eec209c83182dbc724510cd39f2ebb",
         "tracked_files": {
-          "kernel/Kconfig": "sha256:92ac701c79aa3e578c0aa1e2df4674ddcf8f0e83738f9a2a648854f586f4e2cd",
-          "kernel/downstream/ksu_hostsredirect.h": "sha256:6152ac7fc5535c2ca1a426f1a7aa82a66eaf1eda72d5f1a51b22c82330812fa7",
-          "kernel/feature/kernel_umount.c": "sha256:a88b2da16a4b249255f324450d23b79db4a74f66b087ccb184db635b8aeb1fa7",
-          "kernel/feature/sucompat.c": "sha256:65b804fbb00d333211ce7d4fbdc257329dd3d56b6bae89c456bb706183329957",
+          "kernel/Kconfig": "sha256:e736aec3f381cbaf5c11e71714b65cd7f1d74578a10ec33d8fa883d9e7c45e22",
+          "kernel/downstream/ksu_hostsredirect.h": "sha256:9dbaf73b1edcb515ca98ca0cfe9f12dc4fa3c264041aba70398061fe897cf4e9",
+          "kernel/feature/kernel_umount.c": "sha256:8117bc04e3ca3c8cffbc222f09f08d2641c63f22721bd0d19ef10982901ab54d",
+          "kernel/feature/sucompat.c": "sha256:2b016b7a49792d13c0982f9a0a272b560901cec70f005ac5d7b591c27601f597",
           "kernel/hook/setuid_hook.c": "sha256:dd7f40fa454fdea2d997ee219f3aed2892a71efa8ad2b69a5f2d6aca86ada1e5",
-          "kernel/hook/syscall_table_hook_arm64.c": "sha256:97060baf71bfe3fc9d69b927a4c329974b3e72592dccf6179888dea8f55891d0",
-          "kernel/ksu.c": "sha256:a2d83aab4e41824759e55fe227f79b79ef3937ad85c298969267837f5450992d",
-          "kernel/runtime/ksud.c": "sha256:523b327bd25f4a6d4ebdb0e9243e6441dfab5f11eae9552a9801ac1d6c997a9b",
-          "kernel/selinux/rules.c": "sha256:46432b9d2f8f904672e50e2f999b11aa4f9329ec07d9b6b5eda07baafec8aff6",
+          "kernel/hook/syscall_table_hook_arm64.c": "sha256:9e0b0c3ce4935455032888ec9c7c6102664aa360767f607372835103fb42fa5d",
+          "kernel/ksu.c": "sha256:08fa2558b19d1751d5866e008bb05e7d436e241a7d4fb18a53c2eae6a044085b",
+          "kernel/runtime/ksud.c": "sha256:6761b422cdcb0777c609e0b0e991531c7f153787951a89e7579a589f9bf8c0e1",
+          "kernel/selinux/rules.c": "sha256:b1d5ba8d2f90090ba029c76e4484158452fc170006fceb4f9d2b34eb4bb57003",
           "kernel/selinux/selinux.c": "sha256:f864d3c4f0ee87fd5ecc2a822ffd63c73a7983127f690bc66c2e39ec2a63915d",
           "kernel/selinux/selinux.h": "sha256:125bb10481a681e53c2e745333e7a7d9d3fdae3cccbc1e32974b56b136276c83",
-          "kernel/supercall/dispatch.c": "sha256:5353140074f3371acbf5bd448df466833e8417bc5e1a3a88a3659f77f0f887f6",
-          "kernel/supercall/supercall.c": "sha256:fa5b06348724c03370a6b57f6b2f7fd44b076a79a5583b3e81338d18eec06a68"
+          "kernel/supercall/dispatch.c": "sha256:cafa744b43b4b82a09f0d16c9e2771cec56ccb122f9538a519b328483ae6fbb9",
+          "kernel/supercall/supercall.c": "sha256:7fcf757a0a04399312365556be47120d7ce95d8c6229d08534d1c9559449f01e"
         }
       },
       "susfs_sultan": {

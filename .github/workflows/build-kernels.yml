@@ -72,13 +72,13 @@ jobs:
           git checkout FETCH_HEAD
           cd ..
 
-          echo "📥 Fetching authoritative xxKSU (0b138d6a)..."
+          echo "📥 Fetching authoritative xxKSU (41c73d28)..."
           git init xxksu_src
           cd xxksu_src
           git config user.name "yapixel"
           git config user.email "yapixel@users.noreply.github.com"
           git remote add origin "https://github.com/backslashxx/KernelSU.git"
-          git fetch --depth=1 origin "0b138d6a9cfe4dc163aa05c21b1e6a14ff868230"
+          git fetch --depth=1 origin "41c73d28d054f74eabe8a3ba494f14dc3402b3f8"
           git checkout FETCH_HEAD
           cd ..
 
@@ -138,7 +138,7 @@ jobs:
           echo "- **Profile Mode:** \`${{ matrix.hook_mode }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Kernel Commit:** \`af5c65b9547a9f33c5f566430d0434aecab5a8b5\` (16.0.0-sultan)" >> $GITHUB_STEP_SUMMARY
           echo "- **SuSFS Commit:** \`7fd1da8e0cc8d1b572c97c5fe4a27d0ec6e3e2f1\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **xxKSU Commit:** \`0b138d6a9cfe4dc163aa05c21b1e6a14ff868230\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **xxKSU Commit:** \`41c73d28d054f74eabe8a3ba494f14dc3402b3f8\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Rejects:** 0" >> $GITHUB_STEP_SUMMARY
           echo "- **Fuzz:** 0" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** ✅ PASS" >> $GITHUB_STEP_SUMMARY
@@ -181,13 +181,13 @@ jobs:
           git checkout FETCH_HEAD
           cd ..
 
-          echo "📥 Fetching authoritative xxKSU (0b138d6a)..."
+          echo "📥 Fetching authoritative xxKSU (41c73d28)..."
           git init xxksu_src
           cd xxksu_src
           git config user.name "yapixel"
           git config user.email "yapixel@users.noreply.github.com"
           git remote add origin "https://github.com/backslashxx/KernelSU.git"
-          git fetch --depth=1 origin "0b138d6a9cfe4dc163aa05c21b1e6a14ff868230"
+          git fetch --depth=1 origin "41c73d28d054f74eabe8a3ba494f14dc3402b3f8"
           git checkout FETCH_HEAD
           cd ..
 
@@ -244,7 +244,7 @@ jobs:
           echo "- **Target:** \`gki-android16-6.12\` (android16-6.12-2025-09_r38)" >> $GITHUB_STEP_SUMMARY
           echo "- **Profile Mode:** \`${{ matrix.hook_mode }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **SuSFS Commit:** \`c8f64e41e3dea2cd44754d7472d3cd0bc0b40784\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **xxKSU Commit:** \`0b138d6a9cfe4dc163aa05c21b1e6a14ff868230\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **xxKSU Commit:** \`41c73d28d054f74eabe8a3ba494f14dc3402b3f8\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Rejects:** 0" >> $GITHUB_STEP_SUMMARY
           echo "- **Fuzz:** 0" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** ✅ PASS" >> $GITHUB_STEP_SUMMARY

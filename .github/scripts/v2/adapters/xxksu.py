@@ -43,16 +43,16 @@ PATCH11_CANONICAL_FILES: Tuple[str, ...] = (
 )
 
 PATCH11_FILE_INDEXES: Mapping[str, str] = {
-    "kernel/Kconfig": "index 18b97b7..36e28e2 100644",
-    "kernel/downstream/ksu_hostsredirect.h": "index 07e7ca9..c5a5ef8 100644",
-    "kernel/feature/kernel_umount.c": "index 3d6eb6f..001b1f0 100644",
+    "kernel/Kconfig": "index 45e09d1..e783e43 100644",
+    "kernel/downstream/ksu_hostsredirect.h": "index 4d98a8b..67da4cc 100644",
+    "kernel/feature/kernel_umount.c": "index 15aded3..4ee471e 100644",
     "kernel/hook/setuid_hook.c": "index 9257980..c0cdcad 100644",
-    "kernel/ksu.c": "index ff786d1..7441a22 100644",
-    "kernel/selinux/rules.c": "index 12a7a17..9f7743f 100644",
+    "kernel/ksu.c": "index 06df055..77210ba 100644",
+    "kernel/selinux/rules.c": "index a9d4f67..9351318 100644",
     "kernel/selinux/selinux.c": "index 04e5ffe..e3bd796 100644",
     "kernel/selinux/selinux.h": "index cbeac55..42bdf73 100644",
-    "kernel/supercall/dispatch.c": "index b1cf6b5..05e5fa9 100644",
-    "kernel/supercall/supercall.c": "index 8c20793..f8a4276 100644",
+    "kernel/supercall/dispatch.c": "index fe628e3..4b3c30c 100644",
+    "kernel/supercall/supercall.c": "index 59ec582..1fad7a1 100644",
 }
 
 PATCH11_PREAMBLE: Tuple[str, ...] = (
@@ -64,7 +64,7 @@ PATCH11_PREAMBLE: Tuple[str, ...] = (
     "---",
     " kernel/Kconfig                        |  98 +++++++++++++++",
     " kernel/downstream/ksu_hostsredirect.h |   4 +",
-    " kernel/feature/kernel_umount.c        |  54 +++++---",
+    " kernel/feature/kernel_umount.c        |  53 ++++++++---",
     " kernel/hook/setuid_hook.c             | 169 +++++++++++++++++++++++---",
     " kernel/ksu.c                          |   8 ++",
     " kernel/selinux/rules.c                |   7 ++",
@@ -72,7 +72,7 @@ PATCH11_PREAMBLE: Tuple[str, ...] = (
     " kernel/selinux/selinux.h              |  14 +++",
     " kernel/supercall/dispatch.c           |  24 ++++",
     " kernel/supercall/supercall.c          |  99 +++++++++++++++",
-    " 10 files changed, 545 insertions(+), 35 deletions(-)",
+    " 10 files changed, 545 insertions(+), 34 deletions(-)",
     "",
 )
 
@@ -143,14 +143,14 @@ def get_patch11_operation_specs() -> Tuple[XxksuOperationSpec, ...]:
         XxksuOperationSpec(
             operation_id='xxksu.kernel_feature_kernel_umount_c.hunk_0',
             file_path='kernel/feature/kernel_umount.c',
-            spec=AnchorSpec('kernel/feature/kernel_umount.c', 'static bool ksu_kernel_umount_enabled __read_mostly = true;\nbool ksu_webview_zygote_umount_enabled __read_mostly = true;\n', context_before=(), context_after=('static int kernel_umount_feature_get(u64 *value)',)),
+            spec=AnchorSpec('kernel/feature/kernel_umount.c', 'static bool ksu_kernel_umount_enabled __read_mostly = true;\n', context_before=(), context_after=('static int kernel_umount_feature_get(u64 *value)',)),
             placement=Placement.REPLACE,
             payload='#ifndef CONFIG_KSU_SUSFS\nstatic bool ksu_kernel_umount_enabled __read_mostly = true;\n#else\nbool ksu_kernel_umount_enabled = true;\n#endif // #ifndef CONFIG_KSU_SUSFS\nbool ksu_webview_zygote_umount_enabled = true;\n\nbool ksu_is_webview_zygote_umount_enabled(void)\n{\n\treturn READ_ONCE(ksu_webview_zygote_umount_enabled);\n}\n',
             section_context='',
             context_before_count=0,
             context_after_count=3,
             context_before_offset=0,
-            diff_body=(('+', '#ifndef CONFIG_KSU_SUSFS'), (' ', 'static bool ksu_kernel_umount_enabled __read_mostly = true;'), ('-', 'bool ksu_webview_zygote_umount_enabled __read_mostly = true;'), ('+', '#else'), ('+', 'bool ksu_kernel_umount_enabled = true;'), ('+', '#endif // #ifndef CONFIG_KSU_SUSFS'), ('+', 'bool ksu_webview_zygote_umount_enabled = true;'), ('+', ''), ('+', 'bool ksu_is_webview_zygote_umount_enabled(void)'), ('+', '{'), ('+', '\treturn READ_ONCE(ksu_webview_zygote_umount_enabled);'), ('+', '}')),
+            diff_body=(('+', '#ifndef CONFIG_KSU_SUSFS'), (' ', 'static bool ksu_kernel_umount_enabled __read_mostly = true;'), ('+', '#else'), ('+', 'bool ksu_kernel_umount_enabled = true;'), ('+', '#endif // #ifndef CONFIG_KSU_SUSFS'), ('+', 'bool ksu_webview_zygote_umount_enabled = true;'), ('+', ''), ('+', 'bool ksu_is_webview_zygote_umount_enabled(void)'), ('+', '{'), ('+', '\treturn READ_ONCE(ksu_webview_zygote_umount_enabled);'), ('+', '}')),
         ),
         XxksuOperationSpec(
             operation_id='xxksu.kernel_feature_kernel_umount_c.hunk_1',
@@ -351,13 +351,13 @@ def get_patch11_operation_specs() -> Tuple[XxksuOperationSpec, ...]:
         XxksuOperationSpec(
             operation_id='xxksu.kernel_supercall_supercall_c.hunk_0',
             file_path='kernel/supercall/supercall.c',
-            spec=AnchorSpec('kernel/supercall/supercall.c', 'static int anon_ksu_release(struct inode *inode, struct file *filp)\n', context_before=(), context_after=('{', 'pr_info("ksu fd released\\n");')),
+            spec=AnchorSpec('kernel/supercall/supercall.c', 'static int anon_ksu_release(struct inode *inode, struct file *filp)\n', context_before=('\tunsigned long permissions;', '};'), context_after=('{', '\tkfree(filp->private_data);')),
             placement=Placement.BEFORE,
             payload='#ifdef CONFIG_KSU_SUSFS\n#include <linux/namei.h>\n#include <linux/susfs.h>\n#include "objsec.h"\n#endif // #ifdef CONFIG_KSU_SUSFS\n\n',
-            section_context='',
-            context_before_count=0,
+            section_context='struct ksu_driver_context {',
+            context_before_count=3,
             context_after_count=3,
-            context_before_offset=0,
+            context_before_offset=3,
             diff_body=(('+', '#ifdef CONFIG_KSU_SUSFS'), ('+', '#include <linux/namei.h>'), ('+', '#include <linux/susfs.h>'), ('+', '#include "objsec.h"'), ('+', '#endif // #ifdef CONFIG_KSU_SUSFS'), ('+', '')),
         ),
         XxksuOperationSpec(

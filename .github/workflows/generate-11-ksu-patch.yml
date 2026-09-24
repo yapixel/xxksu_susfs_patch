@@ -6,7 +6,7 @@ on:
       ksu_commit:
         description: "Authoritative KernelSU Commit to Test"
         required: false
-        default: "0b138d6a9cfe4dc163aa05c21b1e6a14ff868230"
+        default: "41c73d28d054f74eabe8a3ba494f14dc3402b3f8"
   push:
     branches:
       - main
@@ -20,8 +20,8 @@ permissions:
 
 env:
   KSU_REPO: "backslashxx/KernelSU"
-  KSU_COMMIT: "0b138d6a9cfe4dc163aa05c21b1e6a14ff868230"
-  PATCH_11_SHA256: "ce0a8ef338c4a7f51ec8a6b9e110add81bb702b68bd685239bfbdb0ccd05cc16"
+  KSU_COMMIT: "41c73d28d054f74eabe8a3ba494f14dc3402b3f8"
+  PATCH_11_SHA256: "bfa196dde54874b34c285614ff842fe26540ba8d46fb715aaf3cd2ba95e7956e"
 
 jobs:
   validate_11_patch:

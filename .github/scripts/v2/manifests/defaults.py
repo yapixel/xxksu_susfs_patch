@@ -20,7 +20,7 @@ _TARGET_DATA = {
     },
 }
 
-_XXKSU_COMMIT = "0b138d6a9cfe4dc163aa05c21b1e6a14ff868230"
+_XXKSU_COMMIT = "41c73d28d054f74eabe8a3ba494f14dc3402b3f8"
 
 
 def _target(target_id: str) -> TargetManifest:
