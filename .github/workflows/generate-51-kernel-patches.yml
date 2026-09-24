@@ -42,15 +42,6 @@ jobs:
             out_dir: "patches/sultan-android14-6.1"
             out_patch: "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
 
-          - name: "GKI 6.12 (Android 16)"
-            target: "gki-android16-6.12"
-            susfs_branch: "gki-android16-6.12"
-            susfs_commit: "c8f64e41e3dea2cd44754d7472d3cd0bc0b40784"
-            kernel_type: "tar"
-            kernel_url: "https://android.googlesource.com/kernel/common/+archive/c8909f7cf1380810b285cbeee347dd01a8c9ec5c.tar.gz"
-            out_dir: "patches/gki-android16-6.12"
-            out_patch: "51_deinlined_susfs_hooks_gki-android16-6.12.patch"
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
