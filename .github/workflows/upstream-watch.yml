@@ -1,0 +1,72 @@
+name: "Upstream Watch & Auto-Maintenance (Phase 1)"
+
+on:
+  schedule:
+    # Run daily at 02:00 UTC
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry Run (skip remote fetches and issue creation)"
+        required: false
+        default: false
+        type: boolean
+      source_filter:
+        description: "Filter to specific source (leave empty for all)"
+        required: false
+        default: ""
+        type: string
+      escalate:
+        description: "Create/update GitHub Issues for failures"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watch_upstream:
+    name: "Evaluate Tracked Upstream Sources"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run Upstream Watch & Auto-Maintenance
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          ARGS=()
+          if [ "${{ github.event.inputs.dry_run || 'false' }}" = "true" ]; then
+            ARGS+=( "--dry-run" )
+          fi
+
+          if [ "${{ github.event.inputs.escalate || 'true' }}" = "true" ]; then
+            ARGS+=( "--escalate" )
+          fi
+
+          if [ -n "${{ github.event.inputs.source_filter || '' }}" ]; then
+            ARGS+=( "--source" "${{ github.event.inputs.source_filter }}" )
+          fi
+
+          PYTHONPATH=.github/scripts python3 -m v2.watch.cli "${ARGS[@]}"
+
+      - name: Upload Candidate Patches (if generated)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: upstream-candidate-patches
+          path: candidate_patches/
+          if-no-files-found: ignore
