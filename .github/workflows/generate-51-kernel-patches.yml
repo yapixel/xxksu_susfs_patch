@@ -227,9 +227,27 @@ jobs:
             git commit --no-gpg-sign -m "base: initial clean kernel tree r38" || true
           fi
 
-      - name: Apply & Verify Patch 51 on r38 Source Tree
+      - name: Verify r38 Compatibility Patch 51 Integrity and Checksum
         run: |
-          set -uo pipefail
+          set -euo pipefail
+          PATCH_FILE="patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
+          if [ ! -f "$PATCH_FILE" ]; then
+            echo "❌ Error: $PATCH_FILE not found"
+            exit 1
+          fi
+          EXPECTED_SHA="c9b05ccc94badff5d7e6f01463f71f9ff7281674c40289e11bfa9ee9429cfe6d"
+          ACTUAL_SHA="$(sha256sum "$PATCH_FILE" | cut -d' ' -f1)"
+          echo "Expected SHA-256: $EXPECTED_SHA"
+          echo "Actual SHA-256:   $ACTUAL_SHA"
+          if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
+            echo "❌ r38 Patch 51 SHA-256 mismatch!"
+            exit 1
+          fi
+          echo "✅ r38 Patch 51 integrity and checksum verified!"
+
+      - name: Apply & Verify r38 Compatibility Patch 51 on r38 Source Tree
+        run: |
+          set -euo pipefail
 
           cd kernel_tree
           mkdir -p fs/ include/linux/
@@ -237,22 +255,69 @@ jobs:
           cp -r "${{ github.workspace }}/susfs_src/kernel_patches/include/linux/susfs.h" include/linux/ || true
           cp -r "${{ github.workspace }}/susfs_src/kernel_patches/include/linux/susfs_def.h" include/linux/ || true
 
-          echo "🧪 Testing authoritative GKI 6.12 Patch 51 against android16-6.12-2025-09_r38..."
-          PATCH_RC=0
-          patch -p1 < "${{ github.workspace }}/patches/gki-android16-6.12/51_deinlined_susfs_hooks_gki-android16-6.12.patch" || PATCH_RC=$?
+          echo "🧪 Applying r38 compatibility Patch 51 from patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch..."
+          patch -p1 < "${{ github.workspace }}/patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
 
-          if [ "$PATCH_RC" -ne 0 ] || [ -n "$(find . -name "*.rej")" ]; then
-            echo "❌ Patch 51 rejected on android16-6.12-2025-09_r38 (exit code: $PATCH_RC)!"
-            echo "=== Rejection report ==="
+          if [ -n "$(find . -name "*.rej")" ]; then
+            echo "❌ Rejects found after applying r38 Patch 51!"
             find . -name "*.rej"
-            for rej in $(find . -name "*.rej"); do
-              echo "----------------------------------------"
-              echo "FILE: $rej"
-              echo "----------------------------------------"
-              cat "$rej"
-            done
             exit 1
           fi
 
           find . -type f \( -name "*.orig" -o -name "*~" \) -delete
-          echo "✅ Patch 51 applied cleanly on android16-6.12-2025-09_r38!"
+
+          git add -A
+          git commit --no-gpg-sign -m "SUSFS de-inlined hooks for android16-6.12-2025-09_r38" || true
+          echo "✅ r38 Compatibility Patch 51 applied cleanly with 0 rejects!"
+
+      - name: Validate xxKSU + SuSFS Integration on r38 Kernel Tree
+        run: |
+          set -euo pipefail
+          cd kernel_tree
+
+          echo "🧪 Setting up authoritative xxKSU (${{ github.event.inputs.ksu_branch || env.KSU_COMMIT }})..."
+          if [ ! -d "KernelSU" ]; then
+            git init KernelSU
+            cd KernelSU
+            git config user.name "yapixel"
+            git config user.email "yapixel@users.noreply.github.com"
+            git remote add origin "https://github.com/${{ env.KSU_REPO }}.git"
+            git fetch --depth=1 origin "${{ github.event.inputs.ksu_branch || env.KSU_COMMIT }}"
+            git checkout FETCH_HEAD
+            cd ..
+          fi
+
+          DRIVER_DIR="drivers"
+          if [ -d "common/drivers" ]; then
+            DRIVER_DIR="common/drivers"
+          fi
+
+          ln -sf "$(realpath --relative-to="$DRIVER_DIR" "KernelSU/kernel")" "$DRIVER_DIR/kernelsu"
+          grep -q "kernelsu" "$DRIVER_DIR/Makefile" || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> "$DRIVER_DIR/Makefile"
+          grep -q "drivers/kernelsu/Kconfig" "$DRIVER_DIR/Kconfig" || sed -i "/endmenu/i\source \"drivers/kernelsu/Kconfig\"" "$DRIVER_DIR/Kconfig"
+
+          echo "🧪 Applying universal 11 patch to KernelSU..."
+          cd KernelSU
+          patch -p1 < "${{ github.workspace }}/patches/xxksu/11_enable_susfs_for_ksu.patch"
+          if [ -n "$(find . -name "*.rej")" ]; then
+            echo "❌ Rejects found after applying 11 patch to KernelSU!"
+            find . -name "*.rej"
+            exit 1
+          fi
+          find . -type f \( -name "*.orig" -o -name "*~" \) -delete
+          cd ..
+
+          echo "✅ Full r38 kernel tree integration (Patch 51 + xxKSU Patch 11) verified successfully!"
+
+      - name: Generate Statistics Report (r38 Compatibility)
+        run: |
+          echo "### 📄 GKI 6.12 r38 Compatibility Patch 51 Diffstat" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          git apply --stat "${{ github.workspace }}/patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload 51 Patch Artifact (r38 Compatibility)
+        uses: actions/upload-artifact@v4
+        with:
+          name: 51_patch_gki-android16-6.12-r38
+          path: patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch
