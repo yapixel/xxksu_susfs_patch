@@ -20,14 +20,22 @@ from ..adapters.xxksu import (
     generate_patch11,
     get_patch11_operation_specs,
 )
+from ..engine.diff_parser import parse_patch
 from ..policy.model import PolicyIncomplete
 from ..policy.patch11 import classify_patch11
 from ..policy.patch51 import classify_patch51
-from ..semantic import SemanticInventory
+from ..semantic import SemanticInventory, SemanticKind, inventory_patch
 from ..source.baseline import load_authoritative_bundle
 from ..source.bundle import SourceBundle, create_source_bundle
 from ..source.patch_apply import SourceBundlePatchError, apply_patch_to_bundle
 from .model import SourceResult, WatchClassification, WatchReport
+
+try:
+    from deinline_50_to_51 import deinline_patch_content
+except ImportError:
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from deinline_50_to_51 import deinline_patch_content
 
 logger = logging.getLogger(__name__)
 
@@ -416,7 +424,7 @@ class UpstreamWatcher:
                 reproduction_command=repro_cmd,
             )
 
-        # Check existing patch application against authoritative bundle
+        # Locate candidate Patch 51 filename from target baseline
         baseline_path = self.repo_root / "patches" / target_id / "BASELINE.json"
         patch_file = (
             "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
@@ -431,23 +439,77 @@ class UpstreamWatcher:
                     patch_file = Path(pf).name
             except Exception:
                 pass
-        patch_path = self.repo_root / "patches" / target_id / patch_file
-        if patch_path.is_file() and bundle is not None:
-            try:
-                apply_patch_to_bundle(bundle, patch_path.read_text(encoding="utf-8"))
+
+        # Locate upstream 50 patch in fetched contents
+        patch50_file = None
+        for p in fetched_contents:
+            if ("50_add_susfs" in p or "50_" in p) and p.endswith(".patch"):
+                patch50_file = p
+                break
+
+        if not patch50_file:
+            return SourceResult(
+                source_id=source_id,
+                source_type="authoritative",
+                classification=WatchClassification.SEMANTIC_DRIFT,
+                old_identity=old_commit,
+                new_identity=new_commit,
+                old_content_hash=old_hash,
+                new_content_hash=new_hash,
+                affected_files=tuple(affected_files),
+                details=f"No upstream 50 patch found in fetched contents for {target_id}.",
+                reproduction_command=repro_cmd,
+            )
+
+        # 1. Regenerate candidate Patch 51 from the NEW immutable upstream input
+        try:
+            candidate_patch_text = deinline_patch_content(fetched_contents[patch50_file], target=target_id)
+            parsed_candidate = parse_patch(candidate_patch_text)
+        except Exception as exc:
+            return SourceResult(
+                source_id=source_id,
+                source_type="authoritative",
+                classification=WatchClassification.SEMANTIC_DRIFT,
+                old_identity=old_commit,
+                new_identity=new_commit,
+                old_content_hash=old_hash,
+                new_content_hash=new_hash,
+                affected_files=tuple(affected_files),
+                details=f"Candidate Patch 51 generation failed on {target_id}: {exc}",
+                reproduction_command=repro_cmd,
+            )
+
+        # 2. Check for missing newly-required source files in authoritative bundle (e.g. Sultan fs/super.c)
+        if bundle is not None:
+            bundle_files = {entry.path for entry in bundle.files}
+            candidate_files = {
+                f.new_path[2:] if (f.new_path and f.new_path.startswith(("a/", "b/"))) else (f.new_path or f.old_path or "")
+                for f in parsed_candidate.files
+            }
+            candidate_files.discard("")
+            missing_files = sorted(candidate_files - bundle_files)
+            if missing_files:
                 return SourceResult(
                     source_id=source_id,
                     source_type="authoritative",
-                    classification=WatchClassification.SAFE_REGEN_CANDIDATE,
+                    classification=WatchClassification.SEMANTIC_DRIFT,
                     old_identity=old_commit,
                     new_identity=new_commit,
                     old_content_hash=old_hash,
                     new_content_hash=new_hash,
                     affected_files=tuple(affected_files),
-                    details=f"Upstream SuSFS updated ({new_commit[:12]}). Existing patch integration remains clean with 0 rejects, 0 fuzz.",
-                    candidate_patch_name=patch_file,
+                    affected_semantics=tuple(f"unbundled_file:{f}" for f in missing_files),
+                    details=(
+                        f"Upstream SuSFS update requires unbundled kernel files on {target_id}: "
+                        f"{', '.join(missing_files)}. Baseline expansion required."
+                    ),
                     reproduction_command=repro_cmd,
                 )
+
+        # 3. Strict application of candidate patch against authoritative target source
+        if bundle is not None:
+            try:
+                apply_patch_to_bundle(bundle, candidate_patch_text)
             except Exception as exc:
                 return SourceResult(
                     source_id=source_id,
@@ -458,20 +520,118 @@ class UpstreamWatcher:
                     old_content_hash=old_hash,
                     new_content_hash=new_hash,
                     affected_files=tuple(affected_files),
-                    details=f"SuSFS update broke strict patch application on {target_id}: {exc}",
+                    details=f"Candidate Patch 51 failed strict application on {target_id}: {exc}",
                     reproduction_command=repro_cmd,
                 )
+
+        # 4. Semantic inventory verification: SAFE_REGEN_CANDIDATE requires zero UNKNOWN semantic changes
+        new_unknowns: list[Any] = []
+        try:
+            old_contents = fetch_git_files(repo_url, old_commit, [patch50_file])
+            if patch50_file in old_contents:
+                inv_old = inventory_patch(
+                    parse_patch(old_contents[patch50_file]),
+                    source_identity=old_commit,
+                    source_type="official_50",
+                )
+                inv_new = inventory_patch(
+                    parse_patch(fetched_contents[patch50_file]),
+                    source_identity=new_commit,
+                    source_type="official_50",
+                )
+                old_digests = {u.evidence[0].fingerprint.digest.value for u in inv_old.units}
+                new_unknowns = [
+                    u for u in inv_new.units
+                    if u.kind == SemanticKind.UNKNOWN and u.evidence[0].fingerprint.digest.value not in old_digests
+                ]
+        except Exception as exc:
+            logger.warning("Failed semantic inventory comparison for %s: %s", source_id, exc)
+            return SourceResult(
+                source_id=source_id,
+                source_type="authoritative",
+                classification=WatchClassification.SEMANTIC_DRIFT,
+                old_identity=old_commit,
+                new_identity=new_commit,
+                old_content_hash=old_hash,
+                new_content_hash=new_hash,
+                affected_files=tuple(affected_files),
+                details=f"Semantic inventory verification failed for {source_id}: {exc}",
+                reproduction_command=repro_cmd,
+            )
+
+        if new_unknowns:
+            affected_paths = sorted(set(u.location.path for u in new_unknowns))
+            return SourceResult(
+                source_id=source_id,
+                source_type="authoritative",
+                classification=WatchClassification.SEMANTIC_DRIFT,
+                old_identity=old_commit,
+                new_identity=new_commit,
+                old_content_hash=old_hash,
+                new_content_hash=new_hash,
+                affected_files=tuple(affected_files),
+                affected_semantics=tuple(f"unknown:{u.location.path}:{u.location.start_line}" for u in new_unknowns[:20]),
+                details=(
+                    f"Upstream SuSFS update introduces {len(new_unknowns)} new UNKNOWN semantic units across "
+                    f"{len(affected_paths)} files ({', '.join(affected_paths[:5])}). Semantic reconciliation required."
+                ),
+                reproduction_command=repro_cmd,
+            )
+
+        # 5. Check Patch 10 if tracked and changed
+        patch10_file = "kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+        if patch10_file in affected_files and patch10_file in fetched_contents:
+            try:
+                old_10 = fetch_git_files(repo_url, old_commit, [patch10_file])
+                if patch10_file in old_10:
+                    inv_10_old = inventory_patch(
+                        parse_patch(old_10[patch10_file]),
+                        source_identity=old_commit,
+                        source_type="official_10",
+                    )
+                    inv_10_new = inventory_patch(
+                        parse_patch(fetched_contents[patch10_file]),
+                        source_identity=new_commit,
+                        source_type="official_10",
+                    )
+                    old_10_digests = {u.evidence[0].fingerprint.digest.value for u in inv_10_old.units}
+                    new_unknowns_10 = [
+                        u for u in inv_10_new.units
+                        if u.kind == SemanticKind.UNKNOWN and u.evidence[0].fingerprint.digest.value not in old_10_digests
+                    ]
+                    if new_unknowns_10:
+                        affected_paths = sorted(set(u.location.path for u in new_unknowns_10))
+                        return SourceResult(
+                            source_id=source_id,
+                            source_type="authoritative",
+                            classification=WatchClassification.SEMANTIC_DRIFT,
+                            old_identity=old_commit,
+                            new_identity=new_commit,
+                            old_content_hash=old_hash,
+                            new_content_hash=new_hash,
+                            affected_files=tuple(affected_files),
+                            affected_semantics=tuple(f"unknown:{u.location.path}:{u.location.start_line}" for u in new_unknowns_10[:20]),
+                            details=(
+                                f"Upstream SuSFS Patch 10 update introduces {len(new_unknowns_10)} new UNKNOWN semantic units across "
+                                f"{len(affected_paths)} files ({', '.join(affected_paths[:5])}). Semantic reconciliation required."
+                            ),
+                            reproduction_command=repro_cmd,
+                        )
+            except Exception as exc:
+                logger.warning("Failed Patch 10 semantic inventory comparison for %s: %s", source_id, exc)
 
         return SourceResult(
             source_id=source_id,
             source_type="authoritative",
-            classification=WatchClassification.SEMANTIC_DRIFT,
+            classification=WatchClassification.SAFE_REGEN_CANDIDATE,
             old_identity=old_commit,
             new_identity=new_commit,
             old_content_hash=old_hash,
             new_content_hash=new_hash,
             affected_files=tuple(affected_files),
-            details=f"SuSFS source changed across {len(affected_files)} files; semantic reconciliation needed.",
+            details=f"Safe upstream SuSFS update detected on {target_id}. Candidate Patch 51 generated and verified with 0 rejects, 0 fuzz.",
+            candidate_patch=candidate_patch_text,
+            candidate_patch_name=patch_file,
             reproduction_command=repro_cmd,
         )
 

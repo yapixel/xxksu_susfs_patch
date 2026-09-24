@@ -245,5 +245,135 @@ class WatchEscalationTests(unittest.TestCase):
         self.assertIn("PYTHONPATH=.github/scripts python3 -m v2.watch.cli", body)
 
 
+class SuSFSWatcherRegressionTests(unittest.TestCase):
+    def setUp(self):
+        self.watcher = UpstreamWatcher(repo_root=REPO_ROOT, state_path=STATE_FILE)
+
+    def test_deinline_target_isolation(self):
+        from deinline_50_to_51 import deinline_patch_content
+
+        sample_patch = """diff --git a/fs/statfs.c b/fs/statfs.c
+--- a/fs/statfs.c
++++ b/fs/statfs.c
+@@ -10,1 +10,2 @@
+ int foo;
++int bar;
+"""
+        gki_cand = deinline_patch_content(sample_patch, target="gki-android16-6.12")
+        self.assertIn("drivers/input/input.c", gki_cand)
+        self.assertIn("354", gki_cand)
+        self.assertNotIn("387", gki_cand)
+        self.assertNotIn("diff --git a/fs/susfs.c", gki_cand)
+        self.assertNotIn("diff --git a/include/linux/susfs.h", gki_cand)
+
+        sultan_cand = deinline_patch_content(sample_patch, target="sultan-android14-6.1")
+        self.assertIn("drivers/input/input.c", sultan_cand)
+        self.assertIn("387", sultan_cand)
+        self.assertIn("diff --git a/fs/susfs.c", sultan_cand)
+        self.assertIn("diff --git a/include/linux/susfs.h", sultan_cand)
+
+    @patch("v2.watch.checker.fetch_remote_commit")
+    @patch("v2.watch.checker.fetch_git_files")
+    def test_susfs_drift_detected_on_unbundled_file(self, mock_files, mock_commit):
+        mock_commit.return_value = "new_sultan_commit_c254cf2d"
+        new_patch = """diff --git a/fs/super.c b/fs/super.c
+--- a/fs/super.c
++++ b/fs/super.c
+@@ -10,1 +10,2 @@
+ int a;
++int b;
+"""
+        mock_files.return_value = {
+            "kernel_patches/50_add_susfs_in_gki-android14-6.1.patch": new_patch,
+        }
+        info = {
+            "repository": "https://gitlab.com/simonpunk/susfs4ksu.git",
+            "ref": "sultan-shiba-susfs-minimal",
+            "commit": "old_commit_7fd1da8e",
+            "relevant_content_hash": "sha256:old_hash",
+            "tracked_files": {
+                "kernel_patches/50_add_susfs_in_gki-android14-6.1.patch": "sha256:different",
+            },
+        }
+        res = self.watcher.check_susfs_authoritative("susfs_sultan", "sultan-android14-6.1", info, fetch_remote=True)
+        self.assertEqual(res.classification, WatchClassification.SEMANTIC_DRIFT)
+        self.assertTrue(res.requires_escalation())
+        self.assertIn("unbundled kernel files", res.details)
+        self.assertIn("fs/super.c", res.details)
+        self.assertIn("Baseline expansion required", res.details)
+
+    @patch("v2.watch.checker.fetch_remote_commit")
+    @patch("v2.watch.checker.fetch_git_files")
+    def test_susfs_drift_when_candidate_fails_strict_apply(self, mock_files, mock_commit):
+        mock_commit.return_value = "new_gki_commit_2528bdb0"
+        # Context mismatch on existing bundled file
+        new_patch = """diff --git a/fs/stat.c b/fs/stat.c
+--- a/fs/stat.c
++++ b/fs/stat.c
+@@ -9999,1 +9999,2 @@
+ completely_nonexistent_context_line();
++int injected_var;
+"""
+        mock_files.return_value = {
+            "kernel_patches/50_add_susfs_in_gki-android16-6.12.patch": new_patch,
+        }
+        info = {
+            "repository": "https://gitlab.com/simonpunk/susfs4ksu.git",
+            "ref": "gki-android16-6.12",
+            "commit": "old_commit_c8f64e41",
+            "relevant_content_hash": "sha256:old_hash",
+            "tracked_files": {
+                "kernel_patches/50_add_susfs_in_gki-android16-6.12.patch": "sha256:different",
+            },
+        }
+        res = self.watcher.check_susfs_authoritative("susfs_gki", "gki-android16-6.12", info, fetch_remote=True)
+        self.assertEqual(res.classification, WatchClassification.SEMANTIC_DRIFT)
+        self.assertTrue(res.requires_escalation())
+        self.assertIn("failed strict application", res.details)
+
+    @patch("v2.watch.checker.fetch_remote_commit")
+    @patch("v2.watch.checker.fetch_git_files")
+    @patch("v2.watch.checker.apply_patch_to_bundle")
+    def test_susfs_drift_detected_on_unknown_semantic_unit(self, mock_apply, mock_files, mock_commit):
+        mock_commit.return_value = "new_gki_commit_2528bdb0"
+        mock_apply.return_value = None
+
+        old_patch = """diff --git a/fs/statfs.c b/fs/statfs.c
+--- a/fs/statfs.c
++++ b/fs/statfs.c
+@@ -10,1 +10,2 @@
+ int flags;
++int old_flags;
+"""
+        new_patch = """diff --git a/fs/statfs.c b/fs/statfs.c
+--- a/fs/statfs.c
++++ b/fs/statfs.c
+@@ -10,1 +10,3 @@
+ int flags;
++int old_flags;
++int totally_new_unmodeled_susfs_hook(void);
+"""
+        def mock_fetch(repo_url, commit, paths):
+            if commit == "old_commit_c8f64e41":
+                return {"kernel_patches/50_add_susfs_in_gki-android16-6.12.patch": old_patch}
+            return {"kernel_patches/50_add_susfs_in_gki-android16-6.12.patch": new_patch}
+
+        mock_files.side_effect = mock_fetch
+
+        info = {
+            "repository": "https://gitlab.com/simonpunk/susfs4ksu.git",
+            "ref": "gki-android16-6.12",
+            "commit": "old_commit_c8f64e41",
+            "relevant_content_hash": "sha256:old_hash",
+            "tracked_files": {
+                "kernel_patches/50_add_susfs_in_gki-android16-6.12.patch": "sha256:different",
+            },
+        }
+        res = self.watcher.check_susfs_authoritative("susfs_gki", "gki-android16-6.12", info, fetch_remote=True)
+        self.assertEqual(res.classification, WatchClassification.SEMANTIC_DRIFT)
+        self.assertTrue(res.requires_escalation())
+        self.assertIn("UNKNOWN semantic units", res.details)
+
+
 if __name__ == "__main__":
     unittest.main()

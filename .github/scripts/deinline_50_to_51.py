@@ -180,15 +180,32 @@ index 6ede62945a68..a0c7dfa9790f 100755
 """
 }
 
-def deinline_patch(input_patch, output_patch, target="gki"):
-    if not os.path.isfile(input_patch):
-        print(f"❌ Error: Input patch {input_patch} not found")
-        sys.exit(1)
+GKI_6_12_EXTRA_CHUNKS = {
+    'drivers/input/input.c': (
+        "diff --git a/drivers/input/input.c b/drivers/input/input.c\n"
+        "index 372c9df..e59059f 100644\n"
+        "--- a/drivers/input/input.c\n"
+        "+++ b/drivers/input/input.c\n"
+        "@@ -354,6 +354,8 @@ static void input_event_dispose(struct input_dev *dev, int disposition,\n"
+        " \t}\n"
+        " }\n"
+        "\n"
+        "+extern struct static_key_false ksu_input_hook_key_false;\n"
+        "+\n"
+        " void input_handle_event(struct input_dev *dev,\n"
+        " \t\t\tunsigned int type, unsigned int code, int value)\n"
+        " {\n"
+    )
+}
 
-    print(f"📖 Reading upstream 50 patch: {input_patch} (Target: {target})")
-    with open(input_patch, 'r', encoding='utf-8', errors='ignore') as f:
-        content = f.read()
+def is_sultan_target(target: str) -> bool:
+    return "sultan" in target.lower()
 
+def is_gki_6_12_target(target: str) -> bool:
+    t = target.lower()
+    return "6.12" in t or t in ("gki", "gki-android16-6.12")
+
+def deinline_patch_content(content: str, target: str = "gki", date_str: str | None = None) -> str:
     excluded_files = [
         'fs/exec.c',
         'fs/open.c',
@@ -203,9 +220,11 @@ def deinline_patch(input_patch, output_patch, target="gki"):
     file_chunks = content.split('diff --git ')
     out_chunks = []
 
-    # Insert drivers/input/input.c for 6.1 kernels (Sultan & Pantah / GKI 6.1)
-    if ("6.1" in target or "sultan" in target.lower()) and 'drivers/input/input.c' in SULTAN_EXTRA_CHUNKS:
+    # Target-isolated drivers/input/input.c insertion
+    if is_sultan_target(target) and 'drivers/input/input.c' in SULTAN_EXTRA_CHUNKS:
         out_chunks.append(SULTAN_EXTRA_CHUNKS['drivers/input/input.c'].strip())
+    elif is_gki_6_12_target(target) and 'drivers/input/input.c' in GKI_6_12_EXTRA_CHUNKS:
+        out_chunks.append(GKI_6_12_EXTRA_CHUNKS['drivers/input/input.c'].strip())
 
     for fchunk in file_chunks[1:]:
         first_line = fchunk.splitlines()[0] if fchunk.splitlines() else ''
@@ -268,8 +287,9 @@ def deinline_patch(input_patch, output_patch, target="gki"):
             full_file_diff = 'diff --git ' + file_header.strip() + '\n' + '\n'.join(kept_hunks)
             out_chunks.append(full_file_diff.strip())
 
-        # Append extra Sultan chunks for fs/susfs.c and include/linux/susfs.h in order
-        if file_path == 'fs/statfs.c':
+        # Append extra Sultan chunks for fs/susfs.c and include/linux/susfs.h in order (Sultan ONLY)
+        # Standalone SuSFS source files must never be emitted into GKI Patch 51.
+        if file_path == 'fs/statfs.c' and is_sultan_target(target):
             if 'fs/susfs.c' in SULTAN_EXTRA_CHUNKS:
                 out_chunks.append(SULTAN_EXTRA_CHUNKS['fs/susfs.c'].strip())
             if 'include/linux/susfs.h' in SULTAN_EXTRA_CHUNKS:
@@ -284,11 +304,12 @@ def deinline_patch(input_patch, output_patch, target="gki"):
         diffstat = ""
 
     import datetime
-    current_utc_date = datetime.datetime.now(datetime.timezone.utc).strftime('%a, %d %b %Y %H:%M:%S +0000')
+    if date_str is None:
+        date_str = datetime.datetime.now(datetime.timezone.utc).strftime('%a, %d %b %Y %H:%M:%S +0000')
 
     git_subject = f"SUSFS de-inlined hooks for {target}"
     git_header = f"""From: yapixel <yapixel@users.noreply.github.com>
-Date: {current_utc_date}
+Date: {date_str}
 Subject: [PATCH] {git_subject}
 
 ---
@@ -296,7 +317,19 @@ Subject: [PATCH] {git_subject}
 
 """
 
-    final_patch = git_header + diff_body
+    return git_header + diff_body
+
+
+def deinline_patch(input_patch, output_patch, target="gki"):
+    if not os.path.isfile(input_patch):
+        print(f"❌ Error: Input patch {input_patch} not found")
+        sys.exit(1)
+
+    print(f"📖 Reading upstream 50 patch: {input_patch} (Target: {target})")
+    with open(input_patch, 'r', encoding='utf-8', errors='ignore') as f:
+        content = f.read()
+
+    final_patch = deinline_patch_content(content, target=target)
 
     os.makedirs(os.path.dirname(os.path.abspath(output_patch)), exist_ok=True)
     with open(output_patch, 'w', encoding='utf-8') as f:
