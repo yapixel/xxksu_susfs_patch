@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 from v2.watch.checker import (
     UpstreamWatcher,
     compute_composite_hash,
+    fetch_remote_commit,
 )
 from v2.watch.escalation import (
     format_issue_body,
@@ -97,6 +98,23 @@ class WatchStateTests(unittest.TestCase):
         ref = sources.get("reference", {})
         self.assertIn("midori_kernelsu_xx_patch", ref)
         self.assertIn("midori_gki_patch_50", ref)
+
+    @patch("subprocess.run")
+    def test_fetch_remote_commit_resolves_exact_ref(self, mock_run):
+        # When git ls-remote returns multiple refs including HEAD, exact ref must match
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.stdout = (
+            "30e66dc3a5c65954de865afd8f44682866887544\tHEAD\n"
+            "c254cf2dcdffcfb466b7ac6706f705a339adeaa0\trefs/heads/sultan-shiba-susfs-minimal\n"
+        )
+        mock_run.return_value = mock_proc
+
+        commit = fetch_remote_commit("https://gitlab.com/simonpunk/susfs4ksu.git", "sultan-shiba-susfs-minimal")
+        self.assertEqual(commit, "c254cf2dcdffcfb466b7ac6706f705a339adeaa0")
+        # Ensure HEAD was not in candidates passed to git ls-remote
+        args = mock_run.call_args[0][0]
+        self.assertNotIn("HEAD", args)
 
 
 class WatchClassificationTests(unittest.TestCase):

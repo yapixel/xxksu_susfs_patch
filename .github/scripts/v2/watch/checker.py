@@ -42,24 +42,38 @@ def compute_composite_hash(file_hashes: Mapping[str, str]) -> str:
 def fetch_remote_commit(repo_url: str, ref: str) -> str:
     """Fetch latest remote commit SHA for a git repository and ref."""
     try:
+        candidates = []
+        if ref:
+            candidates.extend([f"refs/heads/{ref}", f"refs/tags/{ref}", ref])
         proc = subprocess.run(
-            ["git", "ls-remote", repo_url, ref, f"refs/heads/{ref}", "HEAD"],
+            ["git", "ls-remote", repo_url] + candidates,
             capture_output=True,
             text=True,
             check=True,
             timeout=30,
         )
-        for line in proc.stdout.strip().splitlines():
+        lines = [line.strip() for line in proc.stdout.strip().splitlines() if line.strip()]
+        for line in lines:
             parts = line.split()
             if len(parts) >= 2:
                 commit = parts[0]
                 target_ref = parts[1]
-                if target_ref in (ref, f"refs/heads/{ref}", "HEAD"):
+                if target_ref in (f"refs/heads/{ref}", f"refs/tags/{ref}", ref):
                     return commit
-        # If output exists but no exact ref matched, take the first commit returned
-        lines = proc.stdout.strip().splitlines()
-        if lines:
-            return lines[0].split()[0]
+
+        # If ref is main/master/HEAD or empty, fallback to querying HEAD
+        if ref in ("main", "master", "HEAD", ""):
+            proc_head = subprocess.run(
+                ["git", "ls-remote", repo_url, "HEAD"],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=30,
+            )
+            head_lines = [l.strip() for l in proc_head.stdout.strip().splitlines() if l.strip()]
+            if head_lines:
+                return head_lines[0].split()[0]
+
         raise ValueError(f"no remote commit found for {repo_url} @ {ref}")
     except Exception as exc:
         raise RuntimeError(f"failed to fetch remote commit from {repo_url} @ {ref}: {exc}") from exc
@@ -77,12 +91,16 @@ def fetch_git_files(
         subprocess.run(["git", "-C", td, "fetch", "--depth=1", "origin", commit], check=True, capture_output=True, timeout=60)
 
         results: dict[str, str] = {}
+        missing_files: list[str] = []
         for p in file_paths:
             proc = subprocess.run(["git", "-C", td, "show", f"FETCH_HEAD:{p}"], capture_output=True)
             if proc.returncode == 0:
                 results[p] = proc.stdout.decode("utf-8", errors="replace")
             else:
+                missing_files.append(p)
                 logger.warning("File %s not found in %s @ %s", p, repo_url, commit)
+        if missing_files:
+            raise FileNotFoundError(f"Missing required tracked files at {commit}: {', '.join(missing_files)}")
         return results
 
 
@@ -399,11 +417,20 @@ class UpstreamWatcher:
             )
 
         # Check existing patch application against authoritative bundle
+        baseline_path = self.repo_root / "patches" / target_id / "BASELINE.json"
         patch_file = (
             "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
             if "sultan" in target_id
-            else "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
+            else "51_deinlined_susfs_hooks_gki-android16-6.12.patch"
         )
+        if baseline_path.is_file():
+            try:
+                base_data = json.loads(baseline_path.read_text(encoding="utf-8"))
+                pf = base_data.get("patch_51", {}).get("patch_file")
+                if pf:
+                    patch_file = Path(pf).name
+            except Exception:
+                pass
         patch_path = self.repo_root / "patches" / target_id / patch_file
         if patch_path.is_file() and bundle is not None:
             try:
