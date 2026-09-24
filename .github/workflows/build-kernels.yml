@@ -171,13 +171,13 @@ jobs:
           curl -LSs "https://github.com/yapixel/gki-build-assets/releases/download/android16-6.12-2025-09_r38/common-android16-6.12-2025-09_r38.tar.gz" | tar -xz -C kernel_tree
           sed -i 's/ -dirty//g' kernel_tree/scripts/setlocalversion 2>/dev/null || true
 
-          echo "📥 Fetching upstream SuSFS (gki-android16-6.12 / c8f64e41)..."
+          echo "📥 Fetching upstream SuSFS (gki-android16-6.12 / 2528bdb0)..."
           git init susfs_src
           cd susfs_src
           git config user.name "yapixel"
           git config user.email "yapixel@users.noreply.github.com"
           git remote add origin "https://gitlab.com/simonpunk/susfs4ksu.git"
-          git fetch --depth=1 origin "c8f64e41e3dea2cd44754d7472d3cd0bc0b40784"
+          git fetch --depth=1 origin "2528bdb0e2e76d26b9b174a8314ac115c9f00b3c"
           git checkout FETCH_HEAD
           cd ..
 
@@ -243,7 +243,7 @@ jobs:
           echo "### 📄 GKI 6.12 r38 (${{ matrix.hook_mode }}) Patch Integration Summary" >> $GITHUB_STEP_SUMMARY
           echo "- **Target:** \`gki-android16-6.12\` (android16-6.12-2025-09_r38)" >> $GITHUB_STEP_SUMMARY
           echo "- **Profile Mode:** \`${{ matrix.hook_mode }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **SuSFS Commit:** \`c8f64e41e3dea2cd44754d7472d3cd0bc0b40784\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **SuSFS Commit:** \`2528bdb0e2e76d26b9b174a8314ac115c9f00b3c\`" >> $GITHUB_STEP_SUMMARY
           echo "- **xxKSU Commit:** \`41c73d28d054f74eabe8a3ba494f14dc3402b3f8\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Rejects:** 0" >> $GITHUB_STEP_SUMMARY
           echo "- **Fuzz:** 0" >> $GITHUB_STEP_SUMMARY

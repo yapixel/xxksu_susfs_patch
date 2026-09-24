@@ -17,18 +17,18 @@ This lineage represents the authoritative, reproducible production baseline for 
 ### SuSFS Lineage
 - **Repository:** `https://gitlab.com/simonpunk/susfs4ksu`
 - **Branch:** `gki-android16-6.12`
-- **Commit:** `c8f64e41e3dea2cd44754d7472d3cd0bc0b40784`
+- **Commit:** `2528bdb0e2e76d26b9b174a8314ac115c9f00b3c`
 - **Upstream Patch:** `kernel_patches/50_add_susfs_in_gki-android16-6.12.patch`
 
 ### Authoritative Source Bundle
 - **Artifact:** `.github/fixtures/v2/v29-baselines/gki-android16-6.12.json`
 - **Schema:** `xxksu-susfs-source-bundle/v1`
 - **Files:** 22 retained files (20 kernel source + 2 SuSFS source)
-- **Identity:** `sha256:b29c4eff277bdd0ea2422f96ac90f7fe931ca3f390c2fcc3f4ac55f90bad7cb9`
+- **Identity:** `sha256:c021e411441ea098ff38092705e67a78c54c4908117620aa331d35a2436a20f9`
 
 ### Deinlined Target Patch 51
 - **File:** `patches/gki-android16-6.12/51_deinlined_susfs_hooks_gki-android16-6.12.patch`
-- **SHA-256:** `sha256:563a7650efb2e44bcb6b8da95076f79098d00c94511ed25bf70952e7af5bc2f6`
+- **SHA-256:** `sha256:85df06eb9774db0296b341cc7ca15f49e1ae69d7406021191d7184dd3685dbb6`
 - **Strict Patch Application:** `PASS` (zero rejects, exact preimages, zero fuzz)
 
 ### Fixture Bindings

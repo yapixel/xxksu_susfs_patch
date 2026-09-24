@@ -63,7 +63,7 @@ class BaselineRecordContractTests(unittest.TestCase):
         self.assertEqual(record.kernel_version, "6.12")
         self.assertEqual(record.status, "VERIFIED")
         self.assertEqual(record.upstream["resolved_commit"], "c8909f7cf1380810b285cbeee347dd01a8c9ec5c")
-        self.assertEqual(record.susfs["resolved_commit"], "c8f64e41e3dea2cd44754d7472d3cd0bc0b40784")
+        self.assertEqual(record.susfs["resolved_commit"], "2528bdb0e2e76d26b9b174a8314ac115c9f00b3c")
         self.assertEqual(record.validation_results["gki-android16-6.12-manual"], "PASS")
         self.assertEqual(record.validation_results["gki-android16-6.12-lsm_bl"], "PASS")
         self.assertIsInstance(record.identity, HashDigest)
