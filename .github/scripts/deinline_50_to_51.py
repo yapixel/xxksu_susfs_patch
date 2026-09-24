@@ -248,14 +248,6 @@ def deinline_patch_content(content: str, target: str = "gki", date_str: str | No
             hunk_meta = hunk_chunks[i]
             hunk_body = hunk_chunks[i+1].lstrip('\n')
 
-            # In fs/namespace.c, align Google Pixel GKI 6.1 trace/hooks/blk.h anchor
-            if file_path == 'fs/namespace.c' and ("pantah" in target.lower() or "gki-android14-6.1" in target.lower()):
-                if '#include "internal.h"' in hunk_body and '<trace/hooks/blk.h>' not in hunk_body:
-                    hunk_body = hunk_body.replace(
-                        ' #include "internal.h"\n',
-                        ' #include "internal.h"\n #include <trace/hooks/blk.h>\n'
-                    )
-
             # In fs/proc/fd.c, wrap unused variables in proper CONFIG_KSU_SUSFS_* guards
             if file_path == 'fs/proc/fd.c':
                 hunk_body = re.sub(

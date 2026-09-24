@@ -160,10 +160,6 @@ jobs:
 
           # For Sultan specific base patches if required
           if [ "${{ matrix.target }}" = "sultan-android14-6.1" ]; then
-            patch -p1 < "${{ github.workspace }}/.github/fixtures/sultan/60_scripts_mkcompile_h.patch" || true
-            patch -p1 < "${{ github.workspace }}/.github/fixtures/sultan/61_scripts_setlocalversion.patch" || true
-            patch -p1 < "${{ github.workspace }}/.github/fixtures/sultan/62_init_Makefile.patch" || true
-            patch -p1 < "${{ github.workspace }}/.github/fixtures/sultan/0001-modify-noinline.patch" || true
             patch -p1 -l < "${{ github.workspace }}/.github/fixtures/manual-security-hooks-v2.0.patch" || true
             patch -p1 -l < "${{ github.workspace }}/.github/fixtures/scope-min-manual-hooks-v2.3.patch" || true
           fi

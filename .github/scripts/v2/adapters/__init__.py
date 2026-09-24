@@ -69,7 +69,6 @@ __all__ = [
     "UnsupportedKernelVersion",
     "UnsupportedTarget",
     "find_function_span",
-    "GKIAndroid14_6_1Adapter",
     "GKIAndroid16_6_12Adapter",
     "SultanAndroid14_6_1Adapter",
     "get_adapter",
