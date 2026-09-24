@@ -199,17 +199,28 @@ def parse_dashboard_events(body: str) -> list[dict[str, str]]:
     return events
 
 
+def is_confirmed_transition_event(e: Mapping[str, str]) -> bool:
+    """Filter out transient/intermediate failures from persistent event ledger."""
+    text = e.get("text", "")
+    if "SOURCE_IDENTITY_ERROR" in text or "UNKNOWN" in text:
+        return False
+    return True
+
+
 def extract_transition_events(report: WatchReport, date_str: str) -> list[dict[str, str]]:
     """Extract meaningful state transitions from the current report.
 
+    Only confirmed completed watcher state transitions belong here.
+    Transient / intermediate failures (like SOURCE_IDENTITY_ERROR from network timeouts)
+    must NOT be persisted into Recent Events.
     Routine NO_CHANGE or IRRELEVANT_CHANGE runs produce zero events.
     """
     events: list[dict[str, str]] = []
     for r in report.results:
+        # Only confirmed code drift transitions belong in Recent Events
         if r.classification in (
             WatchClassification.ANCHOR_DRIFT,
             WatchClassification.SEMANTIC_DRIFT,
-            WatchClassification.SOURCE_IDENTITY_ERROR,
         ):
             events.append({
                 "timestamp": date_str,
@@ -238,19 +249,22 @@ def combine_recent_events(
     max_events: int = MAX_RECENT_EVENTS,
 ) -> list[dict[str, str]]:
     """Combine existing and new transition events, capped to max_events."""
-    if not existing_events and not new_events:
+    valid_existing = [e for e in existing_events if is_confirmed_transition_event(e)]
+    valid_new = [e for e in new_events if is_confirmed_transition_event(e)]
+
+    if not valid_existing and not valid_new:
         return [dict(e) for e in DEFAULT_INITIAL_EVENTS[:max_events]]
 
     combined: list[dict[str, str]] = []
     seen = set()
 
-    for e in new_events:
+    for e in valid_new:
         key = (e.get("source_id", ""), e.get("text", ""))
         if key not in seen:
             seen.add(key)
             combined.append(dict(e))
 
-    for e in existing_events:
+    for e in valid_existing:
         key = (e.get("source_id", ""), e.get("text", ""))
         if key not in seen:
             seen.add(key)
@@ -440,6 +454,15 @@ def render_dashboard_body(
         ("midori_gki_patch_50", "Reference Only"),
     ]
 
+    # Load upstream-state.json for reference normalized metadata
+    state_file = root / ".github" / "upstream-state.json"
+    ref_sources_state: dict[str, Any] = {}
+    if state_file.is_file():
+        try:
+            ref_sources_state = json.loads(state_file.read_text(encoding="utf-8")).get("sources", {}).get("reference", {})
+        except Exception:
+            pass
+
     for source_id, s_type in tracked_source_order:
         disp_name = SOURCE_DISPLAY_NAMES.get(source_id, source_id)
         if source_id in results_map:
@@ -455,18 +478,76 @@ def render_dashboard_body(
             }
             status_badge = badge_map.get(r.classification, f"🔴 `{r.classification.value}`")
 
-            # Current identity
-            curr_id = r.old_identity[:12] if r.old_identity else r.old_content_hash[:12]
-
-            # Discovered upstream
-            if r.new_identity and r.new_identity != r.old_identity:
-                disc_up = f"`{r.new_identity[:12]}`"
+            if s_type == "Authoritative":
+                # Authoritative sources remain commit-identity based
+                curr_id = f"`{r.old_identity[:12]}`" if r.old_identity else f"`{r.old_content_hash[:12]}`"
+                if r.new_identity and r.new_identity != r.old_identity:
+                    disc_up = f"`{r.new_identity[:12]}`"
+                else:
+                    disc_up = "—"
             else:
-                disc_up = "—"
+                # Reference-only patch sources: present normalized patch content identity as primary;
+                # show upstream commit SHA only as metadata.
+                ref_state = ref_sources_state.get(source_id, {})
+                norm_hash = ref_state.get("normalized_sha256", "").removeprefix("sha256:")[:12]
+                if not norm_hash:
+                    norm_hash = r.old_content_hash.removeprefix("sha256:")[:12]
+
+                commit_ref = ref_state.get("commit_or_ref")
+                if commit_ref and len(commit_ref) >= 7 and not commit_ref.startswith("http") and not commit_ref.startswith("sha256:"):
+                    commit_meta = f" (commit: `{commit_ref[:8]}`)"
+                elif (
+                    r.old_identity
+                    and len(r.old_identity) >= 7
+                    and not r.old_identity.startswith("http")
+                    and not r.old_identity.startswith("sha256:")
+                    and all(c in "0123456789abcdefABCDEF" for c in r.old_identity[:8])
+                ):
+                    commit_meta = f" (commit: `{r.old_identity[:8]}`)"
+                else:
+                    commit_meta = ""
+
+                curr_id = f"`{norm_hash}`{commit_meta}"
+
+                if r.classification == WatchClassification.REFERENCE_DRIFT:
+                    new_norm = r.new_content_hash.removeprefix("sha256:")[:12]
+                    disc_up = f"`{new_norm}`"
+                    if (
+                        r.new_identity
+                        and r.new_identity != r.old_identity
+                        and len(r.new_identity) >= 7
+                        and not r.new_identity.startswith("http")
+                        and not r.new_identity.startswith("sha256:")
+                        and all(c in "0123456789abcdefABCDEF" for c in r.new_identity[:8])
+                    ):
+                        disc_up += f" (commit: `{r.new_identity[:8]}`)"
+                else:
+                    if (
+                        r.new_identity
+                        and r.new_identity != r.old_identity
+                        and len(r.new_identity) >= 7
+                        and not r.new_identity.startswith("http")
+                        and not r.new_identity.startswith("sha256:")
+                        and all(c in "0123456789abcdefABCDEF" for c in r.new_identity[:8])
+                    ):
+                        disc_up = f"— (commit: `{r.new_identity[:8]}`)"
+                    else:
+                        disc_up = "—"
         else:
             # Fallback if filtered
             status_badge = "🟢 `NO_CHANGE`"
-            curr_id = "—"
+            if s_type == "Reference Only":
+                ref_state = ref_sources_state.get(source_id, {})
+                norm_hash = ref_state.get("normalized_sha256", "").removeprefix("sha256:")[:12] or "—"
+                commit_ref = ref_state.get("commit_or_ref")
+                commit_meta = (
+                    f" (commit: `{commit_ref[:8]}`)"
+                    if commit_ref and len(commit_ref) >= 7 and not commit_ref.startswith("http") and not commit_ref.startswith("sha256:")
+                    else ""
+                )
+                curr_id = f"`{norm_hash}`{commit_meta}"
+            else:
+                curr_id = "—"
             disc_up = "—"
 
         # Linked escalation
@@ -478,7 +559,7 @@ def render_dashboard_body(
             esc_str = "—"
 
         lines.append(
-            f"| `{disp_name}` | {s_type} | {status_badge} | `{curr_id}` | {disc_up} | {esc_str} |"
+            f"| `{disp_name}` | {s_type} | {status_badge} | {curr_id} | {disc_up} | {esc_str} |"
         )
 
     # 2. Production Patches (from manifest.json)

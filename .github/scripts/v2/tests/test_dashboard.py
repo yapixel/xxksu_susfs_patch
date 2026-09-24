@@ -326,7 +326,9 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(status, OverallStatus.HEALTHY)
 
         body = render_dashboard_body(report=clean, repo_root=REPO_ROOT)
-        self.assertIn("| `Midori xx.patch` | Reference Only | 🟢 `NO_CHANGE` |", body)
+        self.assertIn("| `Midori xx.patch` | Reference Only | 🟢 `NO_CHANGE` | `cc36da9e333c` (commit: `bc1b8e37`) | — (commit: `719d466e`) | — |", body)
+        self.assertIn("| `Midori GKI 50 Patch` | Reference Only | 🟢 `NO_CHANGE` | `1fa63a063144` | — | — |", body)
+        self.assertIn("| `xxKSU` | Authoritative | 🟢 `NO_CHANGE` | `bb0be9297da4` | — | — |", body)
 
     # 15. rendered body stays below 30 KiB
     def test_15_rendered_body_stays_below_30_kib(self):
@@ -386,6 +388,46 @@ class DashboardTests(unittest.TestCase):
         # 3. Verify manifest and production patches are still 100% untouched and passing
         ok_after, errs_after = verify_patch_manifest(REPO_ROOT)
         self.assertTrue(ok_after, f"Manifest verification failed after simulated error: {errs_after}")
+
+    # 18. transient SOURCE_IDENTITY_ERROR never persisted to Recent Events
+    def test_18_transient_source_identity_error_never_persisted_to_recent_events(self):
+        err_res = SourceResult(
+            source_id="susfs_sultan",
+            source_type="authoritative",
+            classification=WatchClassification.SOURCE_IDENTITY_ERROR,
+            old_identity="c254cf2dcdff",
+            new_identity="UNKNOWN",
+            old_content_hash="h_old",
+            new_content_hash="UNKNOWN",
+            details="Command git ls-remote timed out after 30 seconds",
+        )
+        report = WatchReport(results=(err_res,), timestamp="2026-09-24T22:00:00Z")
+        # 1. extract_transition_events must ignore transient SOURCE_IDENTITY_ERROR
+        events = extract_transition_events(report, "2026-09-24")
+        self.assertEqual(events, [], "Transient SOURCE_IDENTITY_ERROR must not produce a persistent Recent Event")
+
+        # 2. combine_recent_events must strip any existing spurious SOURCE_IDENTITY_ERROR event
+        spurious_events = [
+            {"timestamp": "2026-09-24", "source_id": "susfs_sultan", "text": "Drift detected: SOURCE_IDENTITY_ERROR (old: `c254cf2d`, new: `UNKNOWN`)"},
+            {"timestamp": "2026-09-24", "source_id": "backslashxx_kernelsu", "text": "Promoted authoritative bb0be929 pin and regenerated Patch 11 (resolved Issue #4)"},
+        ]
+        combined = combine_recent_events(spurious_events, [])
+        texts = [e["text"] for e in combined]
+        self.assertFalse(any("SOURCE_IDENTITY_ERROR" in t for t in texts))
+        self.assertTrue(any("resolved Issue #4" in t for t in texts))
+
+    # 19. reference patch primary identity is normalized content
+    def test_19_reference_patch_primary_identity_is_normalized_content(self):
+        report = make_clean_report()
+        body = render_dashboard_body(report=report, repo_root=REPO_ROOT)
+        # Check Midori xx.patch row: normalized content cc36da9e333c is primary, commit bc1b8e37 is metadata
+        self.assertIn("`cc36da9e333c` (commit: `bc1b8e37`)", body)
+        # Check Midori GKI 50 patch row: normalized content 1fa63a063144 is primary
+        self.assertIn("`1fa63a063144`", body)
+        # Check Authoritative rows remain commit-identity based
+        self.assertIn("`bb0be9297da4`", body)
+        self.assertIn("`c254cf2dcdff`", body)
+        self.assertIn("`2528bdb0e2e7`", body)
 
 
 if __name__ == "__main__":
