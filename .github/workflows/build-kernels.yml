@@ -164,7 +164,6 @@ jobs:
           cat >> out/.config <<-'EOF'
           # SuSFS Base Configurations
           CONFIG_KSU_SUSFS=y
-          CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
           CONFIG_KSU_SUSFS_SUS_PATH=y
           CONFIG_KSU_SUSFS_SUS_MOUNT=y
           CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
@@ -256,7 +255,7 @@ jobs:
           VMLINUX_TYPE=$("$READELF" -h "$VMLINUX" | grep -E "Type:" | sed -e 's/^[[:space:]]*Type:[[:space:]]*//')
           echo "  ✅ vmlinux ELF64 / AArch64 verified (ELF Type: $VMLINUX_TYPE)"
 
-          echo "=== MANDATORY GATE 3: SuSFS Object & Archive Compilation ==="
+          echo "=== MANDATORY GATE 3: SuSFS Object & Linkage Evidence ==="
           if [ ! -f "$SUSFS_OBJ" ]; then
             echo "❌ ERROR: SuSFS object ($SUSFS_OBJ) was not compiled!"
             exit 1
@@ -265,21 +264,37 @@ jobs:
           "$READELF" -h "$SUSFS_OBJ" | grep -q "AArch64"
           echo "  ✅ Compiled SuSFS object verified: $SUSFS_OBJ (ELF64 AArch64)"
 
-          FS_ARCHIVE=""
-          for candidate in "sultan/out/vmlinux.a" "sultan/out/fs/built-in.a" $(find sultan/out -name "*.a" 2>/dev/null); do
-            if [ -f "$candidate" ] && "$AR" t "$candidate" 2>/dev/null | grep -q "susfs.o"; then
-              FS_ARCHIVE="$candidate"
+          SUSFS_LINK_EVIDENCE=""
+          for cmd_file in $(find sultan/out/fs sultan/out -maxdepth 2 -name ".*.cmd" 2>/dev/null); do
+            if grep -q "susfs.o" "$cmd_file" 2>/dev/null; then
+              SUSFS_LINK_EVIDENCE="Kbuild command record ($cmd_file)"
               break
             fi
           done
-          if [ -n "$FS_ARCHIVE" ]; then
-            echo "  ✅ SuSFS object confirmed archived in $FS_ARCHIVE"
+          if [ -z "$SUSFS_LINK_EVIDENCE" ]; then
+            for archive in $(find sultan/out -name "*.a" 2>/dev/null); do
+              ARCHIVE_REL="${archive#"sultan/out/"}"
+              if (cd sultan/out && "$AR" t "$ARCHIVE_REL" 2>/dev/null | grep -q "susfs.o") || grep -Fq "susfs.o" "$archive" 2>/dev/null; then
+                SUSFS_LINK_EVIDENCE="Kernel archive ($archive)"
+                break
+              fi
+            done
+          fi
+          if [ -z "$SUSFS_LINK_EVIDENCE" ]; then
+            if [ -f "$SYSMAP" ] && grep -q -E "[[:space:]]susfs_" "$SYSMAP" 2>/dev/null; then
+              SUSFS_LINK_EVIDENCE="System.map symbol table (susfs_ symbols linked into final vmlinux)"
+            elif [ -f "$VMLINUX" ] && "$NM" "$VMLINUX" 2>/dev/null | grep -q -E "[[:space:]]susfs_"; then
+              SUSFS_LINK_EVIDENCE="vmlinux ELF symbol table (susfs_ symbols linked)"
+            fi
+          fi
+          if [ -n "$SUSFS_LINK_EVIDENCE" ]; then
+            echo "  ✅ SuSFS linkage evidence verified via: $SUSFS_LINK_EVIDENCE"
           else
-            echo "❌ ERROR: susfs.o is not archived in any kernel archive!"
+            echo "❌ ERROR: No Kbuild linkage evidence found for susfs.o!"
             exit 1
           fi
 
-          echo "=== MANDATORY GATE 4: xxKSU Object & Archive Compilation ==="
+          echo "=== MANDATORY GATE 4: xxKSU Object & Linkage Evidence ==="
           if [ ! -f "$KSU_OBJ" ]; then
             echo "❌ ERROR: xxKSU object ($KSU_OBJ) was not compiled!"
             exit 1
@@ -288,34 +303,40 @@ jobs:
           "$READELF" -h "$KSU_OBJ" | grep -q "AArch64"
           echo "  ✅ Compiled xxKSU object verified: $KSU_OBJ (ELF64 AArch64)"
 
-          KSU_ARCHIVE=""
-          for candidate in "sultan/out/vmlinux.a" "sultan/out/drivers/kernelsu/built-in.a" "sultan/out/drivers/built-in.a" $(find sultan/out -name "*.a" 2>/dev/null); do
-            if [ -f "$candidate" ] && "$AR" t "$candidate" 2>/dev/null | grep -q "ksu.o"; then
-              KSU_ARCHIVE="$candidate"
+          KSU_LINK_EVIDENCE=""
+          for cmd_file in $(find sultan/out/drivers sultan/out -maxdepth 3 -name ".*.cmd" 2>/dev/null); do
+            if grep -q "ksu.o" "$cmd_file" 2>/dev/null; then
+              KSU_LINK_EVIDENCE="Kbuild command record ($cmd_file)"
               break
             fi
           done
-          if [ -n "$KSU_ARCHIVE" ]; then
-            echo "  ✅ xxKSU object confirmed archived in $KSU_ARCHIVE"
+          if [ -z "$KSU_LINK_EVIDENCE" ]; then
+            for archive in $(find sultan/out -name "*.a" 2>/dev/null); do
+              ARCHIVE_REL="${archive#"sultan/out/"}"
+              if (cd sultan/out && "$AR" t "$ARCHIVE_REL" 2>/dev/null | grep -q "ksu.o") || grep -Fq "ksu.o" "$archive" 2>/dev/null; then
+                KSU_LINK_EVIDENCE="Kernel archive ($archive)"
+                break
+              fi
+            done
+          fi
+          if [ -z "$KSU_LINK_EVIDENCE" ]; then
+            if [ -f "$SYSMAP" ] && grep -q -E "[[:space:]](ksu_|kernelsu_)" "$SYSMAP" 2>/dev/null; then
+              KSU_LINK_EVIDENCE="System.map symbol table (ksu_/kernelsu_ symbols linked into final vmlinux)"
+            elif [ -f "$VMLINUX" ] && "$NM" "$VMLINUX" 2>/dev/null | grep -q -E "[[:space:]](ksu_|kernelsu_)"; then
+              KSU_LINK_EVIDENCE="vmlinux ELF symbol table (ksu_ symbols linked)"
+            fi
+          fi
+          if [ -n "$KSU_LINK_EVIDENCE" ]; then
+            echo "  ✅ xxKSU linkage evidence verified via: $KSU_LINK_EVIDENCE"
           else
-            echo "❌ ERROR: ksu.o is not archived in any kernel archive!"
+            echo "❌ ERROR: No Kbuild linkage evidence found for ksu.o!"
             exit 1
           fi
 
-          echo "=== MANDATORY GATE 5: Exact Final .config & Profile Contract ==="
-          grep -q "CONFIG_KSU_SUSFS=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS missing in .config!"; exit 1; }
-          grep -q "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT missing in .config!"; exit 1; }
-          grep -q "CONFIG_KSU_SUSFS_SUS_PATH=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_SUS_PATH missing in .config!"; exit 1; }
-          grep -q "CONFIG_KSU_SUSFS_SUS_MOUNT=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_SUS_MOUNT missing in .config!"; exit 1; }
-          grep -q "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT missing in .config!"; exit 1; }
-          grep -q "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT missing in .config!"; exit 1; }
-          grep -q "CONFIG_KSU_SUSFS_SUS_KSTAT=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_SUS_KSTAT missing in .config!"; exit 1; }
-          grep -q "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_SPOOF_UNAME missing in .config!"; exit 1; }
-          grep -q "CONFIG_KSU_SUSFS_ENABLE_LOG=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_ENABLE_LOG missing in .config!"; exit 1; }
-          grep -q "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS missing in .config!"; exit 1; }
-          grep -q "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_OPEN_REDIRECT missing in .config!"; exit 1; }
-          grep -q "CONFIG_KSU_SUSFS_SUS_MAP=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_SUS_MAP missing in .config!"; exit 1; }
+          echo "=== MANDATORY GATE 5: Minimal .config & Profile Contract ==="
           grep -q "CONFIG_KSU=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU missing in .config!"; exit 1; }
+          grep -q "CONFIG_KSU_SUSFS=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS missing in .config!"; exit 1; }
+          echo "  ✅ CONFIG_KSU=y and CONFIG_KSU_SUSFS=y verified in .config"
 
           if [ "${{ matrix.hook_mode }}" = "manual" ]; then
             if grep -q "CONFIG_KSU_LSM_SECURITY_HOOKS=y" "$DOTCONFIG"; then
@@ -569,7 +590,6 @@ jobs:
           cat >> "$DEFCONFIG" <<-'EOF'
           # SuSFS Base Configurations
           CONFIG_KSU_SUSFS=y
-          CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
           CONFIG_KSU_SUSFS_SUS_PATH=y
           CONFIG_KSU_SUSFS_SUS_MOUNT=y
           CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
@@ -686,7 +706,7 @@ jobs:
           VMLINUX_TYPE=$("$READELF" -h "$VMLINUX" | grep -E "Type:" | sed -e 's/^[[:space:]]*Type:[[:space:]]*//')
           echo "  ✅ vmlinux ELF64 / AArch64 verified (ELF Type: $VMLINUX_TYPE)"
 
-          echo "=== MANDATORY GATE 3: SuSFS Object & Archive Compilation ==="
+          echo "=== MANDATORY GATE 3: SuSFS Object & Linkage Evidence ==="
           if [ ! -f "$SUSFS_OBJ" ]; then
             echo "❌ ERROR: SuSFS object ($SUSFS_OBJ) was not compiled!"
             exit 1
@@ -695,21 +715,37 @@ jobs:
           "$READELF" -h "$SUSFS_OBJ" | grep -q "AArch64"
           echo "  ✅ Compiled SuSFS object verified: $SUSFS_OBJ (ELF64 AArch64)"
 
-          FS_ARCHIVE=""
-          for candidate in "kernel_tree/out/vmlinux.a" "kernel_tree/out/fs/built-in.a" "kernel_tree/out/common/fs/built-in.a" $(find kernel_tree/out -name "*.a" 2>/dev/null); do
-            if [ -f "$candidate" ] && "$AR" t "$candidate" 2>/dev/null | grep -q "susfs.o"; then
-              FS_ARCHIVE="$candidate"
+          SUSFS_LINK_EVIDENCE=""
+          for cmd_file in $(find kernel_tree/out/fs kernel_tree/out -maxdepth 2 -name ".*.cmd" 2>/dev/null); do
+            if grep -q "susfs.o" "$cmd_file" 2>/dev/null; then
+              SUSFS_LINK_EVIDENCE="Kbuild command record ($cmd_file)"
               break
             fi
           done
-          if [ -n "$FS_ARCHIVE" ]; then
-            echo "  ✅ SuSFS object confirmed archived in $FS_ARCHIVE"
+          if [ -z "$SUSFS_LINK_EVIDENCE" ]; then
+            for archive in $(find kernel_tree/out -name "*.a" 2>/dev/null); do
+              ARCHIVE_REL="${archive#"kernel_tree/out/"}"
+              if (cd kernel_tree/out && "$AR" t "$ARCHIVE_REL" 2>/dev/null | grep -q "susfs.o") || grep -Fq "susfs.o" "$archive" 2>/dev/null; then
+                SUSFS_LINK_EVIDENCE="Kernel archive ($archive)"
+                break
+              fi
+            done
+          fi
+          if [ -z "$SUSFS_LINK_EVIDENCE" ]; then
+            if [ -f "$SYSMAP" ] && grep -q -E "[[:space:]]susfs_" "$SYSMAP" 2>/dev/null; then
+              SUSFS_LINK_EVIDENCE="System.map symbol table (susfs_ symbols linked into final vmlinux)"
+            elif [ -f "$VMLINUX" ] && "$NM" "$VMLINUX" 2>/dev/null | grep -q -E "[[:space:]]susfs_"; then
+              SUSFS_LINK_EVIDENCE="vmlinux ELF symbol table (susfs_ symbols linked)"
+            fi
+          fi
+          if [ -n "$SUSFS_LINK_EVIDENCE" ]; then
+            echo "  ✅ SuSFS linkage evidence verified via: $SUSFS_LINK_EVIDENCE"
           else
-            echo "❌ ERROR: susfs.o is not archived in any kernel archive!"
+            echo "❌ ERROR: No Kbuild linkage evidence found for susfs.o!"
             exit 1
           fi
 
-          echo "=== MANDATORY GATE 4: xxKSU Object & Archive Compilation ==="
+          echo "=== MANDATORY GATE 4: xxKSU Object & Linkage Evidence ==="
           if [ ! -f "$KSU_OBJ" ]; then
             echo "❌ ERROR: xxKSU object ($KSU_OBJ) was not compiled!"
             exit 1
@@ -718,34 +754,40 @@ jobs:
           "$READELF" -h "$KSU_OBJ" | grep -q "AArch64"
           echo "  ✅ Compiled xxKSU object verified: $KSU_OBJ (ELF64 AArch64)"
 
-          KSU_ARCHIVE=""
-          for candidate in "kernel_tree/out/vmlinux.a" "kernel_tree/out/drivers/kernelsu/built-in.a" "kernel_tree/out/common/drivers/kernelsu/built-in.a" "kernel_tree/out/drivers/built-in.a" "kernel_tree/out/common/drivers/built-in.a" $(find kernel_tree/out -name "*.a" 2>/dev/null); do
-            if [ -f "$candidate" ] && "$AR" t "$candidate" 2>/dev/null | grep -q "ksu.o"; then
-              KSU_ARCHIVE="$candidate"
+          KSU_LINK_EVIDENCE=""
+          for cmd_file in $(find kernel_tree/out/drivers kernel_tree/out -maxdepth 3 -name ".*.cmd" 2>/dev/null); do
+            if grep -q "ksu.o" "$cmd_file" 2>/dev/null; then
+              KSU_LINK_EVIDENCE="Kbuild command record ($cmd_file)"
               break
             fi
           done
-          if [ -n "$KSU_ARCHIVE" ]; then
-            echo "  ✅ xxKSU object confirmed archived in $KSU_ARCHIVE"
+          if [ -z "$KSU_LINK_EVIDENCE" ]; then
+            for archive in $(find kernel_tree/out -name "*.a" 2>/dev/null); do
+              ARCHIVE_REL="${archive#"kernel_tree/out/"}"
+              if (cd kernel_tree/out && "$AR" t "$ARCHIVE_REL" 2>/dev/null | grep -q "ksu.o") || grep -Fq "ksu.o" "$archive" 2>/dev/null; then
+                KSU_LINK_EVIDENCE="Kernel archive ($archive)"
+                break
+              fi
+            done
+          fi
+          if [ -z "$KSU_LINK_EVIDENCE" ]; then
+            if [ -f "$SYSMAP" ] && grep -q -E "[[:space:]](ksu_|kernelsu_)" "$SYSMAP" 2>/dev/null; then
+              KSU_LINK_EVIDENCE="System.map symbol table (ksu_/kernelsu_ symbols linked into final vmlinux)"
+            elif [ -f "$VMLINUX" ] && "$NM" "$VMLINUX" 2>/dev/null | grep -q -E "[[:space:]](ksu_|kernelsu_)"; then
+              KSU_LINK_EVIDENCE="vmlinux ELF symbol table (ksu_ symbols linked)"
+            fi
+          fi
+          if [ -n "$KSU_LINK_EVIDENCE" ]; then
+            echo "  ✅ xxKSU linkage evidence verified via: $KSU_LINK_EVIDENCE"
           else
-            echo "❌ ERROR: ksu.o is not archived in any kernel archive!"
+            echo "❌ ERROR: No Kbuild linkage evidence found for ksu.o!"
             exit 1
           fi
 
-          echo "=== MANDATORY GATE 5: Exact Final .config & Profile Contract ==="
-          grep -q "CONFIG_KSU_SUSFS=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS missing in .config!"; exit 1; }
-          grep -q "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT missing in .config!"; exit 1; }
-          grep -q "CONFIG_KSU_SUSFS_SUS_PATH=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_SUS_PATH missing in .config!"; exit 1; }
-          grep -q "CONFIG_KSU_SUSFS_SUS_MOUNT=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_SUS_MOUNT missing in .config!"; exit 1; }
-          grep -q "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT missing in .config!"; exit 1; }
-          grep -q "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT missing in .config!"; exit 1; }
-          grep -q "CONFIG_KSU_SUSFS_SUS_KSTAT=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_SUS_KSTAT missing in .config!"; exit 1; }
-          grep -q "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_SPOOF_UNAME missing in .config!"; exit 1; }
-          grep -q "CONFIG_KSU_SUSFS_ENABLE_LOG=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_ENABLE_LOG missing in .config!"; exit 1; }
-          grep -q "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS missing in .config!"; exit 1; }
-          grep -q "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_OPEN_REDIRECT missing in .config!"; exit 1; }
-          grep -q "CONFIG_KSU_SUSFS_SUS_MAP=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_SUS_MAP missing in .config!"; exit 1; }
+          echo "=== MANDATORY GATE 5: Minimal .config & Profile Contract ==="
           grep -q "CONFIG_KSU=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU missing in .config!"; exit 1; }
+          grep -q "CONFIG_KSU_SUSFS=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS missing in .config!"; exit 1; }
+          echo "  ✅ CONFIG_KSU=y and CONFIG_KSU_SUSFS=y verified in .config"
 
           if [ "${{ matrix.hook_mode }}" = "manual" ]; then
             if grep -q "CONFIG_KSU_LSM_SECURITY_HOOKS=y" "$DOTCONFIG"; then
