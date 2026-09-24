@@ -67,6 +67,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true", help="Skip remote fetches (test mode)")
     parser.add_argument("--source", type=str, default=None, help="Filter check to a specific source ID")
     parser.add_argument("--json", action="store_true", help="Print report in JSON format")
+    parser.add_argument("--no-dashboard", action="store_true", help="Skip updating permanent GitHub Issue dashboard")
 
     args = parser.parse_args(argv)
 
@@ -107,6 +108,23 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(report.to_dict(), indent=2))
     else:
         print(summary_md)
+
+    # Sync permanent GitHub Issue dashboard
+    if not args.no_dashboard:
+        repo_slug = os.environ.get("GITHUB_REPOSITORY", "yapixel/xxksu_susfs_patch")
+        from .dashboard import sync_dashboard_issue
+        try:
+            dashboard_url, created = sync_dashboard_issue(
+                report=report,
+                repo=repo_slug,
+                repo_root=args.repo_root,
+                dry_run=args.dry_run,
+            )
+            if dashboard_url:
+                logger.info("Upstream watch dashboard synchronized: %s (created=%s)", dashboard_url, created)
+        except Exception as exc:
+            logger.error("Failed to synchronize upstream watch dashboard: %s", exc)
+            return 1
 
     # Verify patches manifest consistency
     from ..manifests.patch_manifest import verify_patch_manifest
