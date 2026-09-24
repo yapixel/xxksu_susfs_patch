@@ -45,7 +45,7 @@ PATCH11_CANONICAL_FILES: Tuple[str, ...] = (
 PATCH11_FILE_INDEXES: Mapping[str, str] = {
     "kernel/Kconfig": "index 45e09d1..e783e43 100644",
     "kernel/downstream/ksu_hostsredirect.h": "index 4d98a8b..67da4cc 100644",
-    "kernel/feature/kernel_umount.c": "index 15aded3..4ee471e 100644",
+    "kernel/feature/kernel_umount.c": "index 704e000..e1ae756 100644",
     "kernel/hook/setuid_hook.c": "index 9257980..c0cdcad 100644",
     "kernel/ksu.c": "index 06df055..77210ba 100644",
     "kernel/selinux/rules.c": "index a9d4f67..9351318 100644",
@@ -64,7 +64,7 @@ PATCH11_PREAMBLE: Tuple[str, ...] = (
     "---",
     " kernel/Kconfig                        |  98 +++++++++++++++",
     " kernel/downstream/ksu_hostsredirect.h |   4 +",
-    " kernel/feature/kernel_umount.c        |  53 ++++++++---",
+    " kernel/feature/kernel_umount.c        |  44 ++++++---",
     " kernel/hook/setuid_hook.c             | 169 +++++++++++++++++++++++---",
     " kernel/ksu.c                          |   8 ++",
     " kernel/selinux/rules.c                |   7 ++",
@@ -72,7 +72,7 @@ PATCH11_PREAMBLE: Tuple[str, ...] = (
     " kernel/selinux/selinux.h              |  14 +++",
     " kernel/supercall/dispatch.c           |  24 ++++",
     " kernel/supercall/supercall.c          |  99 +++++++++++++++",
-    " 10 files changed, 545 insertions(+), 34 deletions(-)",
+    " 10 files changed, 536 insertions(+), 34 deletions(-)",
     "",
 )
 
@@ -155,14 +155,26 @@ def get_patch11_operation_specs() -> Tuple[XxksuOperationSpec, ...]:
         XxksuOperationSpec(
             operation_id='xxksu.kernel_feature_kernel_umount_c.hunk_1',
             file_path='kernel/feature/kernel_umount.c',
-            spec=AnchorSpec('kernel/feature/kernel_umount.c', 'static inline void ksu_umount_mnt(const char *mnt, struct path *path, int flags)\n{\n\tint err = path_umount(path, flags);\n\tif (err)\n\t\tpr_info("umount %s failed: %d\\n", mnt, err);\n}\n\nstatic inline void try_umount(const char *mnt, int flags)\n', context_before=('extern int path_umount(struct path *path, int flags);',), context_after=()),
+            spec=AnchorSpec(
+                'kernel/feature/kernel_umount.c',
+                'static inline void try_umount(const char *mnt, int flags)\n',
+                context_before=('#endif',),
+                context_after=('{', 'struct path path;'),
+            ),
             placement=Placement.REPLACE,
-            payload='#ifndef KSU_HAS_PATH_UMOUNT\nstatic inline void ksu_umount_mnt(const char *mnt, struct path *path, int flags)\n{\n\tint err = path_umount(path, flags);\n\tif (err)\n\t\tpr_info("umount %s failed: %d\\n", mnt, err);\n}\n#else\nstatic inline void ksu_umount_mnt(struct path *path, int flags)\n{\n\tint err = path_umount(path, flags);\n\tif (err)\n\t\tpr_info("umount failed: %d\\n", err);\n}\n#endif\n\n#if !defined(CONFIG_KSU_SUSFS) || !defined(CONFIG_KSU_SUSFS_TRY_UMOUNT)\nstatic void try_umount(const char *mnt, int flags)\n#else\nvoid try_umount(const char *mnt, int flags)\n#endif\n',
-            section_context='static const struct ksu_feature_handler webview_zygote_umount_handler = {',
+            payload='#if !defined(CONFIG_KSU_SUSFS) || !defined(CONFIG_KSU_SUSFS_TRY_UMOUNT)\nstatic void try_umount(const char *mnt, int flags)\n#else\nvoid try_umount(const char *mnt, int flags)\n#endif\n',
+            section_context='',
             context_before_count=3,
             context_after_count=3,
             context_before_offset=3,
-            diff_body=(('+', '#ifndef KSU_HAS_PATH_UMOUNT'), (' ', 'static inline void ksu_umount_mnt(const char *mnt, struct path *path, int flags)'), (' ', '{'), (' ', '\tint err = path_umount(path, flags);'), (' ', '\tif (err)'), (' ', '\t\tpr_info("umount %s failed: %d\\n", mnt, err);'), (' ', '}'), ('+', '#else'), ('+', 'static inline void ksu_umount_mnt(struct path *path, int flags)'), ('+', '{'), ('+', '\tint err = path_umount(path, flags);'), ('+', '\tif (err)'), ('+', '\t\tpr_info("umount failed: %d\\n", err);'), ('+', '}'), ('+', '#endif'), (' ', ''), ('-', 'static inline void try_umount(const char *mnt, int flags)'), ('+', '#if !defined(CONFIG_KSU_SUSFS) || !defined(CONFIG_KSU_SUSFS_TRY_UMOUNT)'), ('+', 'static void try_umount(const char *mnt, int flags)'), ('+', '#else'), ('+', 'void try_umount(const char *mnt, int flags)'), ('+', '#endif')),
+            diff_body=(
+                ('-', 'static inline void try_umount(const char *mnt, int flags)'),
+                ('+', '#if !defined(CONFIG_KSU_SUSFS) || !defined(CONFIG_KSU_SUSFS_TRY_UMOUNT)'),
+                ('+', 'static void try_umount(const char *mnt, int flags)'),
+                ('+', '#else'),
+                ('+', 'void try_umount(const char *mnt, int flags)'),
+                ('+', '#endif'),
+            ),
         ),
         XxksuOperationSpec(
             operation_id='xxksu.kernel_feature_kernel_umount_c.hunk_2',

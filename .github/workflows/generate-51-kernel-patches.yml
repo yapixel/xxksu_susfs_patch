@@ -6,7 +6,7 @@ on:
       ksu_branch:
         description: "KernelSU Branch or Commit"
         required: false
-        default: "41c73d28d054f74eabe8a3ba494f14dc3402b3f8"
+        default: "bb0be9297da42ff3f63819125314ce0b13935a06"
   push:
     branches:
       - main
@@ -22,7 +22,7 @@ permissions:
 env:
   SUSFS_REPO_URL: "https://gitlab.com/simonpunk/susfs4ksu.git"
   KSU_REPO: "backslashxx/KernelSU"
-  KSU_COMMIT: "41c73d28d054f74eabe8a3ba494f14dc3402b3f8"
+  KSU_COMMIT: "bb0be9297da42ff3f63819125314ce0b13935a06"
 
 jobs:
   matrix_51_patch:
