@@ -191,3 +191,68 @@ jobs:
         with:
           name: 51_patch_${{ matrix.target }}
           path: ${{ matrix.out_dir }}/${{ matrix.out_patch }}
+
+  validate_gki_r38_compat:
+    name: "GKI 6.12 (Android 16 r38 Compatibility)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Clone Upstream SuSFS Source
+        run: |
+          echo "📥 Fetching upstream SuSFS (commit: c8f64e41e3dea2cd44754d7472d3cd0bc0b40784)..."
+          git init susfs_src
+          cd susfs_src
+          git remote add origin "${{ env.SUSFS_REPO_URL }}"
+          git fetch --depth=1 origin "c8f64e41e3dea2cd44754d7472d3cd0bc0b40784"
+          git checkout FETCH_HEAD
+
+      - name: Prepare Clean Kernel Source Tree (android16-6.12-2025-09_r38)
+        run: |
+          set -euo pipefail
+          mkdir -p kernel_tree
+          echo "📥 Downloading r38 kernel source archive..."
+          curl -LSs "https://github.com/yapixel/gki-build-assets/releases/download/android16-6.12-2025-09_r38/common-android16-6.12-2025-09_r38.tar.gz" | tar -xz -C kernel_tree
+
+          cd kernel_tree
+          if [ ! -d ".git" ]; then
+            git init
+            git config user.name "yapixel"
+            git config user.email "yapixel@users.noreply.github.com"
+            git config commit.gpgsign false
+            git add -A
+            git commit --no-gpg-sign -m "base: initial clean kernel tree r38" || true
+          fi
+
+      - name: Apply & Verify Patch 51 on r38 Source Tree
+        run: |
+          set -uo pipefail
+
+          cd kernel_tree
+          mkdir -p fs/ include/linux/
+          cp -r "${{ github.workspace }}/susfs_src/kernel_patches/fs/susfs.c" fs/ || true
+          cp -r "${{ github.workspace }}/susfs_src/kernel_patches/include/linux/susfs.h" include/linux/ || true
+          cp -r "${{ github.workspace }}/susfs_src/kernel_patches/include/linux/susfs_def.h" include/linux/ || true
+
+          echo "🧪 Testing authoritative GKI 6.12 Patch 51 against android16-6.12-2025-09_r38..."
+          PATCH_RC=0
+          patch -p1 < "${{ github.workspace }}/patches/gki-android16-6.12/51_deinlined_susfs_hooks_gki-android16-6.12.patch" || PATCH_RC=$?
+
+          if [ "$PATCH_RC" -ne 0 ] || [ -n "$(find . -name "*.rej")" ]; then
+            echo "❌ Patch 51 rejected on android16-6.12-2025-09_r38 (exit code: $PATCH_RC)!"
+            echo "=== Rejection report ==="
+            find . -name "*.rej"
+            for rej in $(find . -name "*.rej"); do
+              echo "----------------------------------------"
+              echo "FILE: $rej"
+              echo "----------------------------------------"
+              cat "$rej"
+            done
+            exit 1
+          fi
+
+          find . -type f \( -name "*.orig" -o -name "*~" \) -delete
+          echo "✅ Patch 51 applied cleanly on android16-6.12-2025-09_r38!"

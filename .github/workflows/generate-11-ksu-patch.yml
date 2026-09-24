@@ -1,31 +1,31 @@
-name: "11 Patch: Generate & Verify for KernelSU (xxKSU)"
+name: "11 Patch: Validate Verified Patch for KernelSU (xxKSU)"
 
 on:
   workflow_dispatch:
     inputs:
-      ksu_branch:
-        description: "KernelSU Branch to Test"
+      ksu_commit:
+        description: "Authoritative KernelSU Commit to Test"
         required: false
-        default: "master"
+        default: "0b138d6a9cfe4dc163aa05c21b1e6a14ff868230"
   push:
     branches:
       - main
     paths:
       - ".github/workflows/generate-11-ksu-patch.yml"
-      - ".github/scripts/transform_10_to_11.py"
       - "patches/xxksu/11_enable_susfs_for_ksu.patch"
 
 permissions:
-  contents: write
+  contents: read
   actions: write
 
 env:
   KSU_REPO: "backslashxx/KernelSU"
-  SUSFS_REPO_URL: "https://gitlab.com/simonpunk/susfs4ksu.git"
+  KSU_COMMIT: "0b138d6a9cfe4dc163aa05c21b1e6a14ff868230"
+  PATCH_11_SHA256: "ce0a8ef338c4a7f51ec8a6b9e110add81bb702b68bd685239bfbdb0ccd05cc16"
 
 jobs:
-  generate_11_patch:
-    name: "Generate & Validate 11 Patch"
+  validate_11_patch:
+    name: "Validate Authoritative 11 Patch"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -33,29 +33,53 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Python 3
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Generate Universal 11 Patch
-        run: |
-          mkdir -p patches/xxksu
-
-          echo "⚙️ Dynamically generating patches/xxksu/11_enable_susfs_for_ksu.patch..."
-          python3 .github/scripts/transform_10_to_11.py \
-            --output "patches/xxksu/11_enable_susfs_for_ksu.patch"
-
-      - name: Validate 11 Patch on Clean backslashxx/KernelSU
+      - name: Verify Patch 11 Integrity and Checksum
         run: |
           set -euo pipefail
-          echo "🧪 Testing 11 patch on clean clone of ${{ env.KSU_REPO }}..."
-          git clone --depth=1 https://github.com/${{ env.KSU_REPO }}.git test_ksu
+          PATCH_FILE="patches/xxksu/11_enable_susfs_for_ksu.patch"
+          if [ ! -f "$PATCH_FILE" ]; then
+            echo "❌ Error: $PATCH_FILE not found"
+            exit 1
+          fi
+          ACTUAL_SHA="$(sha256sum "$PATCH_FILE" | cut -d' ' -f1)"
+          echo "Expected SHA-256: ${{ env.PATCH_11_SHA256 }}"
+          echo "Actual SHA-256:   $ACTUAL_SHA"
+          if [ "$ACTUAL_SHA" != "${{ env.PATCH_11_SHA256 }}" ]; then
+            echo "❌ Patch 11 SHA-256 mismatch!"
+            exit 1
+          fi
+          echo "✅ Patch 11 integrity and checksum verified!"
+
+      - name: Validate 11 Patch on Authoritative backslashxx/KernelSU
+        run: |
+          set -euo pipefail
+          TARGET_COMMIT="${{ github.event.inputs.ksu_commit || env.KSU_COMMIT }}"
+          echo "🧪 Testing authoritative 11 patch on ${{ env.KSU_REPO }} @ $TARGET_COMMIT..."
+          git init test_ksu
           cd test_ksu
+          git config user.name "yapixel"
+          git config user.email "yapixel@users.noreply.github.com"
+          git remote add origin "https://github.com/${{ env.KSU_REPO }}.git"
+          git fetch --depth=1 origin "$TARGET_COMMIT"
+          git checkout FETCH_HEAD
+
           patch -p1 < "${{ github.workspace }}/patches/xxksu/11_enable_susfs_for_ksu.patch"
-          git status --short
-          echo "Total modified files: $(git diff --name-only | wc -l)"
-          echo "✅ 11 Patch applied cleanly on backslashxx/KernelSU with 0 rejects!"
+
+          if [ -n "$(find . -name "*.rej")" ]; then
+            echo "❌ Rejects found after applying 11 patch!"
+            find . -name "*.rej"
+            exit 1
+          fi
+          find . -type f \( -name "*.orig" -o -name "*~" \) -delete
+
+          MOD_COUNT="$(git diff --name-only | wc -l)"
+          echo "Total modified files: $MOD_COUNT"
+          if [ "$MOD_COUNT" -ne 10 ]; then
+            echo "❌ Expected exactly 10 modified files, found $MOD_COUNT"
+            git diff --name-only
+            exit 1
+          fi
+          echo "✅ 11 Patch applied cleanly on authoritative xxKSU with 0 rejects across 10 files!"
 
       - name: Generate 11 Patch Statistics Report
         run: |
@@ -63,9 +87,9 @@ jobs:
           echo "Generated on: $(date -u)" >> report_11.md
           echo "" >> report_11.md
           echo "### 📄 Git Diffstat (10 Files Target)" >> report_11.md
-          echo "\`\`\`" >> report_11.md
+          echo '```' >> report_11.md
           git apply --stat patches/xxksu/11_enable_susfs_for_ksu.patch >> report_11.md
-          echo "\`\`\`" >> report_11.md
+          echo '```' >> report_11.md
           cat report_11.md >> $GITHUB_STEP_SUMMARY
 
       - name: Upload 11 Patch Artifact
