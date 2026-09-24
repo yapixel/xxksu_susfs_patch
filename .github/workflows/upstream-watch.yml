@@ -41,6 +41,11 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Verify Patches Manifest Consistency
+        run: |
+          set -euo pipefail
+          PYTHONPATH=.github/scripts python3 -m v2.manifests.patch_manifest --check
+
       - name: Run Upstream Watch & Auto-Maintenance
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

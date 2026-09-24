@@ -56,6 +56,15 @@
     "resolved_commit": "c8909f7cf1380810b285cbeee347dd01a8c9ec5c",
     "tree": "4ce1cd677e86aed8188e040fcd2971a95b1cd5f4"
   },
+  "metadata": {
+    "compatibility_patches": {
+      "gki-android16-6.12-r38": {
+        "compatibility_target": "android16-6.12-2025-09_r38 (Pixel 9 / GKI 6.12)",
+        "patch_file": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
+        "patch_sha256": "sha256:ebc64fc63f900022edebe41e6148ecfa0ac4c221de40d62afc43de402bf36245"
+      }
+    }
+  },
   "validation_results": {
     "gki-android16-6.12-lsm_bl": "PASS",
     "gki-android16-6.12-manual": "PASS"

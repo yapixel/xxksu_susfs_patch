@@ -108,6 +108,13 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(summary_md)
 
+    # Verify patches manifest consistency
+    from ..manifests.patch_manifest import verify_patch_manifest
+    manifest_ok, manifest_errs = verify_patch_manifest()
+    if not manifest_ok:
+        logger.error("patches/manifest.json verification failed: %s", manifest_errs)
+        return 1
+
     return 0
 
 

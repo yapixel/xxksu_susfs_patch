@@ -1,0 +1,61 @@
+{
+  "patches": [
+    {
+      "compatibility_target": "backslashxx/KernelSU (xxKSU)",
+      "id": "xxksu-patch11",
+      "name": "Shared xxKSU Patch 11",
+      "relative_path": "patches/xxksu/11_enable_susfs_for_ksu.patch",
+      "sha256": "bfa196dde54874b34c285614ff842fe26540ba8d46fb715aaf3cd2ba95e7956e",
+      "susfs_lineage": {
+        "commit": "c8f64e41e3dea2cd44754d7472d3cd0bc0b40784",
+        "ref": "gki-android16-6.12",
+        "repository": "https://gitlab.com/simonpunk/susfs4ksu"
+      },
+      "target_lineage": {
+        "commit": "41c73d28d054f74eabe8a3ba494f14dc3402b3f8",
+        "ref": "main",
+        "repository": "https://github.com/backslashxx/KernelSU"
+      },
+      "type": "ksu"
+    },
+    {
+      "compatibility_target": "Pixel 8 / 8 Pro (Shiba/Husky) Tensynos 16.0.0-sultan (Android 14 6.1)",
+      "id": "sultan-android14-6.1-patch51",
+      "kernel_version": "6.1",
+      "name": "Sultan Android 14 / 6.1 Patch 51",
+      "relative_path": "patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch",
+      "sha256": "a01b49a06fd2022d54f8f29bd34968fff68bdabb1b8edd95bd78ec58ad5ea0b9",
+      "susfs_lineage": {
+        "commit": "c254cf2dcdffcfb466b7ac6706f705a339adeaa0",
+        "ref": "sultan-shiba-susfs-minimal",
+        "repository": "https://gitlab.com/simonpunk/susfs4ksu"
+      },
+      "target_lineage": {
+        "commit": "af5c65b9547a9f33c5f566430d0434aecab5a8b5",
+        "ref": "16.0.0-sultan",
+        "repository": "https://github.com/kerneltoast/android_kernel_google_tensynos"
+      },
+      "type": "kernel"
+    },
+    {
+      "compatibility_target": "android16-6.12-2025-09_r38 (Pixel 9 / GKI 6.12)",
+      "id": "gki-android16-6.12-r38-patch51",
+      "kernel_version": "6.12",
+      "name": "GKI Android 16 / 6.12 r38 Patch 51",
+      "relative_path": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
+      "sha256": "ebc64fc63f900022edebe41e6148ecfa0ac4c221de40d62afc43de402bf36245",
+      "susfs_lineage": {
+        "commit": "2528bdb0e2e76d26b9b174a8314ac115c9f00b3c",
+        "ref": "gki-android16-6.12",
+        "repository": "https://gitlab.com/simonpunk/susfs4ksu"
+      },
+      "target_lineage": {
+        "commit": "c8909f7cf1380810b285cbeee347dd01a8c9ec5c",
+        "ref": "android16-6.12",
+        "repository": "https://android.googlesource.com/kernel/common"
+      },
+      "type": "kernel"
+    }
+  ],
+  "schema": "xxksu-susfs-patch-manifest/v1"
+}
