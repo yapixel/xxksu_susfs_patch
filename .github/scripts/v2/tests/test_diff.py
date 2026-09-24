@@ -175,9 +175,9 @@ class RepositoryFixtureTests(unittest.TestCase):
         self.assertEqual(second.structural_key(), first.structural_key())
 
     def test_legacy_malformed_51_fails_closed(self):
-        path = self.ROOT / "patches" / "gki-android14-6.1" / "51_deinlined_susfs_hooks_gki-android14-6.1.patch"
+        malformed = "diff --git a/a b/a\n--- a/a\n+++ b/a\n@@ -1,2 +1,2 @@\n-a\ninvalid hunk content line\n"
         with self.assertRaises(PatchParseError):
-            parse_patch(path.read_text(encoding="utf-8"))
+            parse_patch(malformed)
 
 
 if __name__ == "__main__":
