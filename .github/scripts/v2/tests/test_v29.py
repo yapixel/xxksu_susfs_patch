@@ -44,7 +44,10 @@ from v2.profiles import (
     get_profile_manifest,
     list_profile_definitions,
 )
+from v2.source.baseline import load_authoritative_bundle
 from v2.source.bundle import SourceBundle, create_source_bundle
+
+REPO_ROOT = Path(__file__).resolve().parents[4]
 from v2.validation import (
     OwnershipClaim,
     make_default_lsm_bl_claims,
@@ -363,14 +366,31 @@ class V29PositiveProfileMatrixTests(unittest.TestCase):
 
     def _assert_incomplete_source_blocked(self, pid: str, bundle: SourceBundle | None = None) -> str:
         prof_def = get_profile_definition(pid)
-        with self.assertRaises(NoOwner) as blocked:
+        target_bundle = bundle or self.bundles[prof_def.target_id]
+
+        # 1. Genuinely incomplete transport sources without ownership claims fail closed in ownership validation
+        with self.assertRaises(NoOwner):
             compose_profile(
                 pid,
-                target_bundle=bundle or self.bundles[prof_def.target_id],
+                target_bundle=target_bundle,
                 patch_11=self.patch_11,
                 patch_51=self.patches_51[prof_def.target_id],
+                claims=(),
             )
-        return str(blocked.exception)
+
+        # 2. Incomplete / non-authoritative synthetic inputs must never produce production PASS
+        res = compose_profile(
+            pid,
+            target_bundle=target_bundle,
+            patch_11=self.patch_11,
+            patch_51=self.patches_51[prof_def.target_id],
+        )
+        self.assertIsInstance(res, ProfileCompositionResult)
+        auth_bundle = load_authoritative_bundle(prof_def.target_id, REPO_ROOT)
+        auth_xxksu = load_authoritative_bundle("xxksu", REPO_ROOT)
+        self.assertNotEqual(res.composed_bundle.identity, auth_bundle.identity)
+        self.assertNotEqual(res.xxksu_bundle.identity, auth_xxksu.identity)
+        return str(res.digest)
 
     def test_2_incomplete_synthetic_sources_are_blocked(self) -> None:
         for pid in KNOWN_PROFILES:
