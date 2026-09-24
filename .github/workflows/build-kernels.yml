@@ -29,7 +29,7 @@ permissions:
 jobs:
   build_sultan:
     name: "Sultan 6.1 (${{ matrix.hook_mode }})"
-    if: (github.event.inputs.target == 'all' || github.event.inputs.target == 'sultan' || github.event.inputs.target == '') && (github.event.inputs.hook_mode == 'all' || github.event.inputs.hook_mode == matrix.hook_mode || github.event.inputs.hook_mode == '')
+    if: github.event.inputs.target == 'all' || github.event.inputs.target == 'sultan' || github.event.inputs.target == ''
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -297,7 +297,7 @@ jobs:
 
   build_gki_r38:
     name: "GKI 6.12 r38 (${{ matrix.hook_mode }})"
-    if: (github.event.inputs.target == 'all' || github.event.inputs.target == 'gki_r38' || github.event.inputs.target == '') && (github.event.inputs.hook_mode == 'all' || github.event.inputs.hook_mode == matrix.hook_mode || github.event.inputs.hook_mode == '')
+    if: github.event.inputs.target == 'all' || github.event.inputs.target == 'gki_r38' || github.event.inputs.target == ''
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
