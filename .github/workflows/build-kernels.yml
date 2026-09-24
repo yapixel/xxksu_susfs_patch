@@ -218,8 +218,14 @@ jobs:
           echo "🔍 Verifying Sultan 6.1 (${{ matrix.hook_mode }}) build artifacts..."
           IMG="sultan/out/arch/arm64/boot/Image.lz4"
           VMLINUX="sultan/out/vmlinux"
+          SYSMAP="sultan/out/System.map"
           DOTCONFIG="sultan/out/.config"
+          SUSFS_OBJ="sultan/out/fs/susfs.o"
+          KSU_OBJ="sultan/out/drivers/kernelsu/ksu.o"
+          NM="${{ env.TOOLCHAIN_PATH }}nm"
+          READELF="${{ env.TOOLCHAIN_PATH }}readelf"
 
+          echo "1. Checking Kernel Image ($IMG)..."
           if [ ! -f "$IMG" ]; then
             echo "❌ ERROR: $IMG not found!"
             exit 1
@@ -230,59 +236,107 @@ jobs:
             echo "❌ ERROR: Image.lz4 size ($IMG_SIZE bytes) is suspiciously small (<10MB)!"
             exit 1
           fi
+          lz4 -t "$IMG"
+          echo "  ✅ Valid LZ4 compressed image verified"
 
+          echo "2. Checking ELF64 / AArch64 vmlinux ($VMLINUX)..."
           if [ ! -f "$VMLINUX" ]; then
             echo "❌ ERROR: $VMLINUX not found!"
             exit 1
           fi
+          "$READELF" -h "$VMLINUX" | grep -E "Class:.*ELF64"
+          "$READELF" -h "$VMLINUX" | grep -E "Machine:.*AArch64"
+          echo "  ✅ vmlinux ELF header verified"
 
-          echo "Checking ELF Header:"
-          "${{ env.TOOLCHAIN_PATH }}readelf" -h "$VMLINUX" | grep -E "Class:.*ELF64|Machine:.*AArch64"
+          if [ ! -f "$SYSMAP" ]; then
+            echo "❌ ERROR: $SYSMAP not found!"
+            exit 1
+          fi
+          echo "  ✅ System.map exists ($(wc -l < "$SYSMAP") symbols)"
 
-          echo "Checking SuSFS Symbols in vmlinux:"
-          for sym in susfs_init susfs_add_sus_path susfs_spoof_uname; do
-            if "${{ env.TOOLCHAIN_PATH }}nm" "$VMLINUX" | grep -w "$sym" >/dev/null; then
-              echo "  ✅ Symbol found: $sym"
-            else
-              echo "  ❌ Missing required SuSFS symbol: $sym"
-              exit 1
+          check_symbol() {
+            local sym="$1"
+            if grep -w "$sym" "$SYSMAP" >/dev/null 2>&1; then
+              echo "  ✅ Found symbol in System.map: $sym"
+              return 0
             fi
-          done
-
-          echo "Checking xxKSU Symbols in vmlinux:"
-          for sym in ksu_init ksu_handle_execveat; do
-            if "${{ env.TOOLCHAIN_PATH }}nm" "$VMLINUX" | grep -w "$sym" >/dev/null; then
-              echo "  ✅ Symbol found: $sym"
-            else
-              echo "  ❌ Missing required xxKSU symbol: $sym"
-              exit 1
+            if "$NM" "$VMLINUX" 2>/dev/null | grep -w "$sym" >/dev/null 2>&1; then
+              echo "  ✅ Found symbol in vmlinux: $sym"
+              return 0
             fi
-          done
+            echo "  ❌ Symbol NOT found: $sym"
+            return 1
+          }
 
+          assert_no_symbol() {
+            local sym="$1"
+            if grep -w "$sym" "$SYSMAP" >/dev/null 2>&1; then
+              echo "  ❌ Unexpected symbol found in System.map: $sym"
+              return 1
+            fi
+            if "$NM" "$VMLINUX" 2>/dev/null | grep -w "$sym" >/dev/null 2>&1; then
+              echo "  ❌ Unexpected symbol found in vmlinux: $sym"
+              return 1
+            fi
+            echo "  ✅ Confirmed symbol absent: $sym"
+            return 0
+          }
+
+          echo "3. Checking SuSFS integration..."
+          if [ ! -f "$SUSFS_OBJ" ]; then
+            echo "❌ ERROR: SuSFS object ($SUSFS_OBJ) was not compiled!"
+            exit 1
+          fi
+          "$READELF" -h "$SUSFS_OBJ" | grep -q "ELF64"
+          echo "  ✅ Compiled SuSFS object verified: $SUSFS_OBJ"
+
+          SUSFS_COUNT=$(grep -c -E "[[:space:]]susfs_" "$SYSMAP" || true)
+          echo "  SuSFS symbols in System.map: $SUSFS_COUNT"
+          if [ "$SUSFS_COUNT" -lt 5 ]; then
+            echo "❌ ERROR: Insufficient SuSFS symbols in System.map!"
+            exit 1
+          fi
+          check_symbol susfs_spoof_uname || check_symbol susfs_add_sus_path
+
+          echo "4. Checking xxKSU integration..."
+          if [ ! -f "$KSU_OBJ" ]; then
+            echo "❌ ERROR: xxKSU object ($KSU_OBJ) was not compiled!"
+            exit 1
+          fi
+          "$READELF" -h "$KSU_OBJ" | grep -q "ELF64"
+          echo "  ✅ Compiled xxKSU object verified: $KSU_OBJ"
+          check_symbol ksu_handle_execveat
+          check_symbol ksu_block_modules || check_symbol kernelsu_init
+
+          echo "5. Checking profile identity (${{ matrix.hook_mode }})..."
           if [ "${{ matrix.hook_mode }}" = "manual" ]; then
-            echo "Checking Manual Hook Symbols:"
-            if "${{ env.TOOLCHAIN_PATH }}nm" "$VMLINUX" | grep -w "ksu_handle_rename" >/dev/null; then
-              echo "  ✅ Symbol found: ksu_handle_rename"
-            else
-              echo "  ❌ Missing manual hook symbol: ksu_handle_rename"
-              exit 1
-            fi
+            check_symbol ksu_inode_rename
+            check_symbol ksu_task_fix_setuid
+            assert_no_symbol ksu_do_execveat_common
           elif [ "${{ matrix.hook_mode }}" = "lsm_bl" ]; then
-            echo "Checking LSM/BL Hook Symbols:"
-            if "${{ env.TOOLCHAIN_PATH }}nm" "$VMLINUX" | grep -w "ksu_handle_arm64_branch_link" >/dev/null; then
-              echo "  ✅ Symbol found: ksu_handle_arm64_branch_link"
-            else
-              echo "  ❌ Missing BL symbol: ksu_handle_arm64_branch_link"
-              exit 1
-            fi
+            check_symbol ksu_do_execveat_common
+            check_symbol ksu_do_execveat_common_fn
           fi
 
-          echo "Checking final .config configuration options:"
+          echo "6. Checking final .config values..."
           grep -q "CONFIG_KSU_SUSFS=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS missing in .config!"; exit 1; }
           grep -q "CONFIG_KSU=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU missing in .config!"; exit 1; }
+          grep -q "CONFIG_KSU_SUSFS_SUS_PATH=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_SUS_PATH missing in .config!"; exit 1; }
+          grep -q "CONFIG_KSU_SUSFS_SUS_MOUNT=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_SUS_MOUNT missing in .config!"; exit 1; }
+          grep -q "CONFIG_KSU_SUSFS_SUS_KSTAT=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_SUS_KSTAT missing in .config!"; exit 1; }
+          grep -q "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_SPOOF_UNAME missing in .config!"; exit 1; }
+          grep -q "CONFIG_KSU_SUSFS_ENABLE_LOG=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_ENABLE_LOG missing in .config!"; exit 1; }
+          grep -q "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS missing in .config!"; exit 1; }
+          grep -q "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_OPEN_REDIRECT missing in .config!"; exit 1; }
+          grep -q "CONFIG_KSU_SUSFS_SUS_MAP=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_SUS_MAP missing in .config!"; exit 1; }
+
           if [ "${{ matrix.hook_mode }}" = "manual" ]; then
             if grep -q "CONFIG_KSU_LSM_SECURITY_HOOKS=y" "$DOTCONFIG"; then
               echo "❌ CONFIG_KSU_LSM_SECURITY_HOOKS unexpectedly enabled in manual mode!"
+              exit 1
+            fi
+            if grep -q "CONFIG_KSU_HACK_ARM64_BRANCH_LINK=y" "$DOTCONFIG"; then
+              echo "❌ CONFIG_KSU_HACK_ARM64_BRANCH_LINK unexpectedly enabled in manual mode!"
               exit 1
             fi
           else
@@ -429,9 +483,9 @@ jobs:
           cd ..
 
           if [ "${{ matrix.hook_mode }}" = "manual" ]; then
-            echo "🧪 Applying manual security hooks (manual profile)..."
-            patch -p1 -l --fuzz=3 < "${{ github.workspace }}/.github/fixtures/manual-security-hooks-v2.0.patch"
-            patch -p1 -l < "${{ github.workspace }}/.github/fixtures/scope-min-manual-hooks-v2.3.patch"
+            echo "🧪 Applying 6.12-compatible manual security hooks (manual profile)..."
+            patch -p1 -l < "${{ github.workspace }}/.github/fixtures/r38/manual-security-hooks-v2.0.patch"
+            patch -p1 -l < "${{ github.workspace }}/.github/fixtures/r38/scope-min-manual-hooks-v2.3.patch"
           else
             echo "ℹ️ LSM/BL profile: skipping manual security hooks."
           fi
@@ -543,8 +597,16 @@ jobs:
           echo "🔍 Verifying GKI 6.12 r38 (${{ matrix.hook_mode }}) build artifacts..."
           IMG="kernel_tree/out/arch/arm64/boot/Image"
           VMLINUX="kernel_tree/out/vmlinux"
+          SYSMAP="kernel_tree/out/System.map"
           DOTCONFIG="kernel_tree/out/.config"
+          SUSFS_OBJ="kernel_tree/out/fs/susfs.o"
+          [ ! -f "$SUSFS_OBJ" ] && [ -f "kernel_tree/out/common/fs/susfs.o" ] && SUSFS_OBJ="kernel_tree/out/common/fs/susfs.o"
+          KSU_OBJ="kernel_tree/out/drivers/kernelsu/ksu.o"
+          [ ! -f "$KSU_OBJ" ] && [ -f "kernel_tree/out/common/drivers/kernelsu/ksu.o" ] && KSU_OBJ="kernel_tree/out/common/drivers/kernelsu/ksu.o"
+          NM="llvm-nm"
+          READELF="llvm-readelf"
 
+          echo "1. Checking Kernel Image ($IMG)..."
           if [ ! -f "$IMG" ]; then
             echo "❌ ERROR: $IMG not found!"
             exit 1
@@ -555,59 +617,106 @@ jobs:
             echo "❌ ERROR: Image size ($IMG_SIZE bytes) is suspiciously small (<10MB)!"
             exit 1
           fi
+          echo "  ✅ Valid uncompressed ARM64 kernel Image verified"
 
+          echo "2. Checking ELF64 / AArch64 vmlinux ($VMLINUX)..."
           if [ ! -f "$VMLINUX" ]; then
             echo "❌ ERROR: $VMLINUX not found!"
             exit 1
           fi
+          "$READELF" -h "$VMLINUX" | grep -E "Class:.*ELF64"
+          "$READELF" -h "$VMLINUX" | grep -E "Machine:.*AArch64"
+          echo "  ✅ vmlinux ELF header verified"
 
-          echo "Checking ELF Header:"
-          llvm-readelf -h "$VMLINUX" | grep -E "Class:.*ELF64|Machine:.*AArch64"
+          if [ ! -f "$SYSMAP" ]; then
+            echo "❌ ERROR: $SYSMAP not found!"
+            exit 1
+          fi
+          echo "  ✅ System.map exists ($(wc -l < "$SYSMAP") symbols)"
 
-          echo "Checking SuSFS Symbols in vmlinux:"
-          for sym in susfs_init susfs_add_sus_path susfs_spoof_uname; do
-            if llvm-nm "$VMLINUX" | grep -w "$sym" >/dev/null; then
-              echo "  ✅ Symbol found: $sym"
-            else
-              echo "  ❌ Missing required SuSFS symbol: $sym"
-              exit 1
+          check_symbol() {
+            local sym="$1"
+            if grep -w "$sym" "$SYSMAP" >/dev/null 2>&1; then
+              echo "  ✅ Found symbol in System.map: $sym"
+              return 0
             fi
-          done
-
-          echo "Checking xxKSU Symbols in vmlinux:"
-          for sym in ksu_init ksu_handle_execveat; do
-            if llvm-nm "$VMLINUX" | grep -w "$sym" >/dev/null; then
-              echo "  ✅ Symbol found: $sym"
-            else
-              echo "  ❌ Missing required xxKSU symbol: $sym"
-              exit 1
+            if "$NM" "$VMLINUX" 2>/dev/null | grep -w "$sym" >/dev/null 2>&1; then
+              echo "  ✅ Found symbol in vmlinux: $sym"
+              return 0
             fi
-          done
+            echo "  ❌ Symbol NOT found: $sym"
+            return 1
+          }
 
+          assert_no_symbol() {
+            local sym="$1"
+            if grep -w "$sym" "$SYSMAP" >/dev/null 2>&1; then
+              echo "  ❌ Unexpected symbol found in System.map: $sym"
+              return 1
+            fi
+            if "$NM" "$VMLINUX" 2>/dev/null | grep -w "$sym" >/dev/null 2>&1; then
+              echo "  ❌ Unexpected symbol found in vmlinux: $sym"
+              return 1
+            fi
+            echo "  ✅ Confirmed symbol absent: $sym"
+            return 0
+          }
+
+          echo "3. Checking SuSFS integration..."
+          if [ ! -f "$SUSFS_OBJ" ]; then
+            echo "❌ ERROR: SuSFS object ($SUSFS_OBJ) was not compiled!"
+            exit 1
+          fi
+          "$READELF" -h "$SUSFS_OBJ" | grep -q "ELF64"
+          echo "  ✅ Compiled SuSFS object verified: $SUSFS_OBJ"
+
+          SUSFS_COUNT=$(grep -c -E "[[:space:]]susfs_" "$SYSMAP" || true)
+          echo "  SuSFS symbols in System.map: $SUSFS_COUNT"
+          if [ "$SUSFS_COUNT" -lt 5 ]; then
+            echo "❌ ERROR: Insufficient SuSFS symbols in System.map!"
+            exit 1
+          fi
+          check_symbol susfs_spoof_uname || check_symbol susfs_add_sus_path
+
+          echo "4. Checking xxKSU integration..."
+          if [ ! -f "$KSU_OBJ" ]; then
+            echo "❌ ERROR: xxKSU object ($KSU_OBJ) was not compiled!"
+            exit 1
+          fi
+          "$READELF" -h "$KSU_OBJ" | grep -q "ELF64"
+          echo "  ✅ Compiled xxKSU object verified: $KSU_OBJ"
+          check_symbol ksu_handle_execveat
+          check_symbol ksu_block_modules || check_symbol kernelsu_init
+
+          echo "5. Checking profile identity (${{ matrix.hook_mode }})..."
           if [ "${{ matrix.hook_mode }}" = "manual" ]; then
-            echo "Checking Manual Hook Symbols:"
-            if llvm-nm "$VMLINUX" | grep -w "ksu_handle_rename" >/dev/null; then
-              echo "  ✅ Symbol found: ksu_handle_rename"
-            else
-              echo "  ❌ Missing manual hook symbol: ksu_handle_rename"
-              exit 1
-            fi
+            check_symbol ksu_inode_rename
+            check_symbol ksu_task_fix_setuid
+            assert_no_symbol ksu_do_execveat_common
           elif [ "${{ matrix.hook_mode }}" = "lsm_bl" ]; then
-            echo "Checking LSM/BL Hook Symbols:"
-            if llvm-nm "$VMLINUX" | grep -w "ksu_handle_arm64_branch_link" >/dev/null; then
-              echo "  ✅ Symbol found: ksu_handle_arm64_branch_link"
-            else
-              echo "  ❌ Missing BL symbol: ksu_handle_arm64_branch_link"
-              exit 1
-            fi
+            check_symbol ksu_do_execveat_common
+            check_symbol ksu_do_execveat_common_fn
           fi
 
-          echo "Checking final .config configuration options:"
+          echo "6. Checking final .config values..."
           grep -q "CONFIG_KSU_SUSFS=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS missing in .config!"; exit 1; }
           grep -q "CONFIG_KSU=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU missing in .config!"; exit 1; }
+          grep -q "CONFIG_KSU_SUSFS_SUS_PATH=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_SUS_PATH missing in .config!"; exit 1; }
+          grep -q "CONFIG_KSU_SUSFS_SUS_MOUNT=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_SUS_MOUNT missing in .config!"; exit 1; }
+          grep -q "CONFIG_KSU_SUSFS_SUS_KSTAT=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_SUS_KSTAT missing in .config!"; exit 1; }
+          grep -q "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_SPOOF_UNAME missing in .config!"; exit 1; }
+          grep -q "CONFIG_KSU_SUSFS_ENABLE_LOG=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_ENABLE_LOG missing in .config!"; exit 1; }
+          grep -q "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS missing in .config!"; exit 1; }
+          grep -q "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_OPEN_REDIRECT missing in .config!"; exit 1; }
+          grep -q "CONFIG_KSU_SUSFS_SUS_MAP=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS_SUS_MAP missing in .config!"; exit 1; }
+
           if [ "${{ matrix.hook_mode }}" = "manual" ]; then
             if grep -q "CONFIG_KSU_LSM_SECURITY_HOOKS=y" "$DOTCONFIG"; then
               echo "❌ CONFIG_KSU_LSM_SECURITY_HOOKS unexpectedly enabled in manual mode!"
+              exit 1
+            fi
+            if grep -q "CONFIG_KSU_HACK_ARM64_BRANCH_LINK=y" "$DOTCONFIG"; then
+              echo "❌ CONFIG_KSU_HACK_ARM64_BRANCH_LINK unexpectedly enabled in manual mode!"
               exit 1
             fi
           else

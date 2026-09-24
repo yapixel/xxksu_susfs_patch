@@ -1,0 +1,119 @@
+From: midori01 <lv@lvlv.lv>
+Date: Sat, 22 Aug 2026 15:28:40 +0900
+Subject: [PATCH] scope-minimized manual hooks v2.3 for android16-6.12
+
+---
+ fs/exec.c       |  5 +++++
+ fs/open.c       |  4 ++++
+ fs/stat.c       | 26 ++++++++++++++++++++++++++
+ kernel/reboot.c |  5 +++++
+ 4 files changed, 40 insertions(+)
+
+diff --git a/fs/exec.c b/fs/exec.c
+index 965fdc593d65..9eb6e50f1e35 100644
+--- a/fs/exec.c
++++ b/fs/exec.c
+@@ -1940,6 +1940,11 @@ static int do_execveat_common(int fd, struct filename *filename,
+ 	struct linux_binprm *bprm;
+ 	int retval;
+ 
++#ifdef CONFIG_KSU
++	extern int ksu_handle_execveat(int *, struct filename **, void *, void *, int *);
++	ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
++#endif
++
+ 	if (IS_ERR(filename))
+ 		return PTR_ERR(filename);
+ 
+diff --git a/fs/open.c b/fs/open.c
+index 99fc54ecdc8a..9eb0430d3c0c 100644
+--- a/fs/open.c
++++ b/fs/open.c
+@@ -539,6 +539,10 @@ static long do_faccessat(int dfd, const char __user *filename, int mode, int fla
+ 
+ SYSCALL_DEFINE3(faccessat, int, dfd, const char __user *, filename, int, mode)
+ {
++#ifdef CONFIG_KSU
++	extern int ksu_handle_faccessat(int *, const char __user **, int *, int *);
++	ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
++#endif
+ 	return do_faccessat(dfd, filename, mode, 0);
+ }
+ 
+diff --git a/fs/stat.c b/fs/stat.c
+index adb071bc92e1..66b6e1cd220c 100644
+--- a/fs/stat.c
++++ b/fs/stat.c
+@@ -502,6 +502,11 @@ SYSCALL_DEFINE4(newfstatat, int, dfd, const char __user *, filename,
+ 	struct kstat stat;
+ 	int error;
+ 
++#ifdef CONFIG_KSU
++	extern int ksu_handle_stat(int *, const char __user **, int *);
++	ksu_handle_stat(&dfd, &filename, &flag);
++#endif
++
+ 	error = vfs_fstatat(dfd, filename, &stat, flag);
+ 	if (error)
+ 		return error;
+@@ -517,6 +522,14 @@ SYSCALL_DEFINE2(newfstat, unsigned int, fd, struct stat __user *, statbuf)
+ 	if (!error)
+ 		error = cp_new_stat(&stat, statbuf);
+ 
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wdeclaration-after-statement"
++#if defined(CONFIG_KSU) && !defined(CONFIG_KSU_KPROBES_KSUD)
++	extern void ksu_handle_newfstat_ret(unsigned int *, struct stat __user **);
++	ksu_handle_newfstat_ret(&fd, &statbuf);
++#endif
++#pragma GCC diagnostic pop
++
+ 	return error;
+ }
+ #endif
+@@ -649,6 +662,14 @@ SYSCALL_DEFINE2(fstat64, unsigned long, fd, struct stat64 __user *, statbuf)
+ 	if (!error)
+ 		error = cp_new_stat64(&stat, statbuf);
+ 
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wdeclaration-after-statement"
++#if defined(CONFIG_KSU) && !defined(CONFIG_KSU_KPROBES_KSUD) // for 32-bit
++	extern void ksu_handle_fstat64_ret(unsigned long *, struct stat64 __user **);
++	ksu_handle_fstat64_ret(&fd, &statbuf);
++#endif
++#pragma GCC diagnostic pop
++
+ 	return error;
+ }
+ 
+@@ -658,6 +679,11 @@ SYSCALL_DEFINE4(fstatat64, int, dfd, const char __user *, filename,
+ 	struct kstat stat;
+ 	int error;
+ 
++#ifdef CONFIG_KSU // for 32-bit
++	extern int ksu_handle_stat(int *, const char __user **, int *);
++	ksu_handle_stat(&dfd, &filename, &flag);
++#endif
++
+ 	error = vfs_fstatat(dfd, filename, &stat, flag);
+ 	if (error)
+ 		return error;
+diff --git a/kernel/reboot.c b/kernel/reboot.c
+index 45681d03d331..818890343d9b 100644
+--- a/kernel/reboot.c
++++ b/kernel/reboot.c
+@@ -723,6 +723,11 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
+ 	char buffer[256];
+ 	int ret = 0;
+ 
++#if defined(CONFIG_KSU) && !defined(CONFIG_KSU_KPROBES_KSUD)
++	extern int ksu_handle_sys_reboot(int, int, unsigned int, void __user **);
++	ksu_handle_sys_reboot(magic1, magic2, cmd, &arg);
++#endif
++
+ 	/* We only trust the superuser with rebooting the system. */
+ 	if (!ns_capable(pid_ns->user_ns, CAP_SYS_BOOT))
+ 		return -EPERM;
+-- 
+2.55.0
+
