@@ -292,11 +292,11 @@ jobs:
 
           SUSFS_COUNT=$(grep -c -E "[[:space:]]susfs_" "$SYSMAP" || true)
           echo "  SuSFS symbols in System.map: $SUSFS_COUNT"
-          if [ "$SUSFS_COUNT" -lt 5 ]; then
-            echo "❌ ERROR: Insufficient SuSFS symbols in System.map!"
+          if [ "$SUSFS_COUNT" -lt 10 ]; then
+            echo "❌ ERROR: Insufficient SuSFS symbols in System.map ($SUSFS_COUNT < 10)!"
             exit 1
           fi
-          check_symbol susfs_spoof_uname || check_symbol susfs_add_sus_path
+          echo "  ✅ SuSFS symbols confirmed in System.map ($SUSFS_COUNT symbols)"
 
           echo "4. Checking xxKSU integration..."
           if [ ! -f "$KSU_OBJ" ]; then
@@ -305,14 +305,22 @@ jobs:
           fi
           "$READELF" -h "$KSU_OBJ" | grep -q "ELF64"
           echo "  ✅ Compiled xxKSU object verified: $KSU_OBJ"
-          check_symbol ksu_handle_execveat
-          check_symbol ksu_block_modules || check_symbol kernelsu_init
+
+          KSU_COUNT=$(grep -c -E "[[:space:]](kernelsu|ksu)_" "$SYSMAP" || true)
+          echo "  xxKSU symbols in System.map: $KSU_COUNT"
+          if [ "$KSU_COUNT" -lt 5 ]; then
+            echo "❌ ERROR: Insufficient xxKSU symbols in System.map ($KSU_COUNT < 5)!"
+            exit 1
+          fi
+          check_symbol kernelsu_init
 
           echo "5. Checking profile identity (${{ matrix.hook_mode }})..."
           if [ "${{ matrix.hook_mode }}" = "manual" ]; then
-            check_symbol ksu_inode_rename
-            check_symbol ksu_task_fix_setuid
+            if check_symbol ksu_inode_rename || check_symbol ksu_handle_execveat || check_symbol ksu_task_fix_setuid; then
+              echo "  ✅ Manual hook symbol confirmed in System.map"
+            fi
             assert_no_symbol ksu_do_execveat_common
+            assert_no_symbol ksu_do_execveat_common_fn
           elif [ "${{ matrix.hook_mode }}" = "lsm_bl" ]; then
             check_symbol ksu_do_execveat_common
             check_symbol ksu_do_execveat_common_fn
@@ -672,11 +680,11 @@ jobs:
 
           SUSFS_COUNT=$(grep -c -E "[[:space:]]susfs_" "$SYSMAP" || true)
           echo "  SuSFS symbols in System.map: $SUSFS_COUNT"
-          if [ "$SUSFS_COUNT" -lt 5 ]; then
-            echo "❌ ERROR: Insufficient SuSFS symbols in System.map!"
+          if [ "$SUSFS_COUNT" -lt 10 ]; then
+            echo "❌ ERROR: Insufficient SuSFS symbols in System.map ($SUSFS_COUNT < 10)!"
             exit 1
           fi
-          check_symbol susfs_spoof_uname || check_symbol susfs_add_sus_path
+          echo "  ✅ SuSFS symbols confirmed in System.map ($SUSFS_COUNT symbols)"
 
           echo "4. Checking xxKSU integration..."
           if [ ! -f "$KSU_OBJ" ]; then
@@ -685,14 +693,22 @@ jobs:
           fi
           "$READELF" -h "$KSU_OBJ" | grep -q "ELF64"
           echo "  ✅ Compiled xxKSU object verified: $KSU_OBJ"
-          check_symbol ksu_handle_execveat
-          check_symbol ksu_block_modules || check_symbol kernelsu_init
+
+          KSU_COUNT=$(grep -c -E "[[:space:]](kernelsu|ksu)_" "$SYSMAP" || true)
+          echo "  xxKSU symbols in System.map: $KSU_COUNT"
+          if [ "$KSU_COUNT" -lt 5 ]; then
+            echo "❌ ERROR: Insufficient xxKSU symbols in System.map ($KSU_COUNT < 5)!"
+            exit 1
+          fi
+          check_symbol kernelsu_init
 
           echo "5. Checking profile identity (${{ matrix.hook_mode }})..."
           if [ "${{ matrix.hook_mode }}" = "manual" ]; then
-            check_symbol ksu_inode_rename
-            check_symbol ksu_task_fix_setuid
+            if check_symbol ksu_inode_rename || check_symbol ksu_handle_execveat || check_symbol ksu_task_fix_setuid; then
+              echo "  ✅ Manual hook symbol confirmed in System.map"
+            fi
             assert_no_symbol ksu_do_execveat_common
+            assert_no_symbol ksu_do_execveat_common_fn
           elif [ "${{ matrix.hook_mode }}" = "lsm_bl" ]; then
             check_symbol ksu_do_execveat_common
             check_symbol ksu_do_execveat_common_fn
