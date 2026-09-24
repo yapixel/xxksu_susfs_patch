@@ -128,7 +128,7 @@ def _source_shape(source_id: str, source: SemanticUnit, evidence) -> bool:
         "transport.exec.definition": ("kernel/feature/sucompat.c",),
         "transport.fstat_return.definition": ("kernel/runtime/ksud.c",),
         "transport.read.internal_fallback": ("kernel/hook/syscall_table_hook_arm64.c",),
-        "transport.input.registration": ("kernel/feature/vol_detector.c",),
+        "transport.input.registration": ("kernel/runtime/ksud.c", "kernel/feature/vol_detector.c"),
     }
     expected_symbols = {
         "transport.exec.definition": ("ksu_handle_execveat",),

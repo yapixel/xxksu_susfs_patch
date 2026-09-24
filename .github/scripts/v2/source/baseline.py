@@ -41,18 +41,42 @@ class BaselineRecord:
     kernel_version: str
     status: str
     upstream: Mapping[str, Any]
-    susfs: Mapping[str, Any]
-    fixtures: Mapping[str, str]
-    source_bundle: Mapping[str, Any]
-    retained_file_hashes: Mapping[str, Any]
-    patch_51: Mapping[str, Any]
-    validation_results: Mapping[str, str]
+    susfs: Mapping[str, Any] = field(default_factory=dict)
+    fixtures: Mapping[str, str] = field(default_factory=dict)
+    source_bundle: Mapping[str, Any] = field(default_factory=dict)
+    retained_file_hashes: Mapping[str, Any] = field(default_factory=dict)
+    patch_51: Mapping[str, Any] = field(default_factory=dict)
+    validation_results: Mapping[str, str] = field(default_factory=dict)
+    patch_10: Mapping[str, Any] = field(default_factory=dict)
+    patch_11: Mapping[str, Any] = field(default_factory=dict)
+    policy: Mapping[str, Any] = field(default_factory=dict)
     blocker_reason: Optional[str] = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def validate(self) -> "BaselineRecord":
         if self.schema != BASELINE_SCHEMA:
             raise UnsupportedBaselineSchema(f"unsupported baseline schema: {self.schema}")
+
+        if self.target_id == "xxksu":
+            if self.status not in ("VERIFIED", "BLOCKED"):
+                raise InvalidBaselineContract(f"invalid baseline status: {self.status}")
+            if not self.upstream.get("repository") or not self.upstream.get("resolved_commit"):
+                raise InvalidBaselineContract("xxksu baseline requires upstream repository and resolved_commit")
+            if self.status == "VERIFIED":
+                if not self.upstream.get("archive_sha256"):
+                    raise InvalidBaselineContract("verified xxksu baseline requires upstream archive_sha256")
+                bundle_id = self.source_bundle.get("identity")
+                if not bundle_id or not isinstance(bundle_id, str):
+                    raise InvalidBaselineContract("verified xxksu baseline requires source_bundle identity")
+                if not self.retained_file_hashes:
+                    raise InvalidBaselineContract("verified xxksu baseline requires retained_file_hashes")
+                if self.patch_11.get("strict_apply") != "PASS":
+                    raise InvalidBaselineContract("verified xxksu baseline requires patch_11 strict_apply PASS")
+            elif self.status == "BLOCKED":
+                if not self.blocker_reason:
+                    raise InvalidBaselineContract("blocked xxksu baseline requires blocker_reason")
+            return self
+
         if self.target_id not in KNOWN_TARGETS:
             raise InvalidBaselineContract(f"unknown or retired target: {self.target_id}")
         if self.status not in ("VERIFIED", "BLOCKED"):
@@ -102,21 +126,27 @@ class BaselineRecord:
         return self
 
     def identity_payload(self) -> dict[str, Any]:
-        return {
+        payload = {
             "schema": self.schema,
             "target_id": self.target_id,
             "kernel_version": self.kernel_version,
             "status": self.status,
             "upstream": dict(self.upstream),
-            "susfs": dict(self.susfs),
-            "fixtures": dict(sorted(self.fixtures.items())),
             "source_bundle": dict(self.source_bundle),
             "retained_file_hashes": dict(sorted(self.retained_file_hashes.items())),
-            "patch_51": dict(self.patch_51),
-            "validation_results": dict(sorted(self.validation_results.items())),
             "blocker_reason": self.blocker_reason,
             "metadata": dict(self.metadata),
         }
+        if self.target_id == "xxksu":
+            payload["patch_10"] = dict(self.patch_10)
+            payload["patch_11"] = dict(self.patch_11)
+            payload["policy"] = dict(self.policy)
+        else:
+            payload["susfs"] = dict(self.susfs)
+            payload["fixtures"] = dict(sorted(self.fixtures.items()))
+            payload["patch_51"] = dict(self.patch_51)
+            payload["validation_results"] = dict(sorted(self.validation_results.items()))
+        return payload
 
     def canonical_json(self) -> str:
         return canonical_json(self.identity_payload())
@@ -154,6 +184,9 @@ def load_baseline_record(data: Any) -> BaselineRecord:
         retained_file_hashes=raw.get("retained_file_hashes", {}),
         patch_51=raw.get("patch_51", {}),
         validation_results=raw.get("validation_results", {}),
+        patch_10=raw.get("patch_10", {}),
+        patch_11=raw.get("patch_11", {}),
+        policy=raw.get("policy", {}),
         blocker_reason=raw.get("blocker_reason"),
         metadata=raw.get("metadata", {}),
     )

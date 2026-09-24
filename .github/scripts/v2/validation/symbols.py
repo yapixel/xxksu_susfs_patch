@@ -94,7 +94,7 @@ DEFAULT_SYMBOL_CONTRACTS: Tuple[SymbolContract, ...] = (
     SymbolContract(
         symbol="input_register_handler",
         is_required=True,
-        expected_paths=("kernel/feature/vol_detector.c",),
+        expected_paths=("kernel/runtime/ksud.c", "kernel/feature/vol_detector.c"),
         bundle_target="xxksu",
         description="xxKSU volume detector input registration",
     ),

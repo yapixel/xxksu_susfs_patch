@@ -201,7 +201,7 @@ def validate_all(
     results.extend(abi_results)
 
     # 5. Ownership validation
-    if claims is not None or bundle is not None:
+    if claims is not None:
         ownership_results = validate_ownership(
             mode=mode,
             claims=claims,

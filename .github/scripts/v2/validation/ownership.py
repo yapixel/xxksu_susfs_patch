@@ -85,7 +85,7 @@ def make_default_manual_claims() -> Tuple[OwnershipClaim, ...]:
         OwnershipClaim("read", "PATCH_11", "FIXTURE_MANUAL_SECURITY", "fixture", caller_symbol="ksu_file_permission", source_file="security/security.c"),
         OwnershipClaim("reboot", "PATCH_11", "FIXTURE_SCOPE_MIN", "fixture", caller_symbol="ksu_handle_sys_reboot", source_file="kernel/reboot.c"),
         OwnershipClaim("setuid", "PATCH_11", "FIXTURE_MANUAL_SECURITY", "fixture", caller_symbol="ksu_task_fix_setuid", source_file="security/security.c"),
-        OwnershipClaim("input", "XXKSU_RUNTIME", "XXKSU_RUNTIME", "xxksu", caller_symbol="input_register_handler", source_file="kernel/feature/vol_detector.c"),
+        OwnershipClaim("input", "XXKSU_RUNTIME", "XXKSU_RUNTIME", "xxksu", caller_symbol="input_register_handler", source_file="kernel/runtime/ksud.c"),
         OwnershipClaim("selinux", "XXKSU_RUNTIME", "FIXTURE_MANUAL_SECURITY", "fixture", caller_symbol="ksu_hide_setprocattr", source_file="security/security.c"),
     )
 

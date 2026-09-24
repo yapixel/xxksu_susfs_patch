@@ -162,7 +162,7 @@ def _source_shape(source_id: str, source: SemanticUnit, evidence) -> bool:
         "transport.read.manual_fixture": ("security/security.c",),
         "transport.reboot.definition": ("kernel/supercall/supercall.c",),
         "transport.setuid.definition": ("kernel/hook/setuid_hook.c",),
-        "transport.input.registration": ("kernel/feature/vol_detector.c",),
+        "transport.input.registration": ("kernel/runtime/ksud.c", "kernel/feature/vol_detector.c"),
         "selinux.avc.replace": ("kernel/feature/selinux_hide.c", "kernel/downstream/slow_avc_audit_defs.h"),
         "selinux.setprocattr": ("kernel/feature/selinux_hide.c",),
         "selinux.fake_status": ("kernel/feature/selinux_hide.c",),
