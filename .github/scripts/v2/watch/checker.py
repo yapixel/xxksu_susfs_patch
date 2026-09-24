@@ -7,6 +7,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 from typing import Any, Mapping, Optional, Sequence, Tuple
@@ -123,6 +124,42 @@ def fetch_url_content(url: str, timeout: int = 30) -> tuple[str, str]:
         text = data.decode("utf-8", errors="replace")
         sha = hashlib.sha256(data).hexdigest()
         return text, f"sha256:{sha}"
+
+
+def normalize_reference_patch(text: str) -> str:
+    """Normalize reference patch by stripping commit metadata headers, footers, and index hashes."""
+    diff_idx = text.find("\ndiff --git ")
+    if diff_idx != -1:
+        diff_text = text[diff_idx + 1:]
+    elif text.startswith("diff --git "):
+        diff_text = text
+    else:
+        diff_idx = text.find("\n--- ")
+        if diff_idx != -1:
+            diff_text = text[diff_idx + 1:]
+        elif text.startswith("--- "):
+            diff_text = text
+        else:
+            diff_text = text
+
+    lines = diff_text.splitlines()
+    while lines and not lines[-1].strip():
+        lines.pop()
+    if len(lines) >= 2 and lines[-2].strip() == "--":
+        lines = lines[:-2]
+
+    filtered = [
+        l for l in lines
+        if not (l.startswith("index ") and re.match(r"^index [0-9a-f]+\.\.[0-9a-f]+", l))
+    ]
+    return "\n".join(filtered).strip()
+
+
+def compute_normalized_patch_hash(text: str) -> str:
+    """Compute sha256: hash of normalized reference patch content."""
+    normalized = normalize_reference_patch(text)
+    digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+    return f"sha256:{digest}"
 
 
 class UpstreamWatcher:
@@ -643,6 +680,7 @@ class UpstreamWatcher:
     ) -> SourceResult:
         repro_cmd = f"PYTHONPATH=.github/scripts python3 -m v2.watch.cli --source {source_id}"
         old_hash = info.get("sha256", "")
+        old_norm_hash = info.get("normalized_sha256", "")
         old_identity = info.get("commit_or_ref", old_hash[:16])
         url = info.get("url", "")
 
@@ -674,6 +712,10 @@ class UpstreamWatcher:
                 reproduction_command=repro_cmd,
             )
 
+        new_norm_hash = compute_normalized_patch_hash(text)
+        commit_match = re.search(r"^From\s+([0-9a-f]{40})\b", text, re.MULTILINE)
+        new_identity = commit_match.group(1) if commit_match else new_hash[:16]
+
         if new_hash == old_hash:
             return SourceResult(
                 source_id=source_id,
@@ -687,16 +729,33 @@ class UpstreamWatcher:
                 reproduction_command=repro_cmd,
             )
 
-        # Reference source changed!
+        target_norm_hash = old_norm_hash or old_hash
+        if new_norm_hash == target_norm_hash:
+            return SourceResult(
+                source_id=source_id,
+                source_type="reference",
+                classification=WatchClassification.NO_CHANGE,
+                old_identity=old_identity,
+                new_identity=new_identity,
+                old_content_hash=old_hash,
+                new_content_hash=new_hash,
+                details=(
+                    f"Reference commit identity changed ({old_identity[:12]} -> {new_identity[:12]}), "
+                    f"but normalized patch content is unchanged ({new_norm_hash[:16]})."
+                ),
+                reproduction_command=repro_cmd,
+            )
+
+        # Reference patch content changed!
         return SourceResult(
             source_id=source_id,
             source_type="reference",
             classification=WatchClassification.REFERENCE_DRIFT,
             old_identity=old_identity,
-            new_identity=new_hash[:16],
+            new_identity=new_identity,
             old_content_hash=old_hash,
             new_content_hash=new_hash,
-            details=f"Reference signal changed (new sha256: {new_hash[:16]}). Reference only; never modifies production patches.",
+            details=f"Reference patch content changed (new sha256: {new_hash[:16]}, normalized: {new_norm_hash[:16]}). Reference only; never modifies production patches.",
             reproduction_command=repro_cmd,
         )
 
@@ -734,8 +793,10 @@ class UpstreamWatcher:
 
 __all__ = [
     "compute_composite_hash",
+    "compute_normalized_patch_hash",
     "fetch_remote_commit",
     "fetch_git_files",
     "fetch_url_content",
+    "normalize_reference_patch",
     "UpstreamWatcher",
 ]

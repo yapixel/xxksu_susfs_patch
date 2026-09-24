@@ -51,11 +51,13 @@
     },
     "reference": {
       "midori_gki_patch_50": {
+        "normalized_sha256": "sha256:1fa63a0631448bf92d5c5d424bffd5f06be343fb0287b39e4df8cda85df6d570",
         "sha256": "sha256:4bb0e351558c499bc487f05af1c188fbda1e297798b5832f4ce3333132a5c115",
         "url": "https://raw.githubusercontent.com/midori01/gki_ksu_workflow/main/.github/patches/android16-6.12/50_add_susfs_in_gki-android16-6.12.38.patch"
       },
       "midori_kernelsu_xx_patch": {
         "commit_or_ref": "bc1b8e371d80fb8dbed5ac10096e39f9cf864d56",
+        "normalized_sha256": "sha256:cc36da9e333c0d65e3ef1c5aeadfa83befc61da39b6dc47356bce8913114f7d8",
         "sha256": "sha256:6d0a6b64ffcc41f04fb1638830c0baf355f85fb5e27db52ec55737ff460a4a68",
         "url": "https://github.com/midori01/KernelSU/commit/xx.patch"
       }

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import unittest
@@ -10,6 +11,7 @@ from unittest.mock import MagicMock, patch
 from v2.watch.checker import (
     UpstreamWatcher,
     compute_composite_hash,
+    compute_normalized_patch_hash,
     fetch_remote_commit,
 )
 from v2.watch.escalation import (
@@ -198,6 +200,104 @@ class WatchClassificationTests(unittest.TestCase):
         # Reference drift must NOT trigger escalation or candidate patch
         self.assertFalse(res.requires_escalation())
         self.assertIsNone(res.candidate_patch)
+
+    @patch("v2.watch.checker.fetch_url_content")
+    def test_reference_rebase_identity_change_with_identical_normalized_patch_is_no_change(self, mock_url):
+        old_patch_text = (
+            "From bc1b8e371d80fb8dbed5ac10096e39f9cf864d56 Mon Sep 17 00:00:00 2001\n"
+            "From: midori01 <lv@lvlv.lv>\n"
+            "Date: Mon, 14 Sep 2026 19:50:53 +0900\n"
+            "Subject: [PATCH] test patch\n"
+            "---\n"
+            " file.c | 2 +-\n"
+            " 1 file changed, 1 insertion(+), 1 deletion(-)\n"
+            "\n"
+            "diff --git a/file.c b/file.c\n"
+            "index 1234567..89abcdef 100644\n"
+            "--- a/file.c\n"
+            "+++ b/file.c\n"
+            "@@ -1,2 +1,2 @@\n"
+            " context\n"
+            "-old\n"
+            "+new\n"
+            "-- \n"
+            "2.43.0\n"
+        )
+        new_patch_text = (
+            "From 719d466e7228825f0515a0545f5c708c94a80ac5 Mon Sep 17 00:00:00 2001\n"
+            "From: midori01 <lv@lvlv.lv>\n"
+            "Date: Mon, 14 Sep 2026 19:50:53 +0900\n"
+            "Subject: [PATCH] test patch\n"
+            "---\n"
+            " file.c | 2 +-\n"
+            " 1 file changed, 1 insertion(+), 1 deletion(-)\n"
+            "\n"
+            "diff --git a/file.c b/file.c\n"
+            "index 1234567..89abcdef 100644\n"
+            "--- a/file.c\n"
+            "+++ b/file.c\n"
+            "@@ -1,2 +1,2 @@\n"
+            " context\n"
+            "-old\n"
+            "+new\n"
+            "-- \n"
+            "2.43.0\n"
+        )
+        old_raw_hash = f"sha256:{hashlib.sha256(old_patch_text.encode('utf-8')).hexdigest()}"
+        new_raw_hash = f"sha256:{hashlib.sha256(new_patch_text.encode('utf-8')).hexdigest()}"
+        norm_hash = compute_normalized_patch_hash(old_patch_text)
+
+        mock_url.return_value = (new_patch_text, new_raw_hash)
+        info = {
+            "url": "https://github.com/midori01/KernelSU/commit/xx.patch",
+            "sha256": old_raw_hash,
+            "normalized_sha256": norm_hash,
+            "commit_or_ref": "bc1b8e371d80",
+        }
+        res = self.watcher.check_reference_source("midori_kernelsu_xx_patch", info, fetch_remote=True)
+        self.assertEqual(res.classification, WatchClassification.NO_CHANGE)
+        self.assertEqual(res.source_type, "reference")
+        self.assertEqual(res.old_identity, "bc1b8e371d80")
+        self.assertEqual(res.new_identity[:12], "719d466e7228")
+        self.assertFalse(res.requires_escalation())
+        self.assertIn("normalized patch content is unchanged", res.details)
+
+    @patch("v2.watch.checker.fetch_url_content")
+    def test_reference_drift_when_normalized_content_changes(self, mock_url):
+        old_patch_text = (
+            "From bc1b8e371d80fb8dbed5ac10096e39f9cf864d56 Mon Sep 17 00:00:00 2001\n"
+            "diff --git a/file.c b/file.c\n"
+            "--- a/file.c\n"
+            "+++ b/file.c\n"
+            "@@ -1 +1 @@\n"
+            "-a\n"
+            "+b\n"
+        )
+        new_patch_text = (
+            "From 719d466e7228825f0515a0545f5c708c94a80ac5 Mon Sep 17 00:00:00 2001\n"
+            "diff --git a/file.c b/file.c\n"
+            "--- a/file.c\n"
+            "+++ b/file.c\n"
+            "@@ -1 +1 @@\n"
+            "-a\n"
+            "+c\n"
+        )
+        old_raw_hash = f"sha256:{hashlib.sha256(old_patch_text.encode('utf-8')).hexdigest()}"
+        new_raw_hash = f"sha256:{hashlib.sha256(new_patch_text.encode('utf-8')).hexdigest()}"
+        norm_hash = compute_normalized_patch_hash(old_patch_text)
+
+        mock_url.return_value = (new_patch_text, new_raw_hash)
+        info = {
+            "url": "https://github.com/midori01/KernelSU/commit/xx.patch",
+            "sha256": old_raw_hash,
+            "normalized_sha256": norm_hash,
+            "commit_or_ref": "bc1b8e371d80",
+        }
+        res = self.watcher.check_reference_source("midori_kernelsu_xx_patch", info, fetch_remote=True)
+        self.assertEqual(res.classification, WatchClassification.REFERENCE_DRIFT)
+        self.assertEqual(res.source_type, "reference")
+        self.assertFalse(res.requires_escalation())
+        self.assertIn("Reference patch content changed", res.details)
 
     @patch("v2.watch.checker.fetch_remote_commit")
     def test_source_identity_error_on_network_failure(self, mock_commit):
