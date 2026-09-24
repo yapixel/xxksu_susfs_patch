@@ -75,19 +75,31 @@ jobs:
           echo "📥 Cloning Sultan tensynos kernel (16.0.0-sultan / af5c65b9)..."
           git clone --depth=1 --single-branch -b "16.0.0-sultan" "https://github.com/kerneltoast/android_kernel_google_tensynos.git" sultan
           cd sultan
-          git checkout af5c65b9547a9f33c5f566430d0434aecab5a8b5 || true
+          ACTUAL_COMMIT=$(git rev-parse HEAD)
+          if [ "$ACTUAL_COMMIT" != "af5c65b9547a9f33c5f566430d0434aecab5a8b5" ]; then
+            echo "❌ Sultan commit mismatch: expected af5c65b9547a9f33c5f566430d0434aecab5a8b5, got $ACTUAL_COMMIT"
+            exit 1
+          fi
           cd ..
 
-          echo "📥 Cloning upstream SuSFS (sultan-shiba-susfs-minimal / 7fd1da8e)..."
-          git clone --depth=1 --single-branch -b "sultan-shiba-susfs-minimal" "https://gitlab.com/simonpunk/susfs4ksu.git" susfs_src
+          echo "📥 Fetching upstream SuSFS (sultan-shiba-susfs-minimal / 7fd1da8e)..."
+          git init susfs_src
           cd susfs_src
-          git checkout 7fd1da8e0cc8d1b572c97c5fe4a27d0ec6e3e2f1 || true
+          git config user.name "yapixel"
+          git config user.email "yapixel@users.noreply.github.com"
+          git remote add origin "https://gitlab.com/simonpunk/susfs4ksu.git"
+          git fetch --depth=1 origin "7fd1da8e0cc8d1b572c97c5fe4a27d0ec6e3e2f1"
+          git checkout FETCH_HEAD
           cd ..
 
-          echo "📥 Cloning authoritative xxKSU (0b138d6a)..."
-          git clone --depth=1 --single-branch -b "master" "https://github.com/backslashxx/KernelSU.git" xxksu_src
+          echo "📥 Fetching authoritative xxKSU (0b138d6a)..."
+          git init xxksu_src
           cd xxksu_src
-          git checkout 0b138d6a9cfe4dc163aa05c21b1e6a14ff868230 || true
+          git config user.name "yapixel"
+          git config user.email "yapixel@users.noreply.github.com"
+          git remote add origin "https://github.com/backslashxx/KernelSU.git"
+          git fetch --depth=1 origin "0b138d6a9cfe4dc163aa05c21b1e6a14ff868230"
+          git checkout FETCH_HEAD
           cd ..
 
           echo "📥 Cloning AnyKernel3 (sultan-gs201)..."
@@ -146,7 +158,7 @@ jobs:
           mkdir -p out
 
           echo "⚙️ Generating base gs201_defconfig..."
-          make O=out CROSS_COMPILE="${{ env.TOOLCHAIN_PATH }}" CC="${{ env.TOOLCHAIN_PATH }}gcc" gs201_defconfig
+          make O=out ARCH=arm64 CROSS_COMPILE="${{ env.TOOLCHAIN_PATH }}" CC="${{ env.TOOLCHAIN_PATH }}gcc" gs201_defconfig
 
           echo "⚙️ Injecting SuSFS and profile Kconfigs..."
           cat >> out/.config <<-'EOF'
@@ -175,8 +187,6 @@ jobs:
             cat >> out/.config <<-'EOF'
           # xxKSU Manual Hook Configurations
           CONFIG_KSU=y
-          CONFIG_KSU_EXTRAS=y
-          CONFIG_KSU_MANUAL_HOOK=y
           CONFIG_KSU_LSM_SECURITY_HOOKS=n
           CONFIG_KSU_HACK_ARM64_BRANCH_LINK=n
           CONFIG_KSU_KPROBES_KSUD=n
@@ -185,8 +195,6 @@ jobs:
             cat >> out/.config <<-'EOF'
           # xxKSU LSM + Branch Link Hook Configurations
           CONFIG_KSU=y
-          CONFIG_KSU_EXTRAS=y
-          CONFIG_KSU_MANUAL_HOOK=n
           CONFIG_KSU_LSM_SECURITY_HOOKS=y
           CONFIG_KSU_HACK_ARM64_BRANCH_LINK=y
           CONFIG_KSU_THRONE_TRACKER_ALWAYS_THREADED=y
@@ -195,14 +203,14 @@ jobs:
           fi
 
           echo "⚙️ Finalizing defconfig with olddefconfig..."
-          make O=out CROSS_COMPILE="${{ env.TOOLCHAIN_PATH }}" CC="${{ env.TOOLCHAIN_PATH }}gcc" olddefconfig
+          make O=out ARCH=arm64 CROSS_COMPILE="${{ env.TOOLCHAIN_PATH }}" CC="${{ env.TOOLCHAIN_PATH }}gcc" olddefconfig
 
       - name: Build Sultan Kernel Image
         run: |
           set -euo pipefail
           cd sultan
           echo "🔨 Compiling Sultan 6.1 (${{ matrix.hook_mode }})..."
-          make O=out CROSS_COMPILE="${{ env.TOOLCHAIN_PATH }}" CC="${{ env.TOOLCHAIN_PATH }}gcc" -j"$(nproc --all)"
+          make O=out ARCH=arm64 CROSS_COMPILE="${{ env.TOOLCHAIN_PATH }}" CC="${{ env.TOOLCHAIN_PATH }}gcc" -j"$(nproc --all)"
 
       - name: Verify Sultan Build Artifacts & Symbols
         run: |
@@ -273,9 +281,13 @@ jobs:
           grep -q "CONFIG_KSU_SUSFS=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS missing in .config!"; exit 1; }
           grep -q "CONFIG_KSU=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU missing in .config!"; exit 1; }
           if [ "${{ matrix.hook_mode }}" = "manual" ]; then
-            grep -q "CONFIG_KSU_MANUAL_HOOK=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_MANUAL_HOOK missing in .config!"; exit 1; }
+            if grep -q "CONFIG_KSU_LSM_SECURITY_HOOKS=y" "$DOTCONFIG"; then
+              echo "❌ CONFIG_KSU_LSM_SECURITY_HOOKS unexpectedly enabled in manual mode!"
+              exit 1
+            fi
           else
             grep -q "CONFIG_KSU_LSM_SECURITY_HOOKS=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_LSM_SECURITY_HOOKS missing in .config!"; exit 1; }
+            grep -q "CONFIG_KSU_HACK_ARM64_BRANCH_LINK=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_HACK_ARM64_BRANCH_LINK missing in .config!"; exit 1; }
           fi
           echo "✅ Strict post-build validation PASSED for Sultan 6.1 (${{ matrix.hook_mode }})!"
 
@@ -355,16 +367,24 @@ jobs:
           curl -LSs "https://github.com/yapixel/gki-build-assets/releases/download/android16-6.12-2025-09_r38/common-android16-6.12-2025-09_r38.tar.gz" | tar -xz -C kernel_tree
           sed -i 's/ -dirty//g' kernel_tree/scripts/setlocalversion 2>/dev/null || true
 
-          echo "📥 Cloning upstream SuSFS (gki-android16-6.12 / c8f64e41)..."
-          git clone --depth=1 --single-branch -b "gki-android16-6.12" "https://gitlab.com/simonpunk/susfs4ksu.git" susfs_src
+          echo "📥 Fetching upstream SuSFS (gki-android16-6.12 / c8f64e41)..."
+          git init susfs_src
           cd susfs_src
-          git checkout c8f64e41e3dea2cd44754d7472d3cd0bc0b40784 || true
+          git config user.name "yapixel"
+          git config user.email "yapixel@users.noreply.github.com"
+          git remote add origin "https://gitlab.com/simonpunk/susfs4ksu.git"
+          git fetch --depth=1 origin "c8f64e41e3dea2cd44754d7472d3cd0bc0b40784"
+          git checkout FETCH_HEAD
           cd ..
 
-          echo "📥 Cloning authoritative xxKSU (0b138d6a)..."
-          git clone --depth=1 --single-branch -b "master" "https://github.com/backslashxx/KernelSU.git" xxksu_src
+          echo "📥 Fetching authoritative xxKSU (0b138d6a)..."
+          git init xxksu_src
           cd xxksu_src
-          git checkout 0b138d6a9cfe4dc163aa05c21b1e6a14ff868230 || true
+          git config user.name "yapixel"
+          git config user.email "yapixel@users.noreply.github.com"
+          git remote add origin "https://github.com/backslashxx/KernelSU.git"
+          git fetch --depth=1 origin "0b138d6a9cfe4dc163aa05c21b1e6a14ff868230"
+          git checkout FETCH_HEAD
           cd ..
 
           echo "📥 Cloning AnyKernel3 (gki-2.0)..."
@@ -394,6 +414,7 @@ jobs:
           ln -sf "$(realpath --relative-to="$DRIVER_DIR" "KernelSU/kernel")" "$DRIVER_DIR/kernelsu"
           grep -q "kernelsu" "$DRIVER_DIR/Makefile" || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> "$DRIVER_DIR/Makefile"
           grep -q "drivers/kernelsu/Kconfig" "$DRIVER_DIR/Kconfig" || sed -i '/endmenu/i\source "drivers/kernelsu/Kconfig"' "$DRIVER_DIR/Kconfig"
+          echo 'ccflags-y += -I$(srctree)/drivers/kernelsu' >> "$DRIVER_DIR/kernelsu/Makefile"
 
           cp -r KernelSU/uapi KernelSU/kernel/uapi 2>/dev/null || true
           mkdir -p include/uapi
@@ -423,6 +444,22 @@ jobs:
           echo "✅ All GKI r38 patches applied cleanly with 0 rejects!"
 
       - name: Configure Kernel (GKI 6.12 r38)
+        env:
+          LLVM: 1
+          LLVM_IAS: 1
+          ARCH: arm64
+          SUBARCH: arm64
+          CROSS_COMPILE: aarch64-linux-gnu-
+          HOSTCC: clang
+          HOSTLD: ld.lld
+          CC: clang
+          LD: ld.lld
+          AR: llvm-ar
+          NM: llvm-nm
+          OBJCOPY: llvm-objcopy
+          OBJDUMP: llvm-objdump
+          READELF: llvm-readelf
+          STRIP: llvm-strip
         run: |
           set -euo pipefail
           cd kernel_tree
@@ -457,8 +494,6 @@ jobs:
             cat >> "$DEFCONFIG" <<-'EOF'
           # xxKSU Manual Hook Configurations
           CONFIG_KSU=y
-          CONFIG_KSU_EXTRAS=y
-          CONFIG_KSU_MANUAL_HOOK=y
           CONFIG_KSU_LSM_SECURITY_HOOKS=n
           CONFIG_KSU_HACK_ARM64_BRANCH_LINK=n
           CONFIG_KSU_KPROBES_KSUD=n
@@ -467,10 +502,9 @@ jobs:
             cat >> "$DEFCONFIG" <<-'EOF'
           # xxKSU LSM + Branch Link Hook Configurations
           CONFIG_KSU=y
-          CONFIG_KSU_EXTRAS=y
-          CONFIG_KSU_MANUAL_HOOK=n
           CONFIG_KSU_LSM_SECURITY_HOOKS=y
           CONFIG_KSU_HACK_ARM64_BRANCH_LINK=y
+          CONFIG_KSU_THRONE_TRACKER_ALWAYS_THREADED=y
           CONFIG_KSU_KPROBES_KSUD=n
           EOF
           fi
@@ -572,9 +606,13 @@ jobs:
           grep -q "CONFIG_KSU_SUSFS=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_SUSFS missing in .config!"; exit 1; }
           grep -q "CONFIG_KSU=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU missing in .config!"; exit 1; }
           if [ "${{ matrix.hook_mode }}" = "manual" ]; then
-            grep -q "CONFIG_KSU_MANUAL_HOOK=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_MANUAL_HOOK missing in .config!"; exit 1; }
+            if grep -q "CONFIG_KSU_LSM_SECURITY_HOOKS=y" "$DOTCONFIG"; then
+              echo "❌ CONFIG_KSU_LSM_SECURITY_HOOKS unexpectedly enabled in manual mode!"
+              exit 1
+            fi
           else
             grep -q "CONFIG_KSU_LSM_SECURITY_HOOKS=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_LSM_SECURITY_HOOKS missing in .config!"; exit 1; }
+            grep -q "CONFIG_KSU_HACK_ARM64_BRANCH_LINK=y" "$DOTCONFIG" || { echo "❌ CONFIG_KSU_HACK_ARM64_BRANCH_LINK missing in .config!"; exit 1; }
           fi
           echo "✅ Strict post-build validation PASSED for GKI 6.12 r38 (${{ matrix.hook_mode }})!"
 
