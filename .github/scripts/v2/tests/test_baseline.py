@@ -10,7 +10,8 @@ import unittest
 from v2.model.manifest import KNOWN_TARGETS, MANUAL_FIXTURES
 from v2.model.provenance import HashDigest
 from v2.model.result import ValidationStatus
-from v2.profiles.matrix import get_profile_definition
+from v2.profiles.matrix import KNOWN_PROFILES, get_profile_definition
+from v2.profiles.composition import compose_profile
 from v2.source.baseline import (
     BASELINE_SCHEMA,
     BaselineRecord,
@@ -23,7 +24,9 @@ from v2.source.baseline import (
 from v2.source.bundle import SourceBundle
 from v2.source.hashing import hash_file
 from v2.source.patch_apply import apply_patch_to_bundle
-from v2.validation import validate_all
+from v2.adapters.xxksu import generate_patch11, apply_patch11_to_bundle
+from v2.validation import validate_all, validate_bundle_integrity
+from v2.validation.symbols import validate_symbols
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 
@@ -34,10 +37,12 @@ class BaselineRecordContractTests(unittest.TestCase):
     def setUp(self) -> None:
         self.sultan_path = get_baseline_path("sultan-android14-6.1", REPO_ROOT)
         self.gki_path = get_baseline_path("gki-android16-6.12", REPO_ROOT)
+        self.xxksu_path = get_baseline_path("xxksu", REPO_ROOT)
 
-    def test_both_baseline_files_exist(self) -> None:
+    def test_all_baseline_files_exist(self) -> None:
         self.assertTrue(self.sultan_path.is_file(), f"missing {self.sultan_path}")
         self.assertTrue(self.gki_path.is_file(), f"missing {self.gki_path}")
+        self.assertTrue(self.xxksu_path.is_file(), f"missing {self.xxksu_path}")
 
     def test_sultan_baseline_record_validates(self) -> None:
         record = load_baseline_record(self.sultan_path)
@@ -61,6 +66,19 @@ class BaselineRecordContractTests(unittest.TestCase):
         self.assertEqual(record.susfs["resolved_commit"], "c8f64e41e3dea2cd44754d7472d3cd0bc0b40784")
         self.assertEqual(record.validation_results["gki-android16-6.12-manual"], "PASS")
         self.assertEqual(record.validation_results["gki-android16-6.12-lsm_bl"], "PASS")
+        self.assertIsInstance(record.identity, HashDigest)
+
+    def test_xxksu_baseline_record_validates(self) -> None:
+        record = load_baseline_record(self.xxksu_path)
+        self.assertEqual(record.schema, BASELINE_SCHEMA)
+        self.assertEqual(record.target_id, "xxksu")
+        self.assertEqual(record.kernel_version, "main")
+        self.assertEqual(record.status, "VERIFIED")
+        self.assertEqual(record.upstream["resolved_commit"], "0b138d6a9cfe4dc163aa05c21b1e6a14ff868230")
+        self.assertEqual(record.upstream["tree"], "026a4682a51e6d3d707704ef3a1dc1f478138de6")
+        self.assertEqual(record.upstream["archive_sha256"], "84978d24638b47bd282c2e496255acb364d91ee0474db46d02767b890143a05d")
+        self.assertEqual(record.patch_10["resolved_commit"], "c8f64e41e3dea2cd44754d7472d3cd0bc0b40784")
+        self.assertEqual(record.patch_11["strict_apply"], "PASS")
         self.assertIsInstance(record.identity, HashDigest)
 
     def test_invalid_schema_fails_closed(self) -> None:
@@ -198,6 +216,67 @@ class AuthoritativeBundleVerificationTests(unittest.TestCase):
             raise_on_failure=True,
         )
         self.assertEqual(report_lsm.status, ValidationStatus.PASS)
+
+    def test_xxksu_authoritative_bundle_loads(self) -> None:
+        bundle = load_authoritative_bundle("xxksu", REPO_ROOT)
+        self.assertIsNotNone(bundle)
+        self.assertIsInstance(bundle, SourceBundle)
+        self.assertEqual(bundle.target_id, "xxksu")
+        self.assertEqual(bundle.kernel_version, "main")
+        self.assertEqual(len(bundle.files), 13)
+
+    def test_xxksu_patch_11_deterministic_generation(self) -> None:
+        bundle = load_authoritative_bundle("xxksu", REPO_ROOT)
+        p1 = generate_patch11(bundle)
+        p2 = generate_patch11(bundle)
+        self.assertEqual(p1, p2)
+        patch_path = REPO_ROOT / "patches" / "xxksu" / "11_enable_susfs_for_ksu.patch"
+        disk_text = patch_path.read_text(encoding="utf-8")
+        self.assertEqual(p1, disk_text)
+
+    def test_xxksu_patch_11_strict_application_succeeds(self) -> None:
+        bundle = load_authoritative_bundle("xxksu", REPO_ROOT)
+        patch_path = REPO_ROOT / "patches" / "xxksu" / "11_enable_susfs_for_ksu.patch"
+        patch_text = patch_path.read_text(encoding="utf-8")
+        patched = apply_patch_to_bundle(bundle, patch_text)
+        self.assertIsInstance(patched, SourceBundle)
+        self.assertEqual(len(patched.files), 13)
+
+        adapted = apply_patch11_to_bundle(bundle)
+        for f in bundle.files:
+            self.assertEqual(patched.get_file(f.path).content, adapted.get_file(f.path).content)
+            self.assertEqual(patched.get_file(f.path).content_hash, adapted.get_file(f.path).content_hash)
+
+        integrity_res = validate_bundle_integrity(patched)
+        self.assertEqual(integrity_res.status, ValidationStatus.PASS)
+
+        sym_results = validate_symbols(patch=patch_text)
+        for res in sym_results:
+            self.assertEqual(res.status, ValidationStatus.PASS)
+
+    def test_all_four_profiles_consume_authoritative_patch_11(self) -> None:
+        xxksu_bundle = load_authoritative_bundle("xxksu", REPO_ROOT)
+        patch_11_path = REPO_ROOT / "patches" / "xxksu" / "11_enable_susfs_for_ksu.patch"
+        patch_11_text = patch_11_path.read_text(encoding="utf-8")
+
+        p51_map = {
+            "sultan-android14-6.1": REPO_ROOT / "patches" / "sultan-android14-6.1" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch",
+            "gki-android16-6.12": REPO_ROOT / "patches" / "gki-android16-6.12" / "51_deinlined_susfs_hooks_gki-android16-6.12.patch",
+        }
+
+        for profile_id in sorted(KNOWN_PROFILES):
+            prof_def = get_profile_definition(profile_id)
+            target_bundle = load_authoritative_bundle(prof_def.target_id, REPO_ROOT)
+            patch_51_text = p51_map[prof_def.target_id].read_text(encoding="utf-8")
+            result = compose_profile(
+                profile_id=profile_id,
+                target_bundle=target_bundle,
+                patch_11=patch_11_text,
+                patch_51=patch_51_text,
+                xxksu_bundle=xxksu_bundle,
+                raise_on_failure=True,
+            )
+            self.assertEqual(result.validation_report.status, ValidationStatus.PASS)
 
 
 if __name__ == "__main__":
