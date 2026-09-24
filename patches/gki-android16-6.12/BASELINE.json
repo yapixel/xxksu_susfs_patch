@@ -59,6 +59,7 @@
   "metadata": {
     "compatibility_patches": {
       "gki-android16-6.12-r38": {
+        "apply_target": "android16-6.12-2025-09_r38",
         "compatibility_target": "android16-6.12-2025-09_r38 (Pixel 9 / GKI 6.12)",
         "patch_file": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
         "patch_sha256": "sha256:ebc64fc63f900022edebe41e6148ecfa0ac4c221de40d62afc43de402bf36245"

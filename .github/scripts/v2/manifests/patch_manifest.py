@@ -52,22 +52,24 @@ def generate_patch_manifest(repo_root: Optional[Path] = None) -> dict[str, Any]:
         raise ValueError(f"xxKSU Patch 11 SHA mismatch: expected {expected_p11}, got {p11_sha}")
 
     p11_entry = {
+        "apply_target": xxksu_baseline.upstream["ref"],
+        "compatibility_target": "backslashxx/KernelSU (xxKSU)",
         "id": "xxksu-patch11",
         "name": "Shared xxKSU Patch 11",
+        "patch_apply_target": xxksu_baseline.upstream["ref"],
         "relative_path": p11_rel,
         "sha256": p11_sha,
-        "type": "ksu",
-        "target_lineage": {
-            "repository": xxksu_baseline.upstream["repository"],
-            "ref": xxksu_baseline.upstream["ref"],
-            "commit": xxksu_baseline.upstream["resolved_commit"],
-        },
         "susfs_lineage": {
-            "repository": xxksu_baseline.patch_10["repository"],
-            "ref": xxksu_baseline.patch_10["ref"],
             "commit": xxksu_baseline.patch_10["resolved_commit"],
+            "ref": xxksu_baseline.patch_10["ref"],
+            "repository": xxksu_baseline.patch_10["repository"],
         },
-        "compatibility_target": "backslashxx/KernelSU (xxKSU)",
+        "target_lineage": {
+            "commit": xxksu_baseline.upstream["resolved_commit"],
+            "ref": xxksu_baseline.upstream["ref"],
+            "repository": xxksu_baseline.upstream["repository"],
+        },
+        "type": "ksu",
     }
 
     # 2. Authoritative Sultan Android 14 / 6.1 Patch 51
@@ -82,23 +84,25 @@ def generate_patch_manifest(repo_root: Optional[Path] = None) -> dict[str, Any]:
         raise ValueError(f"Sultan Patch 51 SHA mismatch: expected {expected_sultan}, got {sultan_sha}")
 
     sultan_entry = {
+        "apply_target": sultan_baseline.upstream["ref"],
+        "compatibility_target": "Pixel 8 / 8 Pro (Shiba/Husky) Tensynos 16.0.0-sultan (Android 14 6.1)",
         "id": "sultan-android14-6.1-patch51",
+        "kernel_version": sultan_baseline.kernel_version,
         "name": "Sultan Android 14 / 6.1 Patch 51",
+        "patch_apply_target": sultan_baseline.upstream["ref"],
         "relative_path": sultan_rel,
         "sha256": sultan_sha,
-        "type": "kernel",
-        "kernel_version": sultan_baseline.kernel_version,
-        "target_lineage": {
-            "repository": sultan_baseline.upstream["repository"],
-            "ref": sultan_baseline.upstream["ref"],
-            "commit": sultan_baseline.upstream["resolved_commit"],
-        },
         "susfs_lineage": {
-            "repository": sultan_baseline.susfs["repository"],
-            "ref": sultan_baseline.susfs["ref"],
             "commit": sultan_baseline.susfs["resolved_commit"],
+            "ref": sultan_baseline.susfs["ref"],
+            "repository": sultan_baseline.susfs["repository"],
         },
-        "compatibility_target": "Pixel 8 / 8 Pro (Shiba/Husky) Tensynos 16.0.0-sultan (Android 14 6.1)",
+        "target_lineage": {
+            "commit": sultan_baseline.upstream["resolved_commit"],
+            "ref": sultan_baseline.upstream["ref"],
+            "repository": sultan_baseline.upstream["repository"],
+        },
+        "type": "kernel",
     }
 
     # 3. GKI Android 16 / 6.12 r38 Patch 51
@@ -117,27 +121,37 @@ def generate_patch_manifest(repo_root: Optional[Path] = None) -> dict[str, Any]:
         if r38_sha != expected_r38:
             raise ValueError(f"GKI r38 Patch 51 SHA mismatch: expected {expected_r38}, got {r38_sha}")
 
+    r38_apply_target = compat.get("apply_target", "android16-6.12-2025-09_r38")
     r38_entry = {
-        "id": "gki-android16-6.12-r38-patch51",
-        "name": "GKI Android 16 / 6.12 r38 Patch 51",
-        "relative_path": r38_rel,
-        "sha256": r38_sha,
-        "type": "kernel",
-        "kernel_version": gki_baseline.kernel_version,
-        "target_lineage": {
-            "repository": gki_baseline.upstream["repository"],
-            "ref": gki_baseline.upstream["ref"],
-            "commit": gki_baseline.upstream["resolved_commit"],
-        },
-        "susfs_lineage": {
-            "repository": gki_baseline.susfs["repository"],
-            "ref": gki_baseline.susfs["ref"],
-            "commit": gki_baseline.susfs["resolved_commit"],
-        },
+        "apply_target": r38_apply_target,
         "compatibility_target": compat.get(
             "compatibility_target",
             "android16-6.12-2025-09_r38 (Pixel 9 / GKI 6.12)",
         ),
+        "id": "gki-android16-6.12-r38-patch51",
+        "kernel_version": gki_baseline.kernel_version,
+        "name": "GKI Android 16 / 6.12 r38 Patch 51",
+        "patch_apply_target": r38_apply_target,
+        "provenance_lineage": {
+            "commit": gki_baseline.upstream["resolved_commit"],
+            "description": "Internal generation and provenance lineage (c8909f7)",
+            "ref": gki_baseline.upstream["ref"],
+            "repository": gki_baseline.upstream["repository"],
+        },
+        "relative_path": r38_rel,
+        "sha256": r38_sha,
+        "susfs_lineage": {
+            "commit": gki_baseline.susfs["resolved_commit"],
+            "ref": gki_baseline.susfs["ref"],
+            "repository": gki_baseline.susfs["repository"],
+        },
+        "target_lineage": {
+            "commit": gki_baseline.upstream["resolved_commit"],
+            "description": f"Internal generation and provenance lineage; actual patch apply target is {r38_apply_target}",
+            "ref": gki_baseline.upstream["ref"],
+            "repository": gki_baseline.upstream["repository"],
+        },
+        "type": "kernel",
     }
 
     manifest = {

@@ -22,17 +22,15 @@ xxksu_susfs_patch/
 │       └── scope-min-manual-hooks-v2.3.patch
 │
 └── patches/                               # 🎯 用户直接取用的标准补丁库
+    ├── manifest.json                      # 📋 生产补丁清单（包含 SHA-256、适用目标与上下游血统）
     ├── xxksu/                             # 📦 针对 KernelSU (backslashxx) 的全局通用 11 补丁
     │   └── 11_enable_susfs_for_ksu.patch
     │
     ├── sultan-android14-6.1/              # 📦 针对 Sultan 6.1 (Pixel 8 / Shiba) 的 51 补丁
     │   └── 51_deinlined_susfs_hooks_sultan-android14-6.1.patch
     │
-    ├── gki-android14-6.1/                 # 📦 针对 Google GKI 6.1 (Pixel 7 / Pantah / Cheetah) 的 51 补丁
-    │   └── 51_deinlined_susfs_hooks_gki-android14-6.1.patch
-    │
     └── gki-android16-6.12/                # 📦 针对 Google GKI 6.12 (Android 16 / Pixel 9) 的 51 补丁
-        └── 51_deinlined_susfs_hooks_gki-android16-6.12.patch
+        └── 51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch
 ```
 
 ---

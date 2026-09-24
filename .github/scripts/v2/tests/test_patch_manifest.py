@@ -38,7 +38,16 @@ class PatchManifestTests(unittest.TestCase):
         self.assertEqual(len(patches), 3, "Manifest must contain exactly the 3 verified production patches")
 
     def test_required_fields_in_each_entry(self) -> None:
-        required_fields = ("id", "name", "relative_path", "sha256", "target_lineage", "compatibility_target")
+        required_fields = (
+            "id",
+            "name",
+            "relative_path",
+            "sha256",
+            "target_lineage",
+            "compatibility_target",
+            "apply_target",
+            "patch_apply_target",
+        )
         expected_ids = {"xxksu-patch11", "sultan-android14-6.1-patch51", "gki-android16-6.12-r38-patch51"}
         actual_ids = set()
 
@@ -53,6 +62,17 @@ class PatchManifestTests(unittest.TestCase):
             self.assertIn("commit", lineage)
 
         self.assertEqual(actual_ids, expected_ids)
+
+    def test_gki_r38_manifest_entry_unambiguous(self) -> None:
+        r38_entry = next(e for e in self.raw_manifest["patches"] if e["id"] == "gki-android16-6.12-r38-patch51")
+        self.assertEqual(r38_entry["apply_target"], "android16-6.12-2025-09_r38")
+        self.assertEqual(r38_entry["patch_apply_target"], "android16-6.12-2025-09_r38")
+        self.assertEqual(r38_entry["target_lineage"]["commit"], "c8909f7cf1380810b285cbeee347dd01a8c9ec5c")
+        self.assertEqual(r38_entry["target_lineage"]["ref"], "android16-6.12")
+        self.assertIn("internal", r38_entry["target_lineage"].get("description", "").lower())
+        self.assertIn("provenance_lineage", r38_entry)
+        self.assertEqual(r38_entry["provenance_lineage"]["commit"], "c8909f7cf1380810b285cbeee347dd01a8c9ec5c")
+
 
     def test_every_manifest_path_exists_on_disk(self) -> None:
         for entry in self.raw_manifest["patches"]:

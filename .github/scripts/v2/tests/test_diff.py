@@ -166,10 +166,8 @@ class RepositoryFixtureTests(unittest.TestCase):
                 self.assertEqual(second.structural_key(), first.structural_key())
 
     def test_real_51_file_patch_sample(self):
-        path = self.ROOT / "patches" / "gki-android14-6.1" / "51_deinlined_susfs_hooks_gki-android14-6.1.patch"
+        path = self.ROOT / "patches" / "sultan-android14-6.1" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
         text = path.read_text(encoding="utf-8")
-        # The repository patch contains several legacy malformed hunks. Use a
-        # complete, structurally valid file patch as the real-corpus sample.
         sample = "diff --git " + text.split("diff --git ", 1)[1].split("diff --git ", 1)[0]
         first, second = round_trip(sample)
         self.assertEqual(second.structural_key(), first.structural_key())

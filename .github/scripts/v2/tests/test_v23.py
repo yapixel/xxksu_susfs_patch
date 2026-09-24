@@ -217,7 +217,7 @@ class SemanticRealEvidenceTests(unittest.TestCase):
             self.assertTrue(any(unit.kind != SemanticKind.UNKNOWN for unit in inventory.units))
 
     def test_real_51_bounded_sample_is_inventoryable(self):
-        path = self.ROOT / "patches" / "gki-android14-6.1" / "51_deinlined_susfs_hooks_gki-android14-6.1.patch"
+        path = self.ROOT / "patches" / "sultan-android14-6.1" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
         text = path.read_text(encoding="utf-8")
         sample = "diff --git " + text.split("diff --git ", 1)[1].split("diff --git ", 1)[0]
         inventory = inventory_patch(parse_patch(sample), source_identity="sha256:" + "f" * 64, source_type="official_50")
