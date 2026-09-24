@@ -43,10 +43,10 @@ index 78be582b5766..ca17a064ac9a 100644
  {
 """,
     'fs/susfs.c': """diff --git a/fs/susfs.c b/fs/susfs.c
-index 737a217343f1..4c2895f80f7d 100755
+index f0ea0561195b..4c2895f80f7d 100755
 --- a/fs/susfs.c
 +++ b/fs/susfs.c
-@@ -23,6 +23,7 @@
+@@ -24,6 +24,7 @@
  #include <linux/susfs.h>
  #include "fuse/fuse_i.h"
  #include "mount.h"
@@ -54,7 +54,7 @@ index 737a217343f1..4c2895f80f7d 100755
  
  extern bool susfs_is_current_ksu_domain(void);
  extern void setup_selinux(const char *domain, struct cred *cred);
-@@ -131,7 +132,7 @@ void susfs_add_sus_path_loop(void __user **user_info) {
+@@ -134,7 +135,7 @@ void susfs_add_sus_path_loop(void __user **user_info) {
  	SUSFS_LOGI("CMD_SUSFS_ADD_SUS_PATH_LOOP -> ret: %d\\n", info.err);
  }
  
@@ -63,7 +63,7 @@ index 737a217343f1..4c2895f80f7d 100755
  	struct st_susfs_sus_path_list *cursor = NULL;
  	struct path path;
  	struct inode *inode;
-@@ -610,6 +611,62 @@ void susfs_sus_kstat_spoof_show_map_vma(struct inode *inode, dev_t *out_dev, uns
+@@ -723,6 +724,62 @@ void susfs_sus_kstat_spoof_proc_fd_seq_show(int *out_target_mnt_id, unsigned lo
  }
  #endif // #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
  
@@ -126,7 +126,7 @@ index 737a217343f1..4c2895f80f7d 100755
  /* spoof_uname */
  #ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
  static struct st_susfs_uname my_uname = {0};
-@@ -1197,6 +1254,11 @@ void susfs_get_enabled_features(void __user **user_info) {
+@@ -1283,6 +1340,11 @@ void susfs_get_enabled_features(void __user **user_info) {
  	if (info->err) goto out_copy_to_user;
  	buf_ptr = info->enabled_features + copied_size;
  #endif
@@ -140,10 +140,10 @@ index 737a217343f1..4c2895f80f7d 100755
  	if (info->err) goto out_copy_to_user;
 """,
     'include/linux/susfs.h': """diff --git a/include/linux/susfs.h b/include/linux/susfs.h
-index 6ede62945a68..a0c7dfa9790f 100755
+index 77e11b6e931b..a0c7dfa9790f 100755
 --- a/include/linux/susfs.h
 +++ b/include/linux/susfs.h
-@@ -102,6 +102,20 @@ struct st_susfs_sus_kstat_hlist {
+@@ -104,6 +104,20 @@ struct st_susfs_sus_kstat_hlist {
  };
  #endif
  
@@ -164,7 +164,7 @@ index 6ede62945a68..a0c7dfa9790f 100755
  /* spoof_uname */
  #ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
  struct st_susfs_uname {
-@@ -201,6 +215,12 @@ void susfs_add_sus_kstat(void __user **user_info);
+@@ -203,6 +217,12 @@ void susfs_add_sus_kstat(void __user **user_info);
  void susfs_update_sus_kstat(void __user **user_info);
  #endif
  
@@ -289,7 +289,9 @@ def deinline_patch_content(content: str, target: str = "gki", date_str: str | No
 
         # Append extra Sultan chunks for fs/susfs.c and include/linux/susfs.h in order (Sultan ONLY)
         # Standalone SuSFS source files must never be emitted into GKI Patch 51.
-        if file_path == 'fs/statfs.c' and is_sultan_target(target):
+        has_super_c = 'diff --git a/fs/super.c' in content
+        trigger_file = 'fs/super.c' if has_super_c else 'fs/statfs.c'
+        if file_path == trigger_file and is_sultan_target(target):
             if 'fs/susfs.c' in SULTAN_EXTRA_CHUNKS:
                 out_chunks.append(SULTAN_EXTRA_CHUNKS['fs/susfs.c'].strip())
             if 'include/linux/susfs.h' in SULTAN_EXTRA_CHUNKS:
@@ -329,7 +331,15 @@ def deinline_patch(input_patch, output_patch, target="gki"):
     with open(input_patch, 'r', encoding='utf-8', errors='ignore') as f:
         content = f.read()
 
-    final_patch = deinline_patch_content(content, target=target)
+    date_str = None
+    if os.path.isfile(output_patch):
+        with open(output_patch, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if line.startswith('Date: '):
+                    date_str = line[len('Date: '):].strip()
+                    break
+
+    final_patch = deinline_patch_content(content, target=target, date_str=date_str)
 
     os.makedirs(os.path.dirname(os.path.abspath(output_patch)), exist_ok=True)
     with open(output_patch, 'w', encoding='utf-8') as f:

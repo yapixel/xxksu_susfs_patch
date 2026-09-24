@@ -27,13 +27,13 @@
       "susfs_sultan": {
         "repository": "https://gitlab.com/simonpunk/susfs4ksu.git",
         "ref": "sultan-shiba-susfs-minimal",
-        "commit": "7fd1da8e0cc8d1b572c97c5fe4a27d0ec6e3e2f1",
-        "relevant_content_hash": "sha256:081cef34306b452ad964ea86ea00b424b0fa92782c28913becef306bb3259328",
+        "commit": "c254cf2dcdffcfb466b7ac6706f705a339adeaa0",
+        "relevant_content_hash": "sha256:db2b7a373398ac3222c890a51d4c2c1b2a6ab395fae45b686c69a5bad49e5cbb",
         "tracked_files": {
-          "kernel_patches/50_add_susfs_in_gki-android14-6.1.patch": "sha256:18f841d2c96560ce76f44fbe4f64f6c56d0690dd5c01eddebb284d80e27b87b2",
-          "kernel_patches/fs/susfs.c": "sha256:c556c644dcb345bbe7814812c6ff084e22762d4d0381c8ee331ada1b25cd6770",
-          "kernel_patches/include/linux/susfs.h": "sha256:05d4ec96ba75d459612d6269614bc7e1948c4e7b1ecd4dfaf47fbd4ec4a3fcfb",
-          "kernel_patches/include/linux/susfs_def.h": "sha256:16d7299fd22c6539dc86fb67f963bbfa3c2422afe9f179e27e04b3168915b4ab"
+          "kernel_patches/50_add_susfs_in_gki-android14-6.1.patch": "sha256:0c96acd1c693277ada63dd8e952c9db2841b7f2e83e2b5ad9aa7a1bce1bbf307",
+          "kernel_patches/fs/susfs.c": "sha256:9b3db050a2b7a73c42c63ecdea526f85a6de23229295f9d7ad90b1e9b6f7763e",
+          "kernel_patches/include/linux/susfs.h": "sha256:e755bf34538b8f2eec1e401d2d6b18811d82931770f56cf98448eaad5757cb79",
+          "kernel_patches/include/linux/susfs_def.h": "sha256:db7f98dcf8119a4eb5c45c05205b6c1065766047d6f803b0e86f3d14b1a251f0"
         }
       },
       "susfs_gki": {

@@ -34,7 +34,7 @@ jobs:
           - name: "Sultan 6.1 (Android 14)"
             target: "sultan-android14-6.1"
             susfs_branch: "sultan-shiba-susfs-minimal"
-            susfs_commit: "7fd1da8e0cc8d1b572c97c5fe4a27d0ec6e3e2f1"
+            susfs_commit: "c254cf2dcdffcfb466b7ac6706f705a339adeaa0"
             kernel_type: "git"
             kernel_repo: "https://github.com/kerneltoast/android_kernel_google_tensynos.git"
             kernel_branch: "16.0.0-sultan"

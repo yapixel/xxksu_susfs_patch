@@ -276,9 +276,9 @@ class SuSFSWatcherRegressionTests(unittest.TestCase):
     @patch("v2.watch.checker.fetch_git_files")
     def test_susfs_drift_detected_on_unbundled_file(self, mock_files, mock_commit):
         mock_commit.return_value = "new_sultan_commit_c254cf2d"
-        new_patch = """diff --git a/fs/super.c b/fs/super.c
---- a/fs/super.c
-+++ b/fs/super.c
+        new_patch = """diff --git a/fs/dcache.c b/fs/dcache.c
+--- a/fs/dcache.c
++++ b/fs/dcache.c
 @@ -10,1 +10,2 @@
  int a;
 +int b;
@@ -299,7 +299,7 @@ class SuSFSWatcherRegressionTests(unittest.TestCase):
         self.assertEqual(res.classification, WatchClassification.SEMANTIC_DRIFT)
         self.assertTrue(res.requires_escalation())
         self.assertIn("unbundled kernel files", res.details)
-        self.assertIn("fs/super.c", res.details)
+        self.assertIn("fs/dcache.c", res.details)
         self.assertIn("Baseline expansion required", res.details)
 
     @patch("v2.watch.checker.fetch_remote_commit")

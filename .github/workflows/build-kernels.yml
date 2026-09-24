@@ -62,13 +62,13 @@ jobs:
           fi
           cd ..
 
-          echo "📥 Fetching upstream SuSFS (sultan-shiba-susfs-minimal / 7fd1da8e)..."
+          echo "📥 Fetching upstream SuSFS (sultan-shiba-susfs-minimal / c254cf2d)..."
           git init susfs_src
           cd susfs_src
           git config user.name "yapixel"
           git config user.email "yapixel@users.noreply.github.com"
           git remote add origin "https://gitlab.com/simonpunk/susfs4ksu.git"
-          git fetch --depth=1 origin "7fd1da8e0cc8d1b572c97c5fe4a27d0ec6e3e2f1"
+          git fetch --depth=1 origin "c254cf2dcdffcfb466b7ac6706f705a339adeaa0"
           git checkout FETCH_HEAD
           cd ..
 
@@ -137,7 +137,7 @@ jobs:
           echo "- **Target:** \`sultan-android14-6.1\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Profile Mode:** \`${{ matrix.hook_mode }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Kernel Commit:** \`af5c65b9547a9f33c5f566430d0434aecab5a8b5\` (16.0.0-sultan)" >> $GITHUB_STEP_SUMMARY
-          echo "- **SuSFS Commit:** \`7fd1da8e0cc8d1b572c97c5fe4a27d0ec6e3e2f1\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **SuSFS Commit:** \`c254cf2dcdffcfb466b7ac6706f705a339adeaa0\`" >> $GITHUB_STEP_SUMMARY
           echo "- **xxKSU Commit:** \`41c73d28d054f74eabe8a3ba494f14dc3402b3f8\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Rejects:** 0" >> $GITHUB_STEP_SUMMARY
           echo "- **Fuzz:** 0" >> $GITHUB_STEP_SUMMARY

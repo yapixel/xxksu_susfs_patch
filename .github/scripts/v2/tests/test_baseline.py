@@ -51,7 +51,7 @@ class BaselineRecordContractTests(unittest.TestCase):
         self.assertEqual(record.kernel_version, "6.1")
         self.assertEqual(record.status, "VERIFIED")
         self.assertEqual(record.upstream["resolved_commit"], "af5c65b9547a9f33c5f566430d0434aecab5a8b5")
-        self.assertEqual(record.susfs["resolved_commit"], "7fd1da8e0cc8d1b572c97c5fe4a27d0ec6e3e2f1")
+        self.assertEqual(record.susfs["resolved_commit"], "c254cf2dcdffcfb466b7ac6706f705a339adeaa0")
         self.assertEqual(record.validation_results["sultan-android14-6.1-manual"], "PASS")
         self.assertEqual(record.validation_results["sultan-android14-6.1-lsm_bl"], "PASS")
         self.assertIsInstance(record.identity, HashDigest)
@@ -178,7 +178,7 @@ class AuthoritativeBundleVerificationTests(unittest.TestCase):
         self.assertIsInstance(bundle, SourceBundle)
         self.assertEqual(bundle.target_id, "sultan-android14-6.1")
         self.assertEqual(bundle.kernel_version, "6.1.25")
-        self.assertEqual(len(bundle.files), 22)
+        self.assertEqual(len(bundle.files), 23)
 
     def test_sultan_patch_51_strict_application_succeeds(self) -> None:
         bundle = load_authoritative_bundle("sultan-android14-6.1", REPO_ROOT)
@@ -186,7 +186,7 @@ class AuthoritativeBundleVerificationTests(unittest.TestCase):
         patch_text = patch_path.read_text(encoding="utf-8")
         patched = apply_patch_to_bundle(bundle, patch_text)
         self.assertIsInstance(patched, SourceBundle)
-        self.assertEqual(len(patched.files), 22)
+        self.assertEqual(len(patched.files), 23)
 
     def test_sultan_both_profiles_validate_positive(self) -> None:
         bundle = load_authoritative_bundle("sultan-android14-6.1", REPO_ROOT)
