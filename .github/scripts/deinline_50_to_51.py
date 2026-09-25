@@ -63,7 +63,7 @@ index f0ea0561195b..4c2895f80f7d 100755
  	struct st_susfs_sus_path_list *cursor = NULL;
  	struct path path;
  	struct inode *inode;
-@@ -723,6 +724,62 @@ void susfs_sus_kstat_spoof_proc_fd_seq_show(int *out_target_mnt_id, unsigned lo
+@@ -707,6 +708,62 @@ void susfs_sus_kstat_spoof_proc_fd_seq_show(int *out_target_mnt_id, unsigned lo
  }
  #endif // #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
  
@@ -126,7 +126,7 @@ index f0ea0561195b..4c2895f80f7d 100755
  /* spoof_uname */
  #ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
  static struct st_susfs_uname my_uname = {0};
-@@ -1283,6 +1340,11 @@ void susfs_get_enabled_features(void __user **user_info) {
+@@ -1267,6 +1324,11 @@ void susfs_get_enabled_features(void __user **user_info) {
  	if (info->err) goto out_copy_to_user;
  	buf_ptr = info->enabled_features + copied_size;
  #endif

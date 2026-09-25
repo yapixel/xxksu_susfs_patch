@@ -123,7 +123,7 @@ def default_registry() -> SemanticRegistry:
         s("susfs.uname.behavior", SemanticKind.SUSFS_BEHAVIOR, "uname", ("kernel/sys.c",), symbols=("susfs_spoof_uname",), confidence=Confidence.HIGH),
         s("susfs.stat.kstat", SemanticKind.SUSFS_BEHAVIOR, "stat", ("fs/stat.c",), symbols=("kstat", "susfs"), confidence=Confidence.HIGH),
         s("susfs.stat.mount_id", SemanticKind.SUSFS_BEHAVIOR, "stat", ("fs/stat.c",), symbols=("mnt_id", "mnt_id_unique"), confidence=Confidence.HIGH),
-        s("susfs.statfs.kstat", SemanticKind.SUSFS_BEHAVIOR, "statfs", ("fs/statfs.c",), symbols=("susfs_calculate_f_flags", "susfs_statfs_by_dentry"), confidence=Confidence.HIGH, notes="susfs statfs kstat spoofing and calculate_f_flags behavior"),
+        s("susfs.statfs.kstat", SemanticKind.SUSFS_BEHAVIOR, "statfs", ("fs/statfs.c",), symbols=("susfs_calculate_f_flags", "susfs_statfs_by_dentry", "statfs_by_dentry_wrapper", "calculate_f_flags_wrapper", "statfs_by_dentry"), confidence=Confidence.HIGH, notes="susfs statfs kstat spoofing and calculate_f_flags behavior"),
         s("transport.exec.definition", SemanticKind.HANDLER_DEFINITION, "exec", ("kernel/feature/sucompat.c",), symbols=("ksu_handle_execveat",), source_kinds=("xxksu",), roles=("definition",), confidence=Confidence.HIGH),
         s("transport.exec.linux_call", SemanticKind.LINUX_CALL_SITE, "exec", ("fs/exec.c",), symbols=("ksu_handle_execveat",), source_kinds=("official_50",), roles=("caller",), confidence=Confidence.HIGH),
         s("transport.exec.manual_fixture", SemanticKind.MANUAL_SOURCE_HOOK, "exec", ("fs/exec.c",), symbols=("ksu_handle_execveat",), source_kinds=("fixture_scope_min",), roles=("caller",), confidence=Confidence.HIGH),

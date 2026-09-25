@@ -51,7 +51,7 @@ class BaselineRecordContractTests(unittest.TestCase):
         self.assertEqual(record.kernel_version, "6.1")
         self.assertEqual(record.status, "VERIFIED")
         self.assertEqual(record.upstream["resolved_commit"], "af5c65b9547a9f33c5f566430d0434aecab5a8b5")
-        self.assertEqual(record.susfs["resolved_commit"], "c254cf2dcdffcfb466b7ac6706f705a339adeaa0")
+        self.assertEqual(record.susfs["resolved_commit"], "a8324101bca5e5a2dd7d0dc82b1650e10923eec9")
         self.assertEqual(record.validation_results["sultan-android14-6.1-manual"], "PASS")
         self.assertEqual(record.validation_results["sultan-android14-6.1-lsm_bl"], "PASS")
         self.assertIsInstance(record.identity, HashDigest)

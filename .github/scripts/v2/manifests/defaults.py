@@ -16,7 +16,7 @@ _TARGET_DATA = {
     "sultan-android14-6.1": {
         "kernel": ("https://github.com/kerneltoast/android_kernel_google_tensynos", "16.0.0-sultan"),
         "susfs50": ("https://gitlab.com/simonpunk/susfs4ksu", "sultan-shiba-susfs-minimal"),
-        "susfs50_commit": "c254cf2dcdffcfb466b7ac6706f705a339adeaa0",
+        "susfs50_commit": "a8324101bca5e5a2dd7d0dc82b1650e10923eec9",
     },
 }
 

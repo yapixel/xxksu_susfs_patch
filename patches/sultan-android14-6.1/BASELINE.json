@@ -6,7 +6,7 @@
   "kernel_version": "6.1",
   "patch_51": {
     "patch_file": "patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch",
-    "patch_sha256": "sha256:a01b49a06fd2022d54f8f29bd34968fff68bdabb1b8edd95bd78ec58ad5ea0b9",
+    "patch_sha256": "sha256:275372ecc7e802f94e02c10bc37346a8a44bed16a53369114d3a5aaa85b703c6",
     "strict_apply": "PASS"
   },
   "retained_file_hashes": {
@@ -26,8 +26,8 @@
     "fs/stat.c": "sha256:42518bc30ac17bd3c9d177a76fe5266c3e8ab7822459adf9581b5bfbf20f48dc",
     "fs/statfs.c": "sha256:100e9195fd0654480062620b018a9a2cdfb5106ab61207e1a8205ee85d6028f8",
     "fs/super.c": "sha256:8143cd1dce322e7c968ae0d6178a00a0dc30fe0cb1460a287f5c2e6eba48d516",
-    "fs/susfs.c": "sha256:9b3db050a2b7a73c42c63ecdea526f85a6de23229295f9d7ad90b1e9b6f7763e",
-    "include/linux/susfs.h": "sha256:e755bf34538b8f2eec1e401d2d6b18811d82931770f56cf98448eaad5757cb79",
+    "fs/susfs.c": "sha256:5521aa600f6df698e1d5e31df72e3557a36d33c161bd65dcafe5788fb56a7fa7",
+    "include/linux/susfs.h": "sha256:fafff787b8856bd37a6736c2f0bbc5a57fd1f36232be267936f892fb57bc5120",
     "kernel/kallsyms.c": "sha256:e9126cbecfc154849b404b3d4942925c22575af8f3776b4dc4472c25239c40a5",
     "kernel/reboot.c": "sha256:2ac6cc43f7b33f0153b031e441de7aa126c1c89936c544226fe8706fcb01913a",
     "kernel/sys.c": "sha256:274c7f7d945eb91b34421732420641e9ed511f173ffc08847f4b43400feb03a3",
@@ -38,7 +38,7 @@
   "source_bundle": {
     "artifact_path": ".github/fixtures/v2/v29-baselines/sultan-android14-6.1.json",
     "file_count": 23,
-    "identity": "sha256:f844602e870ebaae901d3cccf79754856ee0372eeb56616aefd5571ec5a317c2",
+    "identity": "sha256:ff059ec5d8a97953c5e2ed2517d2a59c210e22963293c8958846337fe0c70dd0",
     "schema": "xxksu-susfs-source-bundle/v1"
   },
   "status": "VERIFIED",
@@ -46,7 +46,7 @@
     "patch_50": "50_add_susfs_in_gki-android14-6.1.patch",
     "ref": "sultan-shiba-susfs-minimal",
     "repository": "https://gitlab.com/simonpunk/susfs4ksu",
-    "resolved_commit": "c254cf2dcdffcfb466b7ac6706f705a339adeaa0"
+    "resolved_commit": "a8324101bca5e5a2dd7d0dc82b1650e10923eec9"
   },
   "target_id": "sultan-android14-6.1",
   "upstream": {
