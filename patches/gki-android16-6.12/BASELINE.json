@@ -6,7 +6,7 @@
   "kernel_version": "6.12",
   "patch_51": {
     "patch_file": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_gki-android16-6.12.patch",
-    "patch_sha256": "sha256:85df06eb9774db0296b341cc7ca15f49e1ae69d7406021191d7184dd3685dbb6",
+    "patch_sha256": "sha256:69ea0b137b3ddeaf0bbb44e36affe29eced7409f1d1bcaa24d3d2f9cc1179d6b",
     "strict_apply": "PASS"
   },
   "retained_file_hashes": {
@@ -25,8 +25,8 @@
     "fs/readdir.c": "sha256:6985af5159f094beab3d8c9c8ca870fd67907596a415230eb9b09b062bb17b56",
     "fs/stat.c": "sha256:53cafc68502adbf426a7d38827bbb52e0cb4b57c0cc772a759073706964fb587",
     "fs/statfs.c": "sha256:4ec54edbf4ba35ddb30ab3329711cc1c0a2911d01671b0605b3866e861037c3f",
-    "fs/susfs.c": "sha256:9b3db050a2b7a73c42c63ecdea526f85a6de23229295f9d7ad90b1e9b6f7763e",
-    "include/linux/susfs.h": "sha256:e755bf34538b8f2eec1e401d2d6b18811d82931770f56cf98448eaad5757cb79",
+    "fs/susfs.c": "sha256:5521aa600f6df698e1d5e31df72e3557a36d33c161bd65dcafe5788fb56a7fa7",
+    "include/linux/susfs.h": "sha256:fafff787b8856bd37a6736c2f0bbc5a57fd1f36232be267936f892fb57bc5120",
     "kernel/kallsyms.c": "sha256:5778a736c4ea840bde420a2aa8b63566500b8b15d650d518ef56657488ef5529",
     "kernel/reboot.c": "sha256:24a9631059d666b1cb8f8c03d0691f817eff74a2308ee6775f1cc2852c977f94",
     "kernel/sys.c": "sha256:7494b9bf3987a29b510947531db0d7a2e35e916cb1814ad4ff139e5ed2ee8868",
@@ -37,7 +37,7 @@
   "source_bundle": {
     "artifact_path": ".github/fixtures/v2/v29-baselines/gki-android16-6.12.json",
     "file_count": 22,
-    "identity": "sha256:c021e411441ea098ff38092705e67a78c54c4908117620aa331d35a2436a20f9",
+    "identity": "sha256:5777d7c799707340bc0b373b9e478a484b2ba99085a438fbef1d53e1c5dbb5dc",
     "schema": "xxksu-susfs-source-bundle/v1"
   },
   "status": "VERIFIED",
@@ -45,7 +45,7 @@
     "patch_50": "50_add_susfs_in_gki-android16-6.12.patch",
     "ref": "gki-android16-6.12",
     "repository": "https://gitlab.com/simonpunk/susfs4ksu",
-    "resolved_commit": "2528bdb0e2e76d26b9b174a8314ac115c9f00b3c"
+    "resolved_commit": "b213c54126fb243595ce7876e91d84d6e0861fec"
   },
   "target_id": "gki-android16-6.12",
   "upstream": {
@@ -62,7 +62,7 @@
         "apply_target": "android16-6.12-2025-09_r38",
         "compatibility_target": "android16-6.12-2025-09_r38 (Pixel 9 / GKI 6.12)",
         "patch_file": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
-        "patch_sha256": "sha256:ebc64fc63f900022edebe41e6148ecfa0ac4c221de40d62afc43de402bf36245"
+        "patch_sha256": "sha256:74bb2685f2b97caf032e638f10a0bd69fef74143a671d7c975c641a75211ec8c"
       }
     }
   },

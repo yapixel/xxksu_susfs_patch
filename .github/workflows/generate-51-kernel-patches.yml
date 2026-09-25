@@ -206,11 +206,11 @@ jobs:
 
       - name: Clone Upstream SuSFS Source
         run: |
-          echo "📥 Fetching upstream SuSFS (commit: 2528bdb0e2e76d26b9b174a8314ac115c9f00b3c)..."
+          echo "📥 Fetching upstream SuSFS (commit: b213c54126fb243595ce7876e91d84d6e0861fec)..."
           git init susfs_src
           cd susfs_src
           git remote add origin "${{ env.SUSFS_REPO_URL }}"
-          git fetch --depth=1 origin "2528bdb0e2e76d26b9b174a8314ac115c9f00b3c"
+          git fetch --depth=1 origin "b213c54126fb243595ce7876e91d84d6e0861fec"
           git checkout FETCH_HEAD
 
       - name: Prepare Clean Kernel Source Tree (android16-6.12-2025-09_r38)
@@ -238,7 +238,7 @@ jobs:
             echo "❌ Error: $PATCH_FILE not found"
             exit 1
           fi
-          EXPECTED_SHA="ebc64fc63f900022edebe41e6148ecfa0ac4c221de40d62afc43de402bf36245"
+          EXPECTED_SHA="74bb2685f2b97caf032e638f10a0bd69fef74143a671d7c975c641a75211ec8c"
           ACTUAL_SHA="$(sha256sum "$PATCH_FILE" | cut -d' ' -f1)"
           echo "Expected SHA-256: $EXPECTED_SHA"
           echo "Actual SHA-256:   $ACTUAL_SHA"

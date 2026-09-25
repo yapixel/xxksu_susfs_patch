@@ -24,15 +24,15 @@
         }
       },
       "susfs_gki": {
-        "commit": "2528bdb0e2e76d26b9b174a8314ac115c9f00b3c",
+        "commit": "b213c54126fb243595ce7876e91d84d6e0861fec",
         "ref": "gki-android16-6.12",
-        "relevant_content_hash": "sha256:016434f1d9706378ffa4b56364f3cf016f699ce6c0117b6eac45795913eea161",
+        "relevant_content_hash": "sha256:72e0e296b6936fcdd618c7fd30ef7792eee231317b847bdcd785eaf1bd88be64",
         "repository": "https://gitlab.com/simonpunk/susfs4ksu.git",
         "tracked_files": {
-          "kernel_patches/50_add_susfs_in_gki-android16-6.12.patch": "sha256:2ca29ed5593b087b325b32337d18cd4edda5dfb494f3fd25561b8f88ecdd190e",
+          "kernel_patches/50_add_susfs_in_gki-android16-6.12.patch": "sha256:31333a67aef105ce85b43fda29f407cfa4d5585060ed12375da535a4122ea682",
           "kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch": "sha256:590e1bc9ad8e5b738e557a58a03c85a63376d7bbc9f6e4c7ace2dcaceb48f3c7",
-          "kernel_patches/fs/susfs.c": "sha256:9b3db050a2b7a73c42c63ecdea526f85a6de23229295f9d7ad90b1e9b6f7763e",
-          "kernel_patches/include/linux/susfs.h": "sha256:e755bf34538b8f2eec1e401d2d6b18811d82931770f56cf98448eaad5757cb79",
+          "kernel_patches/fs/susfs.c": "sha256:5521aa600f6df698e1d5e31df72e3557a36d33c161bd65dcafe5788fb56a7fa7",
+          "kernel_patches/include/linux/susfs.h": "sha256:fafff787b8856bd37a6736c2f0bbc5a57fd1f36232be267936f892fb57bc5120",
           "kernel_patches/include/linux/susfs_def.h": "sha256:db7f98dcf8119a4eb5c45c05205b6c1065766047d6f803b0e86f3d14b1a251f0"
         }
       },
