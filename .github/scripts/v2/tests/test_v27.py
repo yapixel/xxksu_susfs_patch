@@ -74,7 +74,7 @@ _OFFICIAL_10 = {
     "official_only.input.definition": ("kernel/runtime/ksud.c", "ksu_handle_input_handle_event"),
 }
 
-# The 4 official-only replacement mappings to actual xxKSU sources
+# The 5 official-only / rerouted replacement mappings to actual xxKSU sources
 _OFFICIAL_10_REPLACEMENTS = {
     "official_only.exec.sucompat": (
         "transport.exec.definition",
@@ -104,12 +104,19 @@ _OFFICIAL_10_REPLACEMENTS = {
         "caller",
         RelationshipType.REPLACES_BEHAVIOR_OF,
     ),
+    "susfs.umount.webview_zygote": (
+        "transport.umount.definition",
+        "kernel/feature/kernel_umount.c",
+        "ksu_handle_umount",
+        "definition",
+        RelationshipType.REPLACES_BEHAVIOR_OF,
+    ),
 }
 
 
 def _make_official_observation(key: str, *, evidence_kind=EvidenceKind.SYNTHETIC, abi=None):
     path, symbol = _OFFICIAL_10[key]
-    role = "definition" if key.startswith("official_only.") else "caller"
+    role = "definition" if (key.startswith("official_only.") or key == "susfs.umount.webview_zygote") else "caller"
     text = f"void {symbol}(void) {{" if role == "definition" else f"{symbol}();"
     return CandidateObservation(
         "official-10-test", "official_10", path, text,
@@ -192,13 +199,12 @@ class Patch11PolicyTests(unittest.TestCase):
         self.assertEqual(len(ledger.decisions), 10)
         by_id = {str(d.semantic_id): d for d in ledger.decisions}
 
-        # Verify 6 SuSFS behavior/config units are KEEP owned by PATCH_51
+        # Verify 5 SuSFS behavior/config units are KEEP owned by PATCH_51
         keep_units = [
             "config.susfs.control",
             "integration.susfs.initialization",
             "susfs.supercall.cmd_dispatch",
             "susfs.setuid.zygote_handling",
-            "susfs.umount.webview_zygote",
             "susfs.selinux.sid_management",
         ]
         for unit_id in keep_units:
@@ -207,12 +213,13 @@ class Patch11PolicyTests(unittest.TestCase):
             self.assertEqual(d.owner, OwnerKind.PATCH_51, f"{unit_id} must be owned by PATCH_51")
             self.assertTrue(len(d.rationale) > 0)
 
-        # Verify 4 official-only units are REROUTE owned by XXKSU_RUNTIME
+        # Verify 5 official-only / rerouted units are REROUTE owned by XXKSU_RUNTIME
         reroute_units = [
             ("official_only.exec.sucompat", "transport.exec.definition"),
             ("official_only.fstat.definition", "transport.fstat_return.definition"),
             ("official_only.read.definition", "transport.read.internal_fallback"),
             ("official_only.input.definition", "transport.input.registration"),
+            ("susfs.umount.webview_zygote", "transport.umount.definition"),
         ]
         for unit_id, expected_repl in reroute_units:
             d = by_id[unit_id]
@@ -250,7 +257,7 @@ class Patch11PolicyTests(unittest.TestCase):
         inv = _build_official10_inventory(*obs, replacements=False)
         ledger = classify_patch11(inv, validate=False)
         unknowns = [d for d in ledger.decisions if d.action == PolicyAction.UNKNOWN]
-        self.assertEqual(len(unknowns), 4)
+        self.assertEqual(len(unknowns), 5)
         for u in unknowns:
             self.assertEqual(u.owner, OwnerKind.UNRESOLVED)
 
@@ -316,13 +323,13 @@ class XxksuAdapterTests(unittest.TestCase):
         self.assertEqual(adapter.target_id, "xxksu")
         self.assertEqual(adapter.adapter_id, "xxksu")
 
-    def test_build_adaptation_plan_all_20_operations(self):
+    def test_build_adaptation_plan_all_14_operations(self):
         plan = self.adapter.build_adaptation_plan(self.clean_bundle)
-        self.assertEqual(plan.operation_count, 20)
+        self.assertEqual(plan.operation_count, 14)
         self.assertEqual(plan.target_id, "xxksu")
         self.assertEqual(plan.bundle_identity, str(self.clean_bundle.identity))
 
-        # Check that operations across 10 files have valid offsets
+        # Check that operations across 8 files have valid offsets
         seen_files = set()
         for op in plan.operations:
             seen_files.add(op.file_path)
@@ -330,7 +337,7 @@ class XxksuAdapterTests(unittest.TestCase):
             self.assertIsNotNone(op.anchor_location.end_offset)
             self.assertGreaterEqual(op.anchor_location.start_offset, 0)
             self.assertGreaterEqual(op.anchor_location.end_offset, op.anchor_location.start_offset)
-        self.assertEqual(len(seen_files), 10)
+        self.assertEqual(len(seen_files), 8)
 
     def test_deterministic_patch11_regeneration(self):
         patch1 = generate_patch11(self.clean_bundle)

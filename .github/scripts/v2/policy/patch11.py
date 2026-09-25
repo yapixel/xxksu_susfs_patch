@@ -46,8 +46,10 @@ _RULES = {
         OwnerKind.PATCH_51, "preserve SuSFS zygote credentials and SID handling in setresuid",
     ),
     "susfs.umount.webview_zygote": _Rule(
-        SemanticKind.SUSFS_BEHAVIOR, "umount", PolicyAction.KEEP,
-        OwnerKind.PATCH_51, "preserve SuSFS webview zygote umount behavior and path umount compatibility",
+        SemanticKind.SUSFS_BEHAVIOR, "umount", PolicyAction.REROUTE, OwnerKind.XXKSU_RUNTIME,
+        "xxKSU native kernel_umount path replaces official webview zygote umount modifications",
+        replacements=("transport.umount.definition",),
+        relationship=RelationshipType.REPLACES_BEHAVIOR_OF,
     ),
     "susfs.selinux.sid_management": _Rule(
         SemanticKind.SUSFS_BEHAVIOR, "selinux", PolicyAction.KEEP,
@@ -129,12 +131,14 @@ def _source_shape(source_id: str, source: SemanticUnit, evidence) -> bool:
         "transport.fstat_return.definition": ("kernel/runtime/ksud.c",),
         "transport.read.internal_fallback": ("kernel/hook/syscall_table_hook_arm64.c",),
         "transport.input.registration": ("kernel/runtime/ksud.c", "kernel/feature/vol_detector.c"),
+        "transport.umount.definition": ("kernel/feature/kernel_umount.c",),
     }
     expected_symbols = {
         "transport.exec.definition": ("ksu_handle_execveat",),
         "transport.fstat_return.definition": ("ksu_handle_newfstat_ret", "ksu_handle_fstat64_ret"),
         "transport.read.internal_fallback": ("ksu_handle_sys_read_fd",),
         "transport.input.registration": ("input_register_handler", "vol_detector_event"),
+        "transport.umount.definition": ("ksu_handle_umount",),
     }
     allowed_kinds = {
         SemanticKind.HANDLER_DEFINITION,

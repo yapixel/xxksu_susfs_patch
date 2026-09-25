@@ -128,13 +128,6 @@ DEFAULT_SYMBOL_CONTRACTS: Tuple[SymbolContract, ...] = (
         description="SuSFS zygote credentials and SID handling",
     ),
     SymbolContract(
-        symbol="ksu_is_webview_zygote_umount_enabled",
-        is_required=True,
-        expected_paths=("kernel/feature/kernel_umount.c", "kernel/downstream/ksu_hostsredirect.h"),
-        bundle_target="xxksu",
-        description="SuSFS webview zygote umount helper",
-    ),
-    SymbolContract(
         symbol="susfs_set_sid",
         is_required=True,
         expected_paths=("kernel/selinux/rules.c", "kernel/selinux/selinux.c"),

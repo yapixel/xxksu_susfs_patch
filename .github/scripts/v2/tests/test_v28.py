@@ -95,8 +95,6 @@ def _build_test_xxksu_bundle() -> SourceBundle:
             orig_lines.append("int susfs_cmd_dispatch(void) { return 0; }\nvoid susfs_auto_reboot(void) { }\n")
         elif rel_path == "kernel/hook/setuid_hook.c":
             orig_lines.append("int handle_zygote_setresuid(void) { return 0; }\n")
-        elif rel_path == "kernel/feature/kernel_umount.c":
-            orig_lines.append("bool ksu_is_webview_zygote_umount_enabled(void) { return true; }\n")
 
         content = "".join(orig_lines)
         content_bytes = content.encode("utf-8")
@@ -108,6 +106,7 @@ def _build_test_xxksu_bundle() -> SourceBundle:
         ("kernel/runtime/ksud.c", "void ksu_handle_newfstat_ret(unsigned int *fd, struct stat __user **statbuf) { }\n"),
         ("kernel/hook/syscall_table_hook_arm64.c", "int ksu_handle_sys_read_fd(void) { return 0; }\n"),
         ("kernel/feature/vol_detector.c", "int input_register_handler(void) { return 0; }\n"),
+        ("kernel/feature/kernel_umount.c", "static inline int ksu_handle_umount(struct cred *new, const struct cred *old) { return 0; }\n"),
     ]
     for path, content in extra_files:
         b = content.encode("utf-8")
@@ -153,8 +152,8 @@ class V28PositiveValidationTests(unittest.TestCase):
         self.assertIn("susfs_cmd_dispatch", found_symbols)
         self.assertIn("susfs_auto_reboot", found_symbols)
         self.assertIn("handle_zygote_setresuid", found_symbols)
-        self.assertIn("ksu_is_webview_zygote_umount_enabled", found_symbols)
         self.assertIn("susfs_set_sid", found_symbols)
+
 
     def test_4_valid_manual_ownership_model_passes(self):
         claims = make_default_manual_claims()

@@ -31,8 +31,6 @@ FIXTURE_PATCH11 = "11_enable_susfs_for_ksu.patch"
 
 PATCH11_CANONICAL_FILES: Tuple[str, ...] = (
     "kernel/Kconfig",
-    "kernel/downstream/ksu_hostsredirect.h",
-    "kernel/feature/kernel_umount.c",
     "kernel/hook/setuid_hook.c",
     "kernel/ksu.c",
     "kernel/selinux/rules.c",
@@ -44,9 +42,7 @@ PATCH11_CANONICAL_FILES: Tuple[str, ...] = (
 
 PATCH11_FILE_INDEXES: Mapping[str, str] = {
     "kernel/Kconfig": "index 45e09d1..e783e43 100644",
-    "kernel/downstream/ksu_hostsredirect.h": "index 4d98a8b..67da4cc 100644",
-    "kernel/feature/kernel_umount.c": "index 704e000..e1ae756 100644",
-    "kernel/hook/setuid_hook.c": "index 9257980..c0cdcad 100644",
+    "kernel/hook/setuid_hook.c": "index 9257980..d42a673 100644",
     "kernel/ksu.c": "index 06df055..77210ba 100644",
     "kernel/selinux/rules.c": "index a9d4f67..9351318 100644",
     "kernel/selinux/selinux.c": "index 04e5ffe..e3bd796 100644",
@@ -63,16 +59,14 @@ PATCH11_PREAMBLE: Tuple[str, ...] = (
     "",
     "---",
     " kernel/Kconfig                        |  98 +++++++++++++++",
-    " kernel/downstream/ksu_hostsredirect.h |   4 +",
-    " kernel/feature/kernel_umount.c        |  44 ++++++---",
-    " kernel/hook/setuid_hook.c             | 169 +++++++++++++++++++++++---",
+    " kernel/hook/setuid_hook.c             |  40 +++++++++++++++++-",
     " kernel/ksu.c                          |   8 ++",
     " kernel/selinux/rules.c                |   7 ++",
     " kernel/selinux/selinux.c              | 103 ++++++++++++++++",
     " kernel/selinux/selinux.h              |  14 +++",
     " kernel/supercall/dispatch.c           |  24 ++++",
     " kernel/supercall/supercall.c          |  99 +++++++++++++++",
-    " 10 files changed, 536 insertions(+), 34 deletions(-)",
+    " 8 files changed, 392 insertions(+), 1 deletion(-)",
     "",
 )
 
@@ -114,7 +108,7 @@ class XxksuOperationSpec:
         return tuple(lines)
 
 def get_patch11_operation_specs() -> Tuple[XxksuOperationSpec, ...]:
-    """Return the 20 self-contained operation specifications matching patch 11 intent."""
+    """Return the 14 self-contained operation specifications matching patch 11 intent."""
     return (
         XxksuOperationSpec(
             operation_id='xxksu.kernel_Kconfig.hunk_0',
@@ -129,128 +123,43 @@ def get_patch11_operation_specs() -> Tuple[XxksuOperationSpec, ...]:
             diff_body=(('+', 'menu "KernelSU - SUSFS"'), ('+', 'config KSU_SUSFS'), ('+', '    bool "KernelSU addon - SUSFS"'), ('+', '    depends on KSU'), ('+', '    depends on THREAD_INFO_IN_TASK'), ('+', '    default y'), ('+', '    help'), ('+', '        Patch and Enable SUSFS to kernel with KernelSU.'), ('+', ''), ('+', 'config KSU_SUSFS_SUS_PATH'), ('+', '    bool "Enable to hide suspicious path (NOT recommended)"'), ('+', '    depends on KSU_SUSFS'), ('+', '    default y'), ('+', '    help'), ('+', '        - Allow hiding the user-defined path and all its sub-paths from various system calls.'), ('+', '        - Includes temp fix for the leaks of app path in /sdcard/Android/data directory.'), ('+', '        - Effective only on zygote spawned user app process.'), ('+', '        - Use with cautious as it may cause performance loss and will be vulnerable to side channel attacks,'), ('+', "          just disable this feature if it doesn't work for you or you don't need it at all."), ('+', ''), ('+', 'config KSU_SUSFS_SUS_MOUNT'), ('+', '    bool "Enable to hide suspicious mounts"'), ('+', '    depends on KSU_SUSFS'), ('+', '    default y'), ('+', '    help'), ('+', '        - Allow hiding the user-defined mount paths from /proc/self/[mounts|mountinfo|mountstat].'), ('+', '        - Effective on all processes for hiding mount entries.'), ('+', '        - mnt_id and mnt_group_id of the sus mount will be assigned to a much bigger number to solve the ssue of id not being contiguous.'), ('+', ''), ('+', 'config KSU_SUSFS_SUS_KSTAT'), ('+', '    bool "Enable to spoof suspicious kstat"'), ('+', '    depends on KSU_SUSFS'), ('+', '    default y'), ('+', '    help'), ('+', '        - Allow spoofing the kstat of user-defined file/directory.'), ('+', '        - Effective only on zygote spawned user app process.'), ('+', ''), ('+', 'config KSU_SUSFS_TRY_UMOUNT'), ('+', '\tbool "Enable to use ksu\'s try_umount"'), ('+', '\tdepends on KSU_SUSFS'), ('+', '\tdefault n'), ('+', '\thelp'), ('+', "\t\t- Allow using try_umount to umount other user-defined mount paths prior to ksu's default umount paths."), ('+', '\t\t- Effective only on zygote spawned umounted user app process.'), ('+', ''), ('+', 'config KSU_SUSFS_SPOOF_UNAME'), ('+', '    bool "Enable to spoof uname"'), ('+', '    depends on KSU_SUSFS'), ('+', '    default y'), ('+', '    help'), ('+', '        - Allow spoofing the string returned by uname syscall to user-defined string.'), ('+', '        - Effective on all processes.'), ('+', ''), ('+', 'config KSU_SUSFS_ENABLE_LOG'), ('+', '    bool "Enable logging susfs log to kernel"'), ('+', '    depends on KSU_SUSFS'), ('+', '    default y'), ('+', '    help'), ('+', '        - Allow logging susfs log to kernel, uncheck it to completely disable all susfs log.'), ('+', ''), ('+', 'config KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS'), ('+', '    bool "Enable to automatically hide ksu and susfs symbols from /proc/kallsyms"'), ('+', '    depends on KSU_SUSFS'), ('+', '    default y'), ('+', '    help'), ('+', "        - Automatically hide ksu and susfs symbols from '/proc/kallsyms'."), ('+', '        - Effective on all processes.'), ('+', ''), ('+', 'config KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG'), ('+', '    bool "Enable to spoof /proc/bootconfig (gki) or /proc/cmdline (non-gki)"'), ('+', '    depends on KSU_SUSFS'), ('+', '    default y'), ('+', '    help'), ('+', '        - Spoof the output of /proc/bootconfig (gki) or /proc/cmdline (non-gki) with a user-defined file.'), ('+', '        - Effective on all processes.'), ('+', ''), ('+', 'config KSU_SUSFS_OPEN_REDIRECT'), ('+', '    bool "Enable to redirect a path to be opened with another path (experimental)"'), ('+', '    depends on KSU_SUSFS'), ('+', '    default y'), ('+', '    help'), ('+', '        - Allow redirecting a target path to be opened with another user-defined path.'), ('+', '        - Effective only on processes with uid < 2000.'), ('+', '        - Please be reminded that process with open access to the target and redirected path can be detected.'), ('+', ''), ('+', 'config KSU_SUSFS_SUS_MAP'), ('+', '    bool "Enable to hide some mmapped real file from different proc maps interfaces"'), ('+', '    depends on KSU_SUSFS'), ('+', '    default y'), ('+', '    help'), ('+', '        - Allow hiding mmapped real file from /proc/<pid>/[maps|smaps|smaps_rollup|map_files|mem|pagemap]'), ('+', '        - It does NOT support hiding for anon memory.'), ('+', '        - It does NOT hide any inline hooks or plt hooks cause by the injected library itself.'), ('+', '        - It may not be able to evade detections by apps that implement a good injection detection.'), ('+', '        - Effective only on zygote spawned umounted user app process.'), ('+', ''), ('+', 'endmenu'), ('+', '')),
         ),
         XxksuOperationSpec(
-            operation_id='xxksu.kernel_downstream_ksu_hostsredirect_h.hunk_0',
-            file_path='kernel/downstream/ksu_hostsredirect.h',
-            spec=AnchorSpec('kernel/downstream/ksu_hostsredirect.h', 'static bool ksu_kernel_umount_enabled __read_mostly;\n', context_before=('#ifndef __KSU_H_HOSTSREDIRECT', '#define __KSU_H_HOSTSREDIRECT'), context_after=()),
-            placement=Placement.REPLACE,
-            payload='#ifndef CONFIG_KSU_SUSFS\nstatic bool ksu_kernel_umount_enabled __read_mostly;\n#else\nextern bool ksu_kernel_umount_enabled;\n#endif\n',
-            section_context='',
-            context_before_count=3,
-            context_after_count=3,
-            context_before_offset=3,
-            diff_body=(('+', '#ifndef CONFIG_KSU_SUSFS'), (' ', 'static bool ksu_kernel_umount_enabled __read_mostly;'), ('+', '#else'), ('+', 'extern bool ksu_kernel_umount_enabled;'), ('+', '#endif')),
-        ),
-        XxksuOperationSpec(
-            operation_id='xxksu.kernel_feature_kernel_umount_c.hunk_0',
-            file_path='kernel/feature/kernel_umount.c',
-            spec=AnchorSpec('kernel/feature/kernel_umount.c', 'static bool ksu_kernel_umount_enabled __read_mostly = true;\n', context_before=(), context_after=('static int kernel_umount_feature_get(u64 *value)',)),
-            placement=Placement.REPLACE,
-            payload='#ifndef CONFIG_KSU_SUSFS\nstatic bool ksu_kernel_umount_enabled __read_mostly = true;\n#else\nbool ksu_kernel_umount_enabled = true;\n#endif // #ifndef CONFIG_KSU_SUSFS\nbool ksu_webview_zygote_umount_enabled = true;\n\nbool ksu_is_webview_zygote_umount_enabled(void)\n{\n\treturn READ_ONCE(ksu_webview_zygote_umount_enabled);\n}\n',
-            section_context='',
-            context_before_count=0,
-            context_after_count=3,
-            context_before_offset=0,
-            diff_body=(('+', '#ifndef CONFIG_KSU_SUSFS'), (' ', 'static bool ksu_kernel_umount_enabled __read_mostly = true;'), ('+', '#else'), ('+', 'bool ksu_kernel_umount_enabled = true;'), ('+', '#endif // #ifndef CONFIG_KSU_SUSFS'), ('+', 'bool ksu_webview_zygote_umount_enabled = true;'), ('+', ''), ('+', 'bool ksu_is_webview_zygote_umount_enabled(void)'), ('+', '{'), ('+', '\treturn READ_ONCE(ksu_webview_zygote_umount_enabled);'), ('+', '}')),
-        ),
-        XxksuOperationSpec(
-            operation_id='xxksu.kernel_feature_kernel_umount_c.hunk_1',
-            file_path='kernel/feature/kernel_umount.c',
-            spec=AnchorSpec(
-                'kernel/feature/kernel_umount.c',
-                'static inline void try_umount(const char *mnt, int flags)\n',
-                context_before=('#endif',),
-                context_after=('{', 'struct path path;'),
-            ),
-            placement=Placement.REPLACE,
-            payload='#if !defined(CONFIG_KSU_SUSFS) || !defined(CONFIG_KSU_SUSFS_TRY_UMOUNT)\nstatic void try_umount(const char *mnt, int flags)\n#else\nvoid try_umount(const char *mnt, int flags)\n#endif\n',
-            section_context='',
-            context_before_count=3,
-            context_after_count=3,
-            context_before_offset=3,
-            diff_body=(
-                ('-', 'static inline void try_umount(const char *mnt, int flags)'),
-                ('+', '#if !defined(CONFIG_KSU_SUSFS) || !defined(CONFIG_KSU_SUSFS_TRY_UMOUNT)'),
-                ('+', 'static void try_umount(const char *mnt, int flags)'),
-                ('+', '#else'),
-                ('+', 'void try_umount(const char *mnt, int flags)'),
-                ('+', '#endif'),
-            ),
-        ),
-        XxksuOperationSpec(
-            operation_id='xxksu.kernel_feature_kernel_umount_c.hunk_2',
-            file_path='kernel/feature/kernel_umount.c',
-            spec=AnchorSpec('kernel/feature/kernel_umount.c', '\tksu_umount_mnt(mnt, &path, flags);\n}\n\nstatic inline int ksu_handle_umount(struct cred *new, const struct cred *old)\n{\n\tuid_t new_uid = ksu_get_uid_t(new->uid);\n\tuid_t old_uid = ksu_get_uid_t(old->uid);\n', context_before=('\t\treturn;', '\t}'), context_after=()),
-            placement=Placement.REPLACE,
-            payload='#ifndef KSU_HAS_PATH_UMOUNT\n\tksu_umount_mnt(mnt, &path, flags);\n#else\n\tksu_umount_mnt(&path, flags);\n#endif\n\tpath_put(&path);\n}\n\n#ifdef CONFIG_KSU_SUSFS\nint ksu_handle_umount(uid_t old_uid, uid_t new_uid)\n#else\nstatic inline int ksu_handle_umount(uid_t old_uid, uid_t new_uid)\n#endif\n{',
-            section_context='static inline void try_umount(const char *mnt, int flags)',
-            context_before_count=3,
-            context_after_count=3,
-            context_before_offset=3,
-            diff_body=(('+', '#ifndef KSU_HAS_PATH_UMOUNT'), (' ', '\tksu_umount_mnt(mnt, &path, flags);'), ('+', '#else'), ('+', '\tksu_umount_mnt(&path, flags);'), ('+', '#endif'), ('+', '\tpath_put(&path);'), (' ', '}'), (' ', ''), ('-', 'static inline int ksu_handle_umount(struct cred *new, const struct cred *old)'), ('+', '#ifdef CONFIG_KSU_SUSFS'), ('+', 'int ksu_handle_umount(uid_t old_uid, uid_t new_uid)'), ('+', '#else'), ('+', 'static inline int ksu_handle_umount(uid_t old_uid, uid_t new_uid)'), ('+', '#endif'), (' ', '{'), ('-', '\tuid_t new_uid = ksu_get_uid_t(new->uid);'), ('-', '\tuid_t old_uid = ksu_get_uid_t(old->uid);'), ('-', '')),
-        ),
-        XxksuOperationSpec(
-            operation_id='xxksu.kernel_feature_kernel_umount_c.hunk_3',
-            file_path='kernel/feature/kernel_umount.c',
-            spec=AnchorSpec('kernel/feature/kernel_umount.c', '\t// There are 6 scenarios:\n', context_before=('\tif (!ksu_module_mounted)', '\t\treturn 0;'), context_after=()),
-            placement=Placement.BEFORE,
-            payload='\t// Handle webview zygote umount policy\n\tif (new_uid == WEBVIEW_ZYGOTE_UID && !ksu_is_webview_zygote_umount_enabled())\n\t\treturn 0;\n\n',
-            section_context='static inline int ksu_handle_umount(struct cred *new, const struct cred *old)',
-            context_before_count=3,
-            context_after_count=3,
-            context_before_offset=3,
-            diff_body=(('+', '\t// Handle webview zygote umount policy'), ('+', '\tif (new_uid == WEBVIEW_ZYGOTE_UID && !ksu_is_webview_zygote_umount_enabled())'), ('+', '\t\treturn 0;'), ('+', '')),
-        ),
-        XxksuOperationSpec(
-            operation_id='xxksu.kernel_feature_kernel_umount_c.hunk_4',
-            file_path='kernel/feature/kernel_umount.c',
-            spec=AnchorSpec(
-                'kernel/feature/kernel_umount.c',
-                '\t// check old process\'s selinux context, if it is not zygote, ignore it!\n\t// because some su apps may setuid to untrusted_app but they are in global mount namespace\n\t// when we umount for such process, that is a disaster!\n\t// also handle case 4 and 5\n\tbool is_zygote_child = is_zygote(old);\n\tif (!is_zygote_child) {\n\t\tpr_info("handle umount ignore non zygote child: %d\\n", current->pid);\n\t\treturn 0;\n\t}\n\n',
-                context_before=('if (!ksu_uid_should_umount(new_uid) && !is_isolated_process(new_uid))', 'return 0;'),
-                context_after=('#ifdef CONFIG_KSU_HOSTSREDIRECT', '\tset_thread_flag(TIF_KSU_UNMOUNTABLE);', '#endif'),
-            ),
-            placement=Placement.REPLACE,
-            payload='',
-            section_context='static inline int ksu_handle_umount(struct cred *new, const struct cred *old)',
-            context_before_count=3,
-            context_after_count=3,
-            context_before_offset=3,
-            diff_body=(
-                ('-', "\t// check old process's selinux context, if it is not zygote, ignore it!"),
-                ('-', '\t// because some su apps may setuid to untrusted_app but they are in global mount namespace'),
-                ('-', '\t// when we umount for such process, that is a disaster!'),
-                ('-', '\t// also handle case 4 and 5'),
-                ('-', '\tbool is_zygote_child = is_zygote(old);'),
-                ('-', '\tif (!is_zygote_child) {'),
-                ('-', '\t\tpr_info("handle umount ignore non zygote child: %d\\n", current->pid);'),
-                ('-', '\t\treturn 0;'),
-                ('-', '\t}'),
-                ('-', ''),
-            ),
-        ),
-        XxksuOperationSpec(
             operation_id='xxksu.kernel_hook_setuid_hook_c.hunk_0',
             file_path='kernel/hook/setuid_hook.c',
             spec=AnchorSpec('kernel/hook/setuid_hook.c', 'static __always_inline void ksu_handle_setresuid_cred(struct cred *new, const struct cred *old)\n', context_before=(), context_after=('{', 'if (!new || !old)')),
-            placement=Placement.REPLACE,
-            payload='#ifdef CONFIG_KSU_SUSFS\n#include <linux/susfs_def.h>\n#include "selinux/selinux.h"\n#endif\n\n#ifdef CONFIG_KSU_SUSFS\nextern u32 susfs_zygote_sid;\nextern u32 susfs_zygote_next_sid;\nextern void disable_seccomp(void);\nextern struct work_struct susfs_extra_works;\nextern bool ksu_is_webview_zygote_umount_enabled(void);\n#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT\nextern void susfs_try_umount(uid_t uid);\n#endif\n\nstatic inline void ksu_handle_extra_susfs_work(void)\n{\n\tif (work_pending(&susfs_extra_works))\n\t\treturn;\n\n\tschedule_work(&susfs_extra_works);\n}\n\nstatic int handle_zygote_setresuid(uid_t ruid) {\n\t// Check if spawned process is isolated service first, and force to do umount if so\n\tif (is_isolated_process(ruid)) {\n\t\tsusfs_set_current_proc_no_su();\n\t\tsusfs_set_current_proc_umounted();\n\t\tgoto do_umount;\n\t}\n\n\t// Check if webview zygote should be umounted\n\tif (unlikely(ruid == WEBVIEW_ZYGOTE_UID)) {\n\t\tif (ksu_is_webview_zygote_umount_enabled()) {\n\t\t\tsusfs_set_current_proc_no_su();\n\t\t\tsusfs_set_current_proc_umounted();\n\t\t\tgoto do_umount;\n\t\t}\n\t\tsusfs_set_current_proc_no_su();\n\t\treturn 0;\n\t}\n\n\t// Normal app that needs umount\n\tif (likely(is_appuid(ruid) && ksu_uid_should_umount(ruid))) {\n\t\tsusfs_set_current_proc_no_su();\n\t\tsusfs_set_current_proc_umounted();\n\t\tgoto do_umount;\n\t}\n\n\t// Root allowed apps\n\tif (ksu_is_allow_uid_for_current(ruid)) {\n\t\tdisable_seccomp();\n\t\treturn 0;\n\t}\n\n\tsusfs_set_current_proc_no_su();\n\treturn 0;\n\ndo_umount:\n\t{\n#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT\n\t\tsusfs_try_umount(ruid);\n#endif\n\t\tksu_handle_umount(current_uid().val, ruid);\n\t\tksu_handle_extra_susfs_work();\n\t}\n\n\treturn 0;\n}\n\nstatic int handle_zygote_next_setresuid(uid_t ruid) {\n\t// zygote_next: do NOT umount, just set flags\n\tif (is_isolated_process(ruid)) {\n\t\tsusfs_set_current_proc_no_su();\n\t\tsusfs_set_current_proc_umounted();\n\t\tsusfs_set_current_proc_umounted_for_zygote_next();\n\t\tgoto do_susfs_work;\n\t}\n\n\tif (unlikely(ruid == WEBVIEW_ZYGOTE_UID)) {\n\t\tif (ksu_is_webview_zygote_umount_enabled()) {\n\t\t\tsusfs_set_current_proc_no_su();\n\t\t\tsusfs_set_current_proc_umounted();\n\t\t\tsusfs_set_current_proc_umounted_for_zygote_next();\n\t\t\tgoto do_susfs_work;\n\t\t}\n\t\tsusfs_set_current_proc_no_su();\n\t\treturn 0;\n\t}\n\n\tif (likely(is_appuid(ruid) && ksu_uid_should_umount(ruid))) {\n\t\tsusfs_set_current_proc_no_su();\n\t\tsusfs_set_current_proc_umounted();\n\t\tsusfs_set_current_proc_umounted_for_zygote_next();\n\t\tgoto do_susfs_work;\n\t}\n\n\tif (ksu_is_allow_uid_for_current(ruid)) {\n\t\tdisable_seccomp();\n\t\treturn 0;\n\t}\n\n\tsusfs_set_current_proc_no_su();\n\treturn 0;\n\ndo_susfs_work:\n\t{\n#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT\n\t\tsusfs_try_umount(ruid);\n#endif\n\t\tksu_handle_extra_susfs_work();\n\t}\n\n\treturn 0;\n}\n\nint ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)\n{\n\tuid_t cur_uid = current_uid().val;\n\n\tif (cur_uid != 0)\n\t\treturn 0;\n\n\tif (susfs_is_sid_equal(current_cred(), susfs_zygote_sid))\n\t\treturn handle_zygote_setresuid(ruid);\n\n\tif (susfs_is_sid_equal(current_cred(), susfs_zygote_next_sid))\n\t\treturn handle_zygote_next_setresuid(ruid);\n\n\treturn 0;\n}\n#endif // #ifdef CONFIG_KSU_SUSFS\n\nvoid ksu_handle_setresuid_cred(struct cred *new, const struct cred *old)\n',
+            placement=Placement.BEFORE,
+            payload='#ifdef CONFIG_KSU_SUSFS\n#include <linux/susfs_def.h>\n#include "selinux/selinux.h"\n\nextern struct work_struct susfs_extra_works;\n\nstatic inline void ksu_handle_extra_susfs_work(void)\n{\n\tif (!work_pending(&susfs_extra_works))\n\t\tschedule_work(&susfs_extra_works);\n}\n\nstatic inline void handle_zygote_setresuid(struct cred *new, const struct cred *old, uid_t new_uid, bool is_zygote_next)\n{\n\tbool is_isolated = is_isolated_process(new_uid);\n\tbool should_umount = likely((is_appuid(new_uid) || new_uid == WEBVIEW_ZYGOTE_UID) && ksu_uid_should_umount(new_uid));\n\n\tsusfs_set_current_proc_no_su();\n\n\tif (is_isolated || should_umount) {\n\t\tsusfs_set_current_proc_umounted();\n\t\tif (is_zygote_next)\n\t\t\tsusfs_set_current_proc_umounted_for_zygote_next();\n\t\tif (!is_zygote_next)\n\t\t\tksu_handle_umount(new, old);\n\t\tksu_handle_extra_susfs_work();\n\t}\n}\n#endif // #ifdef CONFIG_KSU_SUSFS\n\n',
             section_context='',
             context_before_count=0,
             context_after_count=3,
             context_before_offset=0,
-            diff_body=(('-', 'static __always_inline void ksu_handle_setresuid_cred(struct cred *new, const struct cred *old)'), ('+', '#ifdef CONFIG_KSU_SUSFS'), ('+', '#include <linux/susfs_def.h>'), ('+', '#include "selinux/selinux.h"'), ('+', '#endif'), ('+', ''), ('+', '#ifdef CONFIG_KSU_SUSFS'), ('+', 'extern u32 susfs_zygote_sid;'), ('+', 'extern u32 susfs_zygote_next_sid;'), ('+', 'extern void disable_seccomp(void);'), ('+', 'extern struct work_struct susfs_extra_works;'), ('+', 'extern bool ksu_is_webview_zygote_umount_enabled(void);'), ('+', '#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT'), ('+', 'extern void susfs_try_umount(uid_t uid);'), ('+', '#endif'), ('+', ''), ('+', 'static inline void ksu_handle_extra_susfs_work(void)'), ('+', '{'), ('+', '\tif (work_pending(&susfs_extra_works))'), ('+', '\t\treturn;'), ('+', ''), ('+', '\tschedule_work(&susfs_extra_works);'), ('+', '}'), ('+', ''), ('+', 'static int handle_zygote_setresuid(uid_t ruid) {'), ('+', '\t// Check if spawned process is isolated service first, and force to do umount if so'), ('+', '\tif (is_isolated_process(ruid)) {'), ('+', '\t\tsusfs_set_current_proc_no_su();'), ('+', '\t\tsusfs_set_current_proc_umounted();'), ('+', '\t\tgoto do_umount;'), ('+', '\t}'), ('+', ''), ('+', '\t// Check if webview zygote should be umounted'), ('+', '\tif (unlikely(ruid == WEBVIEW_ZYGOTE_UID)) {'), ('+', '\t\tif (ksu_is_webview_zygote_umount_enabled()) {'), ('+', '\t\t\tsusfs_set_current_proc_no_su();'), ('+', '\t\t\tsusfs_set_current_proc_umounted();'), ('+', '\t\t\tgoto do_umount;'), ('+', '\t\t}'), ('+', '\t\tsusfs_set_current_proc_no_su();'), ('+', '\t\treturn 0;'), ('+', '\t}'), ('+', ''), ('+', '\t// Normal app that needs umount'), ('+', '\tif (likely(is_appuid(ruid) && ksu_uid_should_umount(ruid))) {'), ('+', '\t\tsusfs_set_current_proc_no_su();'), ('+', '\t\tsusfs_set_current_proc_umounted();'), ('+', '\t\tgoto do_umount;'), ('+', '\t}'), ('+', ''), ('+', '\t// Root allowed apps'), ('+', '\tif (ksu_is_allow_uid_for_current(ruid)) {'), ('+', '\t\tdisable_seccomp();'), ('+', '\t\treturn 0;'), ('+', '\t}'), ('+', ''), ('+', '\tsusfs_set_current_proc_no_su();'), ('+', '\treturn 0;'), ('+', ''), ('+', 'do_umount:'), ('+', '\t{'), ('+', '#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT'), ('+', '\t\tsusfs_try_umount(ruid);'), ('+', '#endif'), ('+', '\t\tksu_handle_umount(current_uid().val, ruid);'), ('+', '\t\tksu_handle_extra_susfs_work();'), ('+', '\t}'), ('+', ''), ('+', '\treturn 0;'), ('+', '}'), ('+', ''), ('+', 'static int handle_zygote_next_setresuid(uid_t ruid) {'), ('+', '\t// zygote_next: do NOT umount, just set flags'), ('+', '\tif (is_isolated_process(ruid)) {'), ('+', '\t\tsusfs_set_current_proc_no_su();'), ('+', '\t\tsusfs_set_current_proc_umounted();'), ('+', '\t\tsusfs_set_current_proc_umounted_for_zygote_next();'), ('+', '\t\tgoto do_susfs_work;'), ('+', '\t}'), ('+', ''), ('+', '\tif (unlikely(ruid == WEBVIEW_ZYGOTE_UID)) {'), ('+', '\t\tif (ksu_is_webview_zygote_umount_enabled()) {'), ('+', '\t\t\tsusfs_set_current_proc_no_su();'), ('+', '\t\t\tsusfs_set_current_proc_umounted();'), ('+', '\t\t\tsusfs_set_current_proc_umounted_for_zygote_next();'), ('+', '\t\t\tgoto do_susfs_work;'), ('+', '\t\t}'), ('+', '\t\tsusfs_set_current_proc_no_su();'), ('+', '\t\treturn 0;'), ('+', '\t}'), ('+', ''), ('+', '\tif (likely(is_appuid(ruid) && ksu_uid_should_umount(ruid))) {'), ('+', '\t\tsusfs_set_current_proc_no_su();'), ('+', '\t\tsusfs_set_current_proc_umounted();'), ('+', '\t\tsusfs_set_current_proc_umounted_for_zygote_next();'), ('+', '\t\tgoto do_susfs_work;'), ('+', '\t}'), ('+', ''), ('+', '\tif (ksu_is_allow_uid_for_current(ruid)) {'), ('+', '\t\tdisable_seccomp();'), ('+', '\t\treturn 0;'), ('+', '\t}'), ('+', ''), ('+', '\tsusfs_set_current_proc_no_su();'), ('+', '\treturn 0;'), ('+', ''), ('+', 'do_susfs_work:'), ('+', '\t{'), ('+', '#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT'), ('+', '\t\tsusfs_try_umount(ruid);'), ('+', '#endif'), ('+', '\t\tksu_handle_extra_susfs_work();'), ('+', '\t}'), ('+', ''), ('+', '\treturn 0;'), ('+', '}'), ('+', ''), ('+', 'int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)'), ('+', '{'), ('+', '\tuid_t cur_uid = current_uid().val;'), ('+', ''), ('+', '\tif (cur_uid != 0)'), ('+', '\t\treturn 0;'), ('+', ''), ('+', '\tif (susfs_is_sid_equal(current_cred(), susfs_zygote_sid))'), ('+', '\t\treturn handle_zygote_setresuid(ruid);'), ('+', ''), ('+', '\tif (susfs_is_sid_equal(current_cred(), susfs_zygote_next_sid))'), ('+', '\t\treturn handle_zygote_next_setresuid(ruid);'), ('+', ''), ('+', '\treturn 0;'), ('+', '}'), ('+', '#endif // #ifdef CONFIG_KSU_SUSFS'), ('+', ''), ('+', 'void ksu_handle_setresuid_cred(struct cred *new, const struct cred *old)')),
         ),
         XxksuOperationSpec(
             operation_id='xxksu.kernel_hook_setuid_hook_c.hunk_1',
             file_path='kernel/hook/setuid_hook.c',
-            spec=AnchorSpec('kernel/hook/setuid_hook.c', '\t// we dont have those new fancy things upstream has\n\t// lets just do the original thing where we disable seccomp\n\tif (unlikely(is_uid_manager(new_uid)))\n\t\tgoto install_ksu_fd;\n\n\tif (ksu_is_allow_uid_for_current(new_uid))\n\t\tgoto kill_seccomp;\n\n\t// Handle kernel umount\n\tksu_handle_umount(new, old);\n\treturn;\n\ninstall_ksu_fd:\n\tpr_info("install fd for manager: %d\\n", new_uid);\n\tksu_install_fd();\n\nkill_seccomp:\n\tdisable_seccomp();\n\tset_thread_flag(TIF_KSU_MANAGED); // sucompat fast-path\n\treturn;\n', context_before=('pr_info("handle_setresuid from %d to %d\\n", old_uid, new_uid);',), context_after=()),
+            spec=AnchorSpec(
+                'kernel/hook/setuid_hook.c',
+                '\tksu_handle_umount(new, old);\n',
+                context_before=('\t// Handle kernel umount',),
+                context_after=('\treturn;', 'install_ksu_fd:'),
+            ),
             placement=Placement.REPLACE,
-            payload='#ifdef CONFIG_KSU_SUSFS\n\tif (unlikely(is_uid_manager(new_uid))) {\n\t\tdisable_seccomp();\n\t\tset_thread_flag(TIF_KSU_MANAGED); // sucompat fast-path\n\t\tpr_info("install fd for manager: %d\\n", new_uid);\n\t\tksu_install_fd();\n\t\treturn;\n\t}\n\n\tif (ksu_is_allow_uid_for_current(new_uid)) {\n\t\tdisable_seccomp();\n\t\treturn;\n\t}\n\n\tksu_handle_setresuid(new_uid, new_uid, new_uid);\n#else\n\tksu_handle_umount(old_uid, new_uid);\n#endif\n',
+            payload='#ifdef CONFIG_KSU_SUSFS\n\tif (susfs_is_current_zygote_domain() || new_uid == WEBVIEW_ZYGOTE_UID) {\n\t\thandle_zygote_setresuid(new, old, new_uid, false);\n\t} else if (susfs_is_current_zygote_next_domain()) {\n\t\thandle_zygote_setresuid(new, old, new_uid, true);\n\t}\n#else\n\tksu_handle_umount(new, old);\n#endif // #ifdef CONFIG_KSU_SUSFS\n',
             section_context='static __always_inline void ksu_handle_setresuid_cred(struct cred *new, const st',
             context_before_count=3,
-            context_after_count=1,
+            context_after_count=3,
             context_before_offset=3,
-            diff_body=(('-', '\t// we dont have those new fancy things upstream has'), ('-', '\t// lets just do the original thing where we disable seccomp'), ('-', '\tif (unlikely(is_uid_manager(new_uid)))'), ('-', '\t\tgoto install_ksu_fd;'), ('-', ''), ('-', '\tif (ksu_is_allow_uid_for_current(new_uid))'), ('-', '\t\tgoto kill_seccomp;'), ('-', ''), ('-', '\t// Handle kernel umount'), ('-', '\tksu_handle_umount(new, old);'), ('-', '\treturn;'), ('+', '#ifdef CONFIG_KSU_SUSFS'), ('+', '\tif (unlikely(is_uid_manager(new_uid))) {'), ('+', '\t\tdisable_seccomp();'), ('+', '\t\tset_thread_flag(TIF_KSU_MANAGED); // sucompat fast-path'), ('+', '\t\tpr_info("install fd for manager: %d\\n", new_uid);'), ('+', '\t\tksu_install_fd();'), ('+', '\t\treturn;'), ('+', '\t}'), (' ', ''), ('-', 'install_ksu_fd:'), ('-', '\tpr_info("install fd for manager: %d\\n", new_uid);'), ('-', '\tksu_install_fd();'), ('+', '\tif (ksu_is_allow_uid_for_current(new_uid)) {'), ('+', '\t\tdisable_seccomp();'), ('+', '\t\treturn;'), ('+', '\t}'), (' ', ''), ('-', 'kill_seccomp:'), ('-', '\tdisable_seccomp();'), ('-', '\tset_thread_flag(TIF_KSU_MANAGED); // sucompat fast-path'), ('-', '\treturn;'), ('+', '\tksu_handle_setresuid(new_uid, new_uid, new_uid);'), ('+', '#else'), ('+', '\tksu_handle_umount(old_uid, new_uid);'), ('+', '#endif')),
+            diff_body=(
+                ('-', '\tksu_handle_umount(new, old);'),
+                ('+', '#ifdef CONFIG_KSU_SUSFS'),
+                ('+', '\tif (susfs_is_current_zygote_domain() || new_uid == WEBVIEW_ZYGOTE_UID) {'),
+                ('+', '\t\thandle_zygote_setresuid(new, old, new_uid, false);'),
+                ('+', '\t} else if (susfs_is_current_zygote_next_domain()) {'),
+                ('+', '\t\thandle_zygote_setresuid(new, old, new_uid, true);'),
+                ('+', '\t}'),
+                ('+', '#else'),
+                ('+', '\tksu_handle_umount(new, old);'),
+                ('+', '#endif // #ifdef CONFIG_KSU_SUSFS'),
+            ),
         ),
         XxksuOperationSpec(
             operation_id='xxksu.kernel_ksu_c.hunk_0',
@@ -402,7 +311,7 @@ class XxksuAdapter(TargetAdapter):
         self.supported_kernel_families = ("common", "android")
 
     def build_adaptation_plan(self, bundle: SourceBundle) -> FixtureAdaptationPlan:
-        """Resolve all 20 anchor locations against clean xxKSU files and construct adaptation plan."""
+        """Resolve all 14 anchor locations against clean xxKSU files and construct adaptation plan."""
         if bundle.target_id != "xxksu":
             raise IncompatibleFixtureTarget(
                 f"bundle target {bundle.target_id} is incompatible with xxksu adapter"
