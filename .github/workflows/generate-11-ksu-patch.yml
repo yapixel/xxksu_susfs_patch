@@ -22,7 +22,7 @@ permissions:
 env:
   KSU_REPO: "backslashxx/KernelSU"
   KSU_COMMIT: "bb0be9297da42ff3f63819125314ce0b13935a06"
-  PATCH_11_SHA256: "c0cfe7f3931061d2732d5cc097e44babaf6b51d6a1f19b9fb466c23c54affd4e"
+  PATCH_11_SHA256: "465d600f1438b069c1cf69c3942f855699c635fbadd05e26dffad050150c0bd2"
 
 jobs:
   validate_11_patch:
@@ -85,19 +85,19 @@ jobs:
 
           MOD_COUNT="$(git diff --name-only | wc -l)"
           echo "Total modified files: $MOD_COUNT"
-          if [ "$MOD_COUNT" -ne 10 ]; then
-            echo "❌ Expected exactly 10 modified files, found $MOD_COUNT"
+          if [ "$MOD_COUNT" -ne 8 ]; then
+            echo "❌ Expected exactly 8 modified files, found $MOD_COUNT"
             git diff --name-only
             exit 1
           fi
-          echo "✅ 11 Patch applied cleanly on authoritative xxKSU with 0 rejects across 10 files!"
+          echo "✅ 11 Patch applied cleanly on authoritative xxKSU with 0 rejects across 8 files!"
 
       - name: Generate 11 Patch Statistics Report
         run: |
           echo "## 📊 Universal 11 Patch (xxKSU) Verification Report" > report_11.md
           echo "Generated on: $(date -u)" >> report_11.md
           echo "" >> report_11.md
-          echo "### 📄 Git Diffstat (10 Files Target)" >> report_11.md
+          echo "### 📄 Git Diffstat (8 Files Target)" >> report_11.md
           echo '```' >> report_11.md
           git apply --stat patches/xxksu/11_enable_susfs_for_ksu.patch >> report_11.md
           echo '```' >> report_11.md
