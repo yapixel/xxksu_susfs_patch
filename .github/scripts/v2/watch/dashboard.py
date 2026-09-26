@@ -39,6 +39,11 @@ SOURCE_DISPLAY_NAMES = {
 
 DEFAULT_INITIAL_EVENTS: Tuple[Mapping[str, str], ...] = (
     {
+        "timestamp": "2026-09-26",
+        "source_id": "backslashxx_kernelsu",
+        "text": "Reconciled Patch 11 policy: retired legacy try_umount and obsolete KSU_MARK_GET override (SHA: a0419c3a)",
+    },
+    {
         "timestamp": "2026-09-24",
         "source_id": "watch",
         "text": "Activated reference-patch normalization (commit rebase with identical normalized patch is NO_CHANGE)",
@@ -601,13 +606,18 @@ def render_dashboard_body(
                 "target": "xxksu-patch11",
                 "reference": "midori01/KernelSU:xx.patch",
                 "status": "IMPLEMENTATION_DIFFERENCE",
-                "details": "Candidate and reference share equivalent semantics with implementation differences in selinux and setuid batching.",
+                "details": (
+                    "Equivalent semantics (OUR_EXTRA=0, REFERENCE_EXTRA=0, SEMANTIC_CONFLICT=0); "
+                    "implementation differences in selinux & zygote batching; "
+                    "TRY_UMOUNT legacy SuSFS integration retired (native xxKSU try-umount retained); "
+                    "obsolete Official-KSU KSU_MARK_GET override retired (native xxKSU ksu_get_task_mark(cmd.pid) retained)."
+                ),
             },
             {
                 "target": "gki-android16-6.12-r38-patch51",
                 "reference": "midori01/gki_ksu_workflow:Patch 51",
                 "status": "IMPLEMENTATION_DIFFERENCE",
-                "details": "Equivalent deinlined hooks; open_redirect implementation variation",
+                "details": "Equivalent deinlined hooks across 16 files; open_redirect implementation variation.",
             },
         ]
 
@@ -775,6 +785,7 @@ def sync_dashboard_issue(
     run_id: Optional[str] = None,
     revision: Optional[str] = None,
     branch: Optional[str] = None,
+    extra_events: Optional[Sequence[Mapping[str, str]]] = None,
 ) -> tuple[Optional[str], bool]:
     """Synchronize the permanent dashboard issue in GitHub.
 
@@ -812,6 +823,8 @@ def sync_dashboard_issue(
     # 4. Extract new transition events from this run
     date_str = report.timestamp[:10] if report.timestamp else datetime.now(timezone.utc).strftime("%Y-%m-%d")
     new_events = extract_transition_events(report, date_str)
+    if extra_events:
+        new_events = list(extra_events) + new_events
 
     # 5. Combine events bounded to MAX_RECENT_EVENTS
     combined_events = combine_recent_events(existing_events, new_events, max_events=MAX_RECENT_EVENTS)

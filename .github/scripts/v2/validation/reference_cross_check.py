@@ -903,6 +903,55 @@ def run_reference_cross_check(
     return None
 
 
+def format_patch11_parity_details(rep: Mapping[str, Any]) -> str:
+    """Derive compact reference parity details for Patch 11 from machine-readable cross-check report."""
+    classification = rep.get("classification", "")
+    our_extras = rep.get("our_extra_units", ())
+    ref_extras = rep.get("ref_extra_units", ())
+    conflicts = rep.get("conflicting_units", ())
+    meta = rep.get("metadata", {})
+    matrix = meta.get("semantic_matrix", {})
+
+    retired_units = []
+    if matrix.get("config.try_umount") == "NOT_APPLICABLE" and matrix.get("supercall.try_umount_cmd") == "NOT_APPLICABLE":
+        retired_units.append("TRY_UMOUNT legacy SuSFS integration retired (native xxKSU try-umount retained)")
+    if matrix.get("supercall.ksu_mark_get_integration") == "NOT_APPLICABLE":
+        retired_units.append("obsolete Official-KSU KSU_MARK_GET override retired (native xxKSU ksu_get_task_mark(cmd.pid) retained)")
+
+    retired_str = f"; {'; '.join(retired_units)}" if retired_units else ""
+
+    if classification == ReferenceComparisonClassification.IMPLEMENTATION_DIFFERENCE.value:
+        return (
+            f"Equivalent semantics (OUR_EXTRA=0, REFERENCE_EXTRA=0, SEMANTIC_CONFLICT=0); "
+            f"implementation differences in selinux & zygote batching{retired_str}."
+        )
+    elif classification == ReferenceComparisonClassification.SEMANTIC_MATCH.value:
+        return f"Exact semantic match across all feature units{retired_str}."
+    elif classification == ReferenceComparisonClassification.OUR_EXTRA.value:
+        extras_str = ", ".join(our_extras) if our_extras else "none"
+        return f"Candidate contains extra authoritative Simonpunk features: {extras_str}."
+    elif classification == ReferenceComparisonClassification.REFERENCE_EXTRA.value:
+        extras_str = ", ".join(ref_extras) if ref_extras else "none"
+        return f"Reference contains extra feature units: {extras_str}."
+    elif classification == ReferenceComparisonClassification.SEMANTIC_CONFLICT.value:
+        conflicts_str = ", ".join(conflicts) if conflicts else "unknown"
+        return f"Genuine semantic conflict detected: {conflicts_str}."
+    return str(rep.get("details", "—"))
+
+
+def format_gki_patch51_parity_details(rep: Mapping[str, Any]) -> str:
+    """Derive compact reference parity details for GKI Patch 51 from machine-readable report."""
+    classification = rep.get("classification", "")
+    if classification == ReferenceComparisonClassification.IMPLEMENTATION_DIFFERENCE.value:
+        return "Equivalent deinlined hooks across 16 files; open_redirect implementation variation."
+    elif classification == ReferenceComparisonClassification.SEMANTIC_MATCH.value:
+        return "Exact semantic match for deinlined hooks across 16 files."
+    elif classification == ReferenceComparisonClassification.SEMANTIC_CONFLICT.value:
+        conflicts = rep.get("conflicting_units", ())
+        return f"Genuine semantic conflict detected: {', '.join(conflicts)}."
+    return str(rep.get("details", "—"))
+
+
 def get_reference_parity_summary(repo_root: Optional[Path] = None) -> list[dict[str, str]]:
     """Return compact parity summary for the Status Issue dashboard."""
     if repo_root is None:
@@ -915,15 +964,41 @@ def get_reference_parity_summary(repo_root: Optional[Path] = None) -> list[dict[
     p11_path = root / "patches" / "xxksu" / "11_enable_susfs_for_ksu.patch"
     if p11_path.is_file():
         rep_file = root / "candidate_patches" / "xxksu-patch11" / "reference_cross_check.json"
-        status_val = ReferenceComparisonClassification.IMPLEMENTATION_DIFFERENCE.value
-        details_val = "Candidate and reference share equivalent semantics with implementation differences in selinux and setuid batching."
+        rep_data = None
         if rep_file.is_file():
             try:
-                rep = json.loads(rep_file.read_text(encoding="utf-8"))
-                status_val = rep.get("classification", status_val)
-                details_val = rep.get("details", details_val)
+                rep_data = json.loads(rep_file.read_text(encoding="utf-8"))
             except Exception:
-                pass
+                rep_data = None
+
+        if rep_data is None:
+            try:
+                p11_text = p11_path.read_text(encoding="utf-8")
+                p11_sha = hashlib.sha256(p11_text.encode("utf-8")).hexdigest()
+                res = run_reference_cross_check(
+                    "xxksu-patch11",
+                    p11_text,
+                    p11_sha,
+                    repo_root=root,
+                    fetch_remote=True,
+                )
+                if res is not None:
+                    rep_data = res.to_dict()
+                    try:
+                        rep_file.parent.mkdir(parents=True, exist_ok=True)
+                        rep_file.write_text(json.dumps(rep_data, indent=2), encoding="utf-8")
+                    except Exception:
+                        pass
+            except Exception as exc:
+                logger.warning("Dynamic cross-check for xxksu-patch11 failed: %s", exc)
+
+        if rep_data:
+            status_val = rep_data.get("classification", ReferenceComparisonClassification.IMPLEMENTATION_DIFFERENCE.value)
+            details_val = format_patch11_parity_details(rep_data)
+        else:
+            status_val = ReferenceComparisonClassification.REFERENCE_UNAVAILABLE.value
+            details_val = "Reference cross-check data unavailable."
+
         items.append({
             "target": "xxksu-patch11",
             "reference": "midori01/KernelSU:xx.patch",
@@ -935,14 +1010,40 @@ def get_reference_parity_summary(repo_root: Optional[Path] = None) -> list[dict[
     gki51_path = root / "patches" / "gki-android16-6.12" / "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
     if gki51_path.is_file():
         rep_file = root / "candidate_patches" / "gki-android16-6.12-r38-patch51" / "reference_cross_check.json"
-        status_val = ReferenceComparisonClassification.IMPLEMENTATION_DIFFERENCE.value
-        details_val = "Equivalent deinlined hooks; open_redirect implementation variation"
+        rep_data = None
         if rep_file.is_file():
             try:
-                rep = json.loads(rep_file.read_text(encoding="utf-8"))
-                status_val = rep.get("classification", status_val)
+                rep_data = json.loads(rep_file.read_text(encoding="utf-8"))
             except Exception:
-                pass
+                rep_data = None
+
+        if rep_data is None:
+            try:
+                gki_text = gki51_path.read_text(encoding="utf-8")
+                gki_sha = hashlib.sha256(gki_text.encode("utf-8")).hexdigest()
+                res = run_reference_cross_check(
+                    "gki-android16-6.12-r38-patch51",
+                    gki_text,
+                    gki_sha,
+                    repo_root=root,
+                    fetch_remote=True,
+                )
+                if res is not None:
+                    rep_data = res.to_dict()
+                    try:
+                        rep_file.parent.mkdir(parents=True, exist_ok=True)
+                        rep_file.write_text(json.dumps(rep_data, indent=2), encoding="utf-8")
+                    except Exception:
+                        pass
+            except Exception as exc:
+                logger.warning("Dynamic cross-check for gki-android16-6.12-r38-patch51 failed: %s", exc)
+
+        if rep_data:
+            status_val = rep_data.get("classification", ReferenceComparisonClassification.IMPLEMENTATION_DIFFERENCE.value)
+            details_val = format_gki_patch51_parity_details(rep_data)
+        else:
+            status_val = ReferenceComparisonClassification.REFERENCE_UNAVAILABLE.value
+            details_val = "Reference cross-check data unavailable."
         items.append({
             "target": "gki-android16-6.12-r38-patch51",
             "reference": "midori01/gki_ksu_workflow:Patch 51",

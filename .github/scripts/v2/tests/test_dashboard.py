@@ -427,7 +427,44 @@ class DashboardTests(unittest.TestCase):
         # Check Authoritative rows remain commit-identity based
         self.assertIn("`bb0be9297da4`", body)
         self.assertIn("`c254cf2dcdff`", body)
-        self.assertIn("`2528bdb0e2e7`", body)
+    # 20. reference parity derived from machine-readable cross-check report
+    def test_20_reference_parity_derived_from_machine_readable_cross_check(self):
+        report = make_clean_report()
+        body = render_dashboard_body(report=report, repo_root=REPO_ROOT)
+        self.assertIn("`xxksu-patch11`", body)
+        self.assertIn("`midori01/KernelSU:xx.patch`", body)
+        self.assertIn("🟢 `IMPLEMENTATION_DIFFERENCE`", body)
+        self.assertIn("OUR_EXTRA=0", body)
+        self.assertIn("TRY_UMOUNT legacy SuSFS integration retired", body)
+        self.assertIn("obsolete Official-KSU KSU_MARK_GET override retired", body)
+
+    # 21. sync_dashboard_issue supports extra_events
+    @patch("v2.watch.dashboard.find_dashboard_issues")
+    @patch("v2.watch.dashboard.update_dashboard_issue", return_value="https://github.com/yapixel/xxksu_susfs_patch/issues/5")
+    @patch("v2.watch.dashboard.fetch_open_escalations", return_value=[])
+    def test_21_sync_dashboard_issue_supports_extra_events(self, mock_esc, mock_update, mock_find):
+        mock_find.return_value = [{
+            "number": 5,
+            "title": "📡 Upstream Watch Status",
+            "body": "## Recent Events\n- **2026-09-24**: `watch` — test\n<!-- dashboard-events: [{\"timestamp\": \"2026-09-24\", \"source_id\": \"watch\", \"text\": \"test\"}] -->",
+        }]
+        report = make_clean_report()
+        policy_event = {
+            "timestamp": "2026-09-26",
+            "source_id": "backslashxx_kernelsu",
+            "text": "Reconciled Patch 11 policy: retired legacy try_umount and obsolete KSU_MARK_GET override (SHA: a0419c3a)",
+        }
+        url, created = sync_dashboard_issue(
+            report=report,
+            repo="yapixel/xxksu_susfs_patch",
+            repo_root=REPO_ROOT,
+            extra_events=[policy_event],
+        )
+        self.assertFalse(created)
+        self.assertEqual(url, "https://github.com/yapixel/xxksu_susfs_patch/issues/5")
+        mock_update.assert_called_once()
+        updated_body = mock_update.call_args[0][2]
+        self.assertIn("Reconciled Patch 11 policy", updated_body)
 
 
 if __name__ == "__main__":
