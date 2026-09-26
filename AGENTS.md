@@ -33,6 +33,10 @@ Synchronize Metadata, BASELINE records, and `patches/manifest.json`
   │
   ▼
 Verify Committed Public Artifact == Validated Candidate (Byte-for-byte)
+  │
+  ▼
+Final Delivery / Write-Back (`origin/main`)
+  (Stage only verified diff -> commit -> push -> verify origin/main and raw URL)
 ```
 
 ---
@@ -104,7 +108,8 @@ PYTHONPATH=.github/scripts python3 -m v2.pipeline \
   --patch-id <xxksu-patch11 | sultan-android14-6.1-patch51 | gki-android16-6.12-r38-patch51> \
   --upstream-input <path-to-source-or-patch> \
   --target-tree <path-to-clean-target-tree> \
-  --promote
+  --promote \
+  --write-back
 
 # 2. Check Manifest Consistency
 PYTHONPATH=.github/scripts python3 -m v2.manifests.patch_manifest --check
@@ -114,5 +119,5 @@ PYTHONPATH=.github/scripts python3 -m v2.watch.cli
 
 # 4. Focused Unit & Regression Test Suites
 PYTHONPATH=.github/scripts:.github/scripts/v2/tests python3 -m unittest \
-  test_semantic_gate test_pipeline test_watch test_baseline test_patch_manifest
+  test_delivery test_semantic_gate test_pipeline test_watch test_baseline test_patch_manifest
 ```

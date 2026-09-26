@@ -19,7 +19,6 @@ on:
 
 permissions:
   contents: write
-  actions: write
 
 env:
   SUSFS_REPO_URL: "https://gitlab.com/simonpunk/susfs4ksu.git"
@@ -114,7 +113,8 @@ jobs:
             --upstream-input susfs_src \
             --target-tree kernel_tree \
             --candidate-dir candidate_patches \
-            --promote
+            --promote \
+            --write-back
 
           cd kernel_tree
           find . -type f \( -name "*.orig" -o -name "*~" \) -delete
@@ -188,6 +188,7 @@ jobs:
 
   validate_gki_r38_compat:
     name: "GKI 6.12 (Android 16 r38 Compatibility)"
+    needs: [matrix_51_patch]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -249,7 +250,8 @@ jobs:
             --upstream-input susfs_src \
             --target-tree kernel_tree \
             --candidate-dir candidate_patches \
-            --promote
+            --promote \
+            --write-back
 
           cd kernel_tree
           find . -type f \( -name "*.orig" -o -name "*~" \) -delete
