@@ -257,20 +257,33 @@ def validate_exact_patch_on_tree(
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    parser = argparse.ArgumentParser(description="Strict patch validator (0 fuzz, 0 offset, 0 rejects)")
+    parser = argparse.ArgumentParser(
+        description="Strict patch validator and authoritative applicator (0 fuzz, 0 offset, 0 rejects)"
+    )
     parser.add_argument("--patch", required=True, type=Path, help="Path to patch file")
     parser.add_argument("--target-tree", type=Path, default=None, help="Path to target kernel tree")
-    parser.add_argument("--dry-run", action="store_true", default=False, help="Run patch in dry-run mode")
+    parser.add_argument(
+        "--check",
+        "--dry-run",
+        dest="check_only",
+        action="store_true",
+        default=False,
+        help="Check-only mode: validate patch application without modifying target tree",
+    )
     args = parser.parse_args(argv)
 
     if args.target_tree:
-        valid, errors = validate_exact_patch_on_tree(args.target_tree, args.patch, dry_run=args.dry_run)
+        valid, errors = validate_exact_patch_on_tree(args.target_tree, args.patch, dry_run=args.check_only)
         if not valid:
-            print("❌ Strict patch validation FAILED:")
+            mode_str = "check" if args.check_only else "application"
+            print(f"❌ Strict patch {mode_str} FAILED:")
             for err in errors:
                 print(f"  - {err}")
             return 1
-        print("✅ Strict patch validation PASSED: 0 fuzz, 0 offsets, 0 rejects, valid syntax.")
+        if args.check_only:
+            print("✅ Strict patch check PASSED: 0 fuzz, 0 offsets, 0 rejects, valid syntax (tree unmodified).")
+        else:
+            print("✅ Strict patch application SUCCEEDED: applied cleanly with 0 fuzz, 0 offsets, 0 rejects, valid syntax.")
         return 0
     else:
         # Syntax check only

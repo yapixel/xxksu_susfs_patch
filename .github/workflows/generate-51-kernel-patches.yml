@@ -105,22 +105,13 @@ jobs:
           cp -r "${{ github.workspace }}/susfs_src/kernel_patches/include/linux/susfs.h" include/linux/ || true
           cp -r "${{ github.workspace }}/susfs_src/kernel_patches/include/linux/susfs_def.h" include/linux/ || true
 
-          # 2. Apply the authoritative deinlined 51 patch
+          # 2. Authoritatively apply & verify the deinlined 51 patch (single-pass: 0 fuzz, 0 offsets, 0 rejects)
           echo "🧪 Applying authoritative 51 patch from ${{ matrix.out_dir }}/${{ matrix.out_patch }}..."
           PYTHONPATH="${{ github.workspace }}/.github/scripts" python3 -m v2.validation.exact_patch \
             --patch "${{ github.workspace }}/${{ matrix.out_dir }}/${{ matrix.out_patch }}" \
             --target-tree .
 
-          patch -p1 --fuzz=0 < "${{ github.workspace }}/${{ matrix.out_dir }}/${{ matrix.out_patch }}"
-
-          # 3. Check for any rejects and fail-closed
-          if [ -n "$(find . -name "*.rej")" ]; then
-            echo "❌ Rejects found after applying 51 patch!"
-            find . -name "*.rej"
-            exit 1
-          fi
-
-          # 4. Clean up any auxiliary artifacts
+          # Clean up any auxiliary artifacts
           find . -type f \( -name "*.orig" -o -name "*~" \) -delete
 
           # 5. Commit SuSFS integration on kernel tree
@@ -156,15 +147,12 @@ jobs:
           grep -q "kernelsu" "$DRIVER_DIR/Makefile" || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> "$DRIVER_DIR/Makefile"
           grep -q "drivers/kernelsu/Kconfig" "$DRIVER_DIR/Kconfig" || sed -i "/endmenu/i\source \"drivers/kernelsu/Kconfig\"" "$DRIVER_DIR/Kconfig"
           
-          # Apply universal 11 patch to xxKSU
+          # Apply universal 11 patch to xxKSU via exact_patch (single-pass: 0 fuzz, 0 offsets, 0 rejects)
           echo "🧪 Applying universal 11 patch to KernelSU..."
           cd KernelSU
-          patch -p1 --fuzz=0 < "${{ github.workspace }}/patches/xxksu/11_enable_susfs_for_ksu.patch"
-          if [ -n "$(find . -name "*.rej")" ]; then
-            echo "❌ Rejects found after applying 11 patch to KernelSU!"
-            find . -name "*.rej"
-            exit 1
-          fi
+          PYTHONPATH="${{ github.workspace }}/.github/scripts" python3 -m v2.validation.exact_patch \
+            --patch "${{ github.workspace }}/patches/xxksu/11_enable_susfs_for_ksu.patch" \
+            --target-tree .
           find . -type f \( -name "*.orig" -o -name "*~" \) -delete
           cd ..
 
@@ -267,14 +255,6 @@ jobs:
             --patch "${{ github.workspace }}/patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch" \
             --target-tree .
 
-          patch -p1 --fuzz=0 < "${{ github.workspace }}/patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
-
-          if [ -n "$(find . -name "*.rej")" ]; then
-            echo "❌ Rejects found after applying r38 Patch 51!"
-            find . -name "*.rej"
-            exit 1
-          fi
-
           find . -type f \( -name "*.orig" -o -name "*~" \) -delete
 
           git add -A
@@ -307,14 +287,12 @@ jobs:
           grep -q "kernelsu" "$DRIVER_DIR/Makefile" || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> "$DRIVER_DIR/Makefile"
           grep -q "drivers/kernelsu/Kconfig" "$DRIVER_DIR/Kconfig" || sed -i "/endmenu/i\source \"drivers/kernelsu/Kconfig\"" "$DRIVER_DIR/Kconfig"
 
+          # Apply universal 11 patch to xxKSU via exact_patch (single-pass: 0 fuzz, 0 offsets, 0 rejects)
           echo "🧪 Applying universal 11 patch to KernelSU..."
           cd KernelSU
-          patch -p1 --fuzz=0 < "${{ github.workspace }}/patches/xxksu/11_enable_susfs_for_ksu.patch"
-          if [ -n "$(find . -name "*.rej")" ]; then
-            echo "❌ Rejects found after applying 11 patch to KernelSU!"
-            find . -name "*.rej"
-            exit 1
-          fi
+          PYTHONPATH="${{ github.workspace }}/.github/scripts" python3 -m v2.validation.exact_patch \
+            --patch "${{ github.workspace }}/patches/xxksu/11_enable_susfs_for_ksu.patch" \
+            --target-tree .
           find . -type f \( -name "*.orig" -o -name "*~" \) -delete
           cd ..
 

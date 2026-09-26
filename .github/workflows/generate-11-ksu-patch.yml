@@ -78,13 +78,6 @@ jobs:
             --patch "${{ github.workspace }}/patches/xxksu/11_enable_susfs_for_ksu.patch" \
             --target-tree .
 
-          patch -p1 --fuzz=0 < "${{ github.workspace }}/patches/xxksu/11_enable_susfs_for_ksu.patch"
-
-          if [ -n "$(find . -name "*.rej")" ]; then
-            echo "❌ Rejects found after applying 11 patch!"
-            find . -name "*.rej"
-            exit 1
-          fi
           find . -type f \( -name "*.orig" -o -name "*~" \) -delete
 
           MOD_COUNT="$(git diff --name-only | wc -l)"
