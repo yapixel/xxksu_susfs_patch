@@ -249,17 +249,21 @@ def deinline_patch_content(content: str, target: str = "gki", date_str: str | No
             hunk_body = hunk_chunks[i+1].lstrip('\n')
 
             # In fs/proc/fd.c, wrap unused variables in proper CONFIG_KSU_SUSFS_* guards
+            # Use direct string replacement to avoid regex template unescaping of '\n'
             if file_path == 'fs/proc/fd.c':
-                hunk_body = re.sub(
-                    r'(\+\tstruct mount \*mnt = NULL;)',
-                    r'+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT\n\1\n+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT',
-                    hunk_body
-                )
-                hunk_body = re.sub(
-                    r'(\+\tint mnt_id = 0;\n\+\tunsigned long ino = 0;)',
-                    r'+#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT\n\1\n+#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT',
-                    hunk_body
-                )
+                target1 = '+\tstruct mount *mnt = NULL;'
+                repl1 = '+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT\n+\tstruct mount *mnt = NULL;\n+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT'
+                hunk_body = hunk_body.replace(target1, repl1)
+
+                target2 = '+\tint mnt_id = 0;\n+\tunsigned long ino = 0;'
+                repl2 = '+#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT\n+\tint mnt_id = 0;\n+\tunsigned long ino = 0;\n+#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT'
+                hunk_body = hunk_body.replace(target2, repl2)
+
+            # Fail closed if any hunk line contains a split/unterminated character literal
+            for line in hunk_body.splitlines():
+                if re.search(r"""(?:seq_putc|seq_pad)\s*\([^,]+,\s*'(\\[^']*)?\s*$""", line):
+                    raise ValueError(f"Corrupt character literal with unescaped newline in hunk for {file_path}: {line}")
+
 
             added_lines = [l[1:] for l in hunk_body.splitlines() if l.startswith('+') and not l.startswith('+++')]
             added_text = '\n'.join(added_lines)

@@ -273,7 +273,7 @@ def _make_clean_bundle(target_id: str = "sultan-android14-6.1", version: str = "
         "security/security.c": sec_content,
     }
     patch_paths = {
-        "gki-android16-6.12": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_gki-android16-6.12.patch",
+        "gki-android16-6.12": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
         "sultan-android14-6.1": "patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch",
     }
     patch = parse_patch((Path(__file__).resolve().parents[4] / patch_paths[target_id]).read_text())

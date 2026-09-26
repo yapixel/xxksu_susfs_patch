@@ -466,7 +466,7 @@ class UpstreamWatcher:
         patch_file = (
             "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
             if "sultan" in target_id
-            else "51_deinlined_susfs_hooks_gki-android16-6.12.patch"
+            else "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
         )
         if baseline_path.is_file():
             try:

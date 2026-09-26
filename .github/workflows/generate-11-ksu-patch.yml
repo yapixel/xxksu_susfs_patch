@@ -74,7 +74,11 @@ jobs:
           git fetch --depth=1 origin "$TARGET_COMMIT"
           git checkout FETCH_HEAD
 
-          patch -p1 < "${{ github.workspace }}/patches/xxksu/11_enable_susfs_for_ksu.patch"
+          PYTHONPATH="${{ github.workspace }}/.github/scripts" python3 -m v2.validation.exact_patch \
+            --patch "${{ github.workspace }}/patches/xxksu/11_enable_susfs_for_ksu.patch" \
+            --target-tree .
+
+          patch -p1 --fuzz=0 < "${{ github.workspace }}/patches/xxksu/11_enable_susfs_for_ksu.patch"
 
           if [ -n "$(find . -name "*.rej")" ]; then
             echo "❌ Rejects found after applying 11 patch!"

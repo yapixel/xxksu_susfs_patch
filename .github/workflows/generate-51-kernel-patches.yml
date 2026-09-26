@@ -107,7 +107,11 @@ jobs:
 
           # 2. Apply the authoritative deinlined 51 patch
           echo "🧪 Applying authoritative 51 patch from ${{ matrix.out_dir }}/${{ matrix.out_patch }}..."
-          patch -p1 < "${{ github.workspace }}/${{ matrix.out_dir }}/${{ matrix.out_patch }}"
+          PYTHONPATH="${{ github.workspace }}/.github/scripts" python3 -m v2.validation.exact_patch \
+            --patch "${{ github.workspace }}/${{ matrix.out_dir }}/${{ matrix.out_patch }}" \
+            --target-tree .
+
+          patch -p1 --fuzz=0 < "${{ github.workspace }}/${{ matrix.out_dir }}/${{ matrix.out_patch }}"
 
           # 3. Check for any rejects and fail-closed
           if [ -n "$(find . -name "*.rej")" ]; then
@@ -155,7 +159,7 @@ jobs:
           # Apply universal 11 patch to xxKSU
           echo "🧪 Applying universal 11 patch to KernelSU..."
           cd KernelSU
-          patch -p1 < "${{ github.workspace }}/patches/xxksu/11_enable_susfs_for_ksu.patch"
+          patch -p1 --fuzz=0 < "${{ github.workspace }}/patches/xxksu/11_enable_susfs_for_ksu.patch"
           if [ -n "$(find . -name "*.rej")" ]; then
             echo "❌ Rejects found after applying 11 patch to KernelSU!"
             find . -name "*.rej"
@@ -259,7 +263,11 @@ jobs:
           cp -r "${{ github.workspace }}/susfs_src/kernel_patches/include/linux/susfs_def.h" include/linux/ || true
 
           echo "🧪 Applying r38 compatibility Patch 51 from patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch..."
-          patch -p1 < "${{ github.workspace }}/patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
+          PYTHONPATH="${{ github.workspace }}/.github/scripts" python3 -m v2.validation.exact_patch \
+            --patch "${{ github.workspace }}/patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch" \
+            --target-tree .
+
+          patch -p1 --fuzz=0 < "${{ github.workspace }}/patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
 
           if [ -n "$(find . -name "*.rej")" ]; then
             echo "❌ Rejects found after applying r38 Patch 51!"
@@ -271,7 +279,7 @@ jobs:
 
           git add -A
           git commit --no-gpg-sign -m "SUSFS de-inlined hooks for android16-6.12-2025-09_r38" || true
-          echo "✅ r38 Compatibility Patch 51 applied cleanly with 0 rejects!"
+          echo "✅ r38 Compatibility Patch 51 applied cleanly with 0 rejects, 0 fuzz, and 0 offsets!"
 
       - name: Validate xxKSU + SuSFS Integration on r38 Kernel Tree
         run: |
@@ -301,7 +309,7 @@ jobs:
 
           echo "🧪 Applying universal 11 patch to KernelSU..."
           cd KernelSU
-          patch -p1 < "${{ github.workspace }}/patches/xxksu/11_enable_susfs_for_ksu.patch"
+          patch -p1 --fuzz=0 < "${{ github.workspace }}/patches/xxksu/11_enable_susfs_for_ksu.patch"
           if [ -n "$(find . -name "*.rej")" ]; then
             echo "❌ Rejects found after applying 11 patch to KernelSU!"
             find . -name "*.rej"

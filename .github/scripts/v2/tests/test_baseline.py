@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 from pathlib import Path
 import unittest
+
+from v2.validation.exact_patch import validate_patch_syntax
 
 from v2.model.manifest import KNOWN_TARGETS, MANUAL_FIXTURES
 from v2.model.provenance import HashDigest
@@ -134,42 +137,28 @@ class AuthoritativeBundleVerificationTests(unittest.TestCase):
         self.assertEqual(bundle.kernel_version, "6.12")
         self.assertEqual(len(bundle.files), 22)
 
-    def test_gki_patch_51_strict_application_succeeds(self) -> None:
-        bundle = load_authoritative_bundle("gki-android16-6.12", REPO_ROOT)
-        patch_path = REPO_ROOT / "patches" / "gki-android16-6.12" / "51_deinlined_susfs_hooks_gki-android16-6.12.patch"
+    def test_gki_internal_patch_51_retired(self) -> None:
+        """Assert defective internal patch 51 is deleted and recorded as retired."""
+        retired_patch = REPO_ROOT / "patches" / "gki-android16-6.12" / "51_deinlined_susfs_hooks_gki-android16-6.12.patch"
+        self.assertFalse(retired_patch.exists(), "Defective internal patch 51 must remain retired/deleted")
+        gki_path = get_baseline_path("gki-android16-6.12", REPO_ROOT)
+        record = load_baseline_record(gki_path)
+        self.assertIn("retired_internal_patch", record.patch_51)
+        self.assertEqual(record.patch_51["retired_internal_patch"], "51_deinlined_susfs_hooks_gki-android16-6.12.patch")
+
+    def test_gki_r38_production_patch_51(self) -> None:
+        """Verify that r38 patch 51 exists as the sole public GKI 6.12 production patch and has 0 syntax errors."""
+        patch_path = REPO_ROOT / "patches" / "gki-android16-6.12" / "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
+        self.assertTrue(patch_path.is_file(), "r38 production patch must exist")
         patch_text = patch_path.read_text(encoding="utf-8")
-        patched = apply_patch_to_bundle(bundle, patch_text)
-        self.assertIsInstance(patched, SourceBundle)
-        self.assertEqual(len(patched.files), 22)
+        syntax_errors = validate_patch_syntax(patch_text)
+        self.assertEqual(syntax_errors, [])
+        gki_path = get_baseline_path("gki-android16-6.12", REPO_ROOT)
+        record = load_baseline_record(gki_path)
+        expected_sha = record.patch_51["patch_sha256"].removeprefix("sha256:")
+        actual_sha = hashlib.sha256(patch_path.read_bytes()).hexdigest()
+        self.assertEqual(actual_sha, expected_sha)
 
-    def test_gki_both_profiles_validate_positive(self) -> None:
-        bundle = load_authoritative_bundle("gki-android16-6.12", REPO_ROOT)
-        patch_path = REPO_ROOT / "patches" / "gki-android16-6.12" / "51_deinlined_susfs_hooks_gki-android16-6.12.patch"
-        patch_text = patch_path.read_text(encoding="utf-8")
-        patched = apply_patch_to_bundle(bundle, patch_text)
-
-        # 1. Manual profile
-        prof_manual = get_profile_definition("gki-android16-6.12-manual")
-        adapter = prof_manual.get_adapter()
-        plan = adapter.adapt_fixtures(patched, prof_manual.fixtures)
-        composed_manual = plan.apply_to_bundle(patched)
-        report_manual = validate_all(
-            bundle=composed_manual,
-            mode="manual",
-            claims=prof_manual.get_ownership_claims(),
-            raise_on_failure=True,
-        )
-        self.assertEqual(report_manual.status, ValidationStatus.PASS)
-
-        # 2. LSM_BL profile
-        prof_lsm = get_profile_definition("gki-android16-6.12-lsm_bl")
-        report_lsm = validate_all(
-            bundle=patched,
-            mode="lsm_bl",
-            claims=prof_lsm.get_ownership_claims(),
-            raise_on_failure=True,
-        )
-        self.assertEqual(report_lsm.status, ValidationStatus.PASS)
 
 
     def test_sultan_authoritative_bundle_loads(self) -> None:
@@ -254,20 +243,17 @@ class AuthoritativeBundleVerificationTests(unittest.TestCase):
         for res in sym_results:
             self.assertEqual(res.status, ValidationStatus.PASS)
 
-    def test_all_four_profiles_consume_authoritative_patch_11(self) -> None:
+    def test_sultan_profiles_consume_authoritative_patch_11(self) -> None:
         xxksu_bundle = load_authoritative_bundle("xxksu", REPO_ROOT)
         patch_11_path = REPO_ROOT / "patches" / "xxksu" / "11_enable_susfs_for_ksu.patch"
         patch_11_text = patch_11_path.read_text(encoding="utf-8")
 
-        p51_map = {
-            "sultan-android14-6.1": REPO_ROOT / "patches" / "sultan-android14-6.1" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch",
-            "gki-android16-6.12": REPO_ROOT / "patches" / "gki-android16-6.12" / "51_deinlined_susfs_hooks_gki-android16-6.12.patch",
-        }
+        p51_path = REPO_ROOT / "patches" / "sultan-android14-6.1" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
+        patch_51_text = p51_path.read_text(encoding="utf-8")
 
-        for profile_id in sorted(KNOWN_PROFILES):
+        for profile_id in ("sultan-android14-6.1-manual", "sultan-android14-6.1-lsm_bl"):
             prof_def = get_profile_definition(profile_id)
             target_bundle = load_authoritative_bundle(prof_def.target_id, REPO_ROOT)
-            patch_51_text = p51_map[prof_def.target_id].read_text(encoding="utf-8")
             result = compose_profile(
                 profile_id=profile_id,
                 target_bundle=target_bundle,

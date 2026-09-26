@@ -26,10 +26,12 @@ This lineage represents the authoritative, reproducible production baseline for 
 - **Files:** 22 retained files (20 kernel source + 2 SuSFS source)
 - **Identity:** `sha256:c021e411441ea098ff38092705e67a78c54c4908117620aa331d35a2436a20f9`
 
-### Deinlined Target Patch 51
-- **File:** `patches/gki-android16-6.12/51_deinlined_susfs_hooks_gki-android16-6.12.patch`
-- **SHA-256:** `sha256:85df06eb9774db0296b341cc7ca15f49e1ae69d7406021191d7184dd3685dbb6`
-- **Strict Patch Application:** `PASS` (zero rejects, exact preimages, zero fuzz)
+### Production Patch 51 (r38) & Retired Internal Lineage
+- **Production Patch:** `patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch`
+- **SHA-256:** `sha256:74bb2685f2b97caf032e638f10a0bd69fef74143a671d7c975c641a75211ec8c`
+- **Target Kernel Apply Target:** `android16-6.12-2025-09_r38`
+- **Strict Patch Application:** `PASS` (zero rejects, exact preimages, zero fuzz, offset 0)
+- **Retired Internal Patch:** `patches/gki-android16-6.12/51_deinlined_susfs_hooks_gki-android16-6.12.patch` (retired due to regex newline unescape defect in `task_mmu.c` and downstream tree offsets/fuzz; historical `c8909f7` provenance record preserved above).
 
 ### Fixture Bindings
 - `manual-security-hooks-v2.0.patch`: `sha256:183f5bc323ad9e8b4b3dc874b7b52761c94187656a51d3d7cb5832d908370934`

@@ -138,7 +138,7 @@ def compose_profile(
         validate_symbols(patch=patch_11, raise_on_failure=True)
 
     p51_paths = {
-        "gki_android16_6_12_51": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_gki-android16-6.12.patch",
+        "gki_android16_6_12_51": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
         "sultan_android14_6_1_51": "patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch",
     }
     if not patch_51:
