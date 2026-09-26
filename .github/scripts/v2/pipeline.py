@@ -436,7 +436,7 @@ def deliver_promotion(
         subprocess.run(["git", "config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"], cwd=repo_root, check=True)
 
     commit_msg = (
-        f"auto(pipeline): deliver verified {patch_id} production patch\n\n"
+        f"auto(pipeline): deliver verified {patch_id} production patch [skip ci]\n\n"
         f"Candidate SHA-256: {candidate_sha}\n"
         f"Target relative path: {TARGET_REL_PATHS[patch_id]}\n"
     )
@@ -491,20 +491,16 @@ def deliver_promotion(
             raise DeliveryError(f"git push failed:\n{push_proc.stderr}\n{push_proc.stdout}")
         pushed = True
 
+        # Ensure local remote tracking ref is up to date with remote
+        subprocess.run(["git", "fetch", git_remote, git_branch], cwd=repo_root, capture_output=True)
+
         # Verify origin/main contains exact validated candidate bytes
         show_proc = subprocess.run(
             ["git", "show", f"{git_remote}/{git_branch}:{TARGET_REL_PATHS[patch_id]}"],
             cwd=repo_root,
             capture_output=True,
+            check=True,
         )
-        if show_proc.returncode != 0:
-            subprocess.run(["git", "fetch", git_remote, git_branch], cwd=repo_root, capture_output=True)
-            show_proc = subprocess.run(
-                ["git", "show", f"{git_remote}/{git_branch}:{TARGET_REL_PATHS[patch_id]}"],
-                cwd=repo_root,
-                capture_output=True,
-                check=True,
-            )
         if show_proc.stdout != candidate_bytes:
             raise DeliveryVerificationError(
                 f"Byte mismatch on {git_remote}/{git_branch}:{TARGET_REL_PATHS[patch_id]} "

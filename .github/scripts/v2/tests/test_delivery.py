@@ -55,6 +55,7 @@ class TestPipelineDelivery(unittest.TestCase):
 
         # Copy baseline fixtures, manifest, and upstream state
         real_root = Path(__file__).resolve().parents[4]
+        shutil.copytree(real_root / ".github" / "fixtures", self.repo_root / ".github" / "fixtures")
         shutil.copy(real_root / "patches" / "xxksu" / "BASELINE.json", self.repo_root / "patches" / "xxksu" / "BASELINE.json")
         shutil.copy(real_root / "patches" / "sultan-android14-6.1" / "BASELINE.json", self.repo_root / "patches" / "sultan-android14-6.1" / "BASELINE.json")
         shutil.copy(real_root / "patches" / "gki-android16-6.12" / "BASELINE.json", self.repo_root / "patches" / "gki-android16-6.12" / "BASELINE.json")
@@ -335,6 +336,112 @@ class TestPipelineDelivery(unittest.TestCase):
                 f.startswith("patches/") or f == ".github/upstream-state.json",
                 f"Unexpected file committed: {f}",
             )
+
+    def test_9_sultan_patch51_verified_write_back(self):
+        """Invariant: Sultan Patch 51 candidate change results in verified delivery write-back."""
+        real_root = Path(__file__).resolve().parents[4]
+        public_patch = self.repo_root / "patches" / "sultan-android14-6.1" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
+        public_patch.write_text("old sultan patch placeholder\n", encoding="utf-8")
+        subprocess.run(["git", "add", str(public_patch)], cwd=self.repo_root, check=True)
+        subprocess.run(["git", "commit", "-m", "mock: simulate older sultan patch"], cwd=self.repo_root, check=True)
+        subprocess.run(["git", "push", "origin", "main"], cwd=self.repo_root, check=True)
+
+        res = run_pipeline(
+            "sultan-android14-6.1-patch51",
+            real_root / ".github" / "fixtures" / "sultan" / "50_add_susfs_in_gki-android14-6.1.patch",
+            target_tree=None,
+            repo_root=self.repo_root,
+            promote=True,
+            check_only=True,
+            write_back=True,
+            verify_raw_url=False,
+        )
+
+        self.assertTrue(res.promoted, "Sultan candidate must be promoted")
+        self.assertTrue(res.committed, "Sultan change must be committed")
+        self.assertTrue(res.pushed, "Sultan change must be pushed")
+
+        # Byte equality on origin/main
+        candidate_bytes = res.candidate_path.read_bytes()
+        self.assertEqual(public_patch.read_bytes(), candidate_bytes)
+        show_bytes = subprocess.run(
+            ["git", "show", "origin/main:patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch"],
+            cwd=self.repo_root,
+            capture_output=True,
+            check=True,
+        ).stdout
+        self.assertEqual(show_bytes, candidate_bytes)
+
+        # Manifest consistency
+        valid, errors = verify_patch_manifest(self.repo_root)
+        self.assertTrue(valid, f"Manifest invalid after Sultan promotion: {errors}")
+
+        # Re-run is clean no-op
+        rerun = run_pipeline(
+            "sultan-android14-6.1-patch51",
+            real_root / ".github" / "fixtures" / "sultan" / "50_add_susfs_in_gki-android14-6.1.patch",
+            target_tree=None,
+            repo_root=self.repo_root,
+            promote=True,
+            check_only=True,
+            write_back=True,
+            verify_raw_url=False,
+        )
+        self.assertTrue(rerun.is_noop)
+        self.assertFalse(rerun.committed)
+
+    def test_10_gki_r38_patch51_verified_write_back(self):
+        """Invariant: GKI r38 Patch 51 candidate change results in verified delivery write-back."""
+        real_root = Path(__file__).resolve().parents[4]
+        public_patch = self.repo_root / "patches" / "gki-android16-6.12" / "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
+        public_patch.write_text("old gki patch placeholder\n", encoding="utf-8")
+        subprocess.run(["git", "add", str(public_patch)], cwd=self.repo_root, check=True)
+        subprocess.run(["git", "commit", "-m", "mock: simulate older gki patch"], cwd=self.repo_root, check=True)
+        subprocess.run(["git", "push", "origin", "main"], cwd=self.repo_root, check=True)
+
+        res = run_pipeline(
+            "gki-android16-6.12-r38-patch51",
+            real_root / ".github" / "fixtures" / "r38" / "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
+            target_tree=None,
+            repo_root=self.repo_root,
+            promote=True,
+            check_only=True,
+            write_back=True,
+            verify_raw_url=False,
+        )
+
+        self.assertTrue(res.promoted, "GKI candidate must be promoted")
+        self.assertTrue(res.committed, "GKI change must be committed")
+        self.assertTrue(res.pushed, "GKI change must be pushed")
+
+        # Byte equality on origin/main
+        candidate_bytes = res.candidate_path.read_bytes()
+        self.assertEqual(public_patch.read_bytes(), candidate_bytes)
+        show_bytes = subprocess.run(
+            ["git", "show", "origin/main:patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"],
+            cwd=self.repo_root,
+            capture_output=True,
+            check=True,
+        ).stdout
+        self.assertEqual(show_bytes, candidate_bytes)
+
+        # Manifest consistency
+        valid, errors = verify_patch_manifest(self.repo_root)
+        self.assertTrue(valid, f"Manifest invalid after GKI promotion: {errors}")
+
+        # Re-run is clean no-op
+        rerun = run_pipeline(
+            "gki-android16-6.12-r38-patch51",
+            real_root / ".github" / "fixtures" / "r38" / "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
+            target_tree=None,
+            repo_root=self.repo_root,
+            promote=True,
+            check_only=True,
+            write_back=True,
+            verify_raw_url=False,
+        )
+        self.assertTrue(rerun.is_noop)
+        self.assertFalse(rerun.committed)
 
 
 if __name__ == "__main__":
