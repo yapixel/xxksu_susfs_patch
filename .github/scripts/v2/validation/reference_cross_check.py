@@ -915,12 +915,13 @@ def get_reference_parity_summary(repo_root: Optional[Path] = None) -> list[dict[
     p11_path = root / "patches" / "xxksu" / "11_enable_susfs_for_ksu.patch"
     if p11_path.is_file():
         rep_file = root / "candidate_patches" / "xxksu-patch11" / "reference_cross_check.json"
-        status_val = ReferenceComparisonClassification.OUR_EXTRA.value
-        details_val = "Extra: try_umount, ksu_mark_get (authoritative Simonpunk parity; setuid/zygote matched)"
+        status_val = ReferenceComparisonClassification.IMPLEMENTATION_DIFFERENCE.value
+        details_val = "Candidate and reference share equivalent semantics with implementation differences in selinux and setuid batching."
         if rep_file.is_file():
             try:
                 rep = json.loads(rep_file.read_text(encoding="utf-8"))
                 status_val = rep.get("classification", status_val)
+                details_val = rep.get("details", details_val)
             except Exception:
                 pass
         items.append({

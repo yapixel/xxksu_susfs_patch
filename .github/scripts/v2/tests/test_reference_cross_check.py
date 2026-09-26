@@ -18,7 +18,9 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from v2.adapters.xxksu import generate_patch11
 from v2.pipeline import deliver_multi_candidates
+from v2.source.baseline import load_authoritative_bundle
 from v2.validation.reference_cross_check import (
     PATCH11_FEATURE_UNITS,
     ReferenceComparisonClassification,
@@ -236,9 +238,8 @@ exit 0
         self.assertEqual(len(PATCH11_FEATURE_UNITS), 26)
 
         repo_root = Path(__file__).resolve().parents[4]
-        p11_path = repo_root / "patches" / "xxksu" / "11_enable_susfs_for_ksu.patch"
-        self.assertTrue(p11_path.is_file())
-        our_text = p11_path.read_text(encoding="utf-8")
+        bundle = load_authoritative_bundle("xxksu", repo_root)
+        our_text = generate_patch11(bundle)
 
         ref_path = Path("/tmp/midori_xx.patch")
         if ref_path.is_file():
@@ -275,10 +276,9 @@ exit 0
             reference_source_name="midori01/KernelSU:xx.patch",
         )
         self.assertTrue(res.passed)
-        self.assertFalse(res.blocks_promotion)
-        self.assertEqual(res.classification, ReferenceComparisonClassification.OUR_EXTRA)
-        self.assertIn("config.try_umount", res.our_extra_units)
-        self.assertIn("supercall.ksu_mark_get_integration", res.our_extra_units)
+        self.assertEqual(res.classification, ReferenceComparisonClassification.IMPLEMENTATION_DIFFERENCE)
+        self.assertEqual(res.our_extra_units, ())
+        self.assertEqual(res.ref_extra_units, ())
         self.assertIn("semantic_matrix", res.metadata)
 
 

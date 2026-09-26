@@ -600,8 +600,8 @@ def render_dashboard_body(
             {
                 "target": "xxksu-patch11",
                 "reference": "midori01/KernelSU:xx.patch",
-                "status": "OUR_EXTRA",
-                "details": "Extra: try_umount, ksu_mark_get (authoritative Simonpunk parity; setuid/zygote matched)",
+                "status": "IMPLEMENTATION_DIFFERENCE",
+                "details": "Candidate and reference share equivalent semantics with implementation differences in selinux and setuid batching.",
             },
             {
                 "target": "gki-android16-6.12-r38-patch51",

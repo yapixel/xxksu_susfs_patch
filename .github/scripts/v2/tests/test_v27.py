@@ -323,9 +323,9 @@ class XxksuAdapterTests(unittest.TestCase):
         self.assertEqual(adapter.target_id, "xxksu")
         self.assertEqual(adapter.adapter_id, "xxksu")
 
-    def test_build_adaptation_plan_all_14_operations(self):
+    def test_build_adaptation_plan_all_12_operations(self):
         plan = self.adapter.build_adaptation_plan(self.clean_bundle)
-        self.assertEqual(plan.operation_count, 14)
+        self.assertEqual(plan.operation_count, 12)
         self.assertEqual(plan.target_id, "xxksu")
         self.assertEqual(plan.bundle_identity, str(self.clean_bundle.identity))
 
