@@ -26,6 +26,7 @@ from ..policy.model import PolicyIncomplete
 from ..policy.patch11 import classify_patch11
 from ..policy.patch51 import classify_patch51
 from ..semantic import SemanticInventory, SemanticKind, inventory_patch
+from ..semantic.gate import evaluate_semantic_gate
 from ..source.baseline import load_authoritative_bundle
 from ..source.bundle import SourceBundle, create_source_bundle
 from ..source.patch_apply import SourceBundlePatchError, apply_patch_to_bundle
@@ -269,29 +270,26 @@ class UpstreamWatcher:
                 reproduction_command=repro_cmd,
             )
 
-        # Relevant files changed! Evaluate anchors and semantics.
-        adapter = XxksuAdapter()
-        drifted_anchors: list[str] = []
-        for op in get_patch11_operation_specs():
-            if op.file_path in fetched_contents:
-                src = fetched_contents[op.file_path]
-                try:
-                    adapter.locate_anchor(src, op.spec, file_path=op.file_path, function=op.function)
-                except (MissingSemanticAnchor, MultipleSemanticAnchors, AnchorConflict) as exc:
-                    drifted_anchors.append(f"{op.operation_id} ({op.file_path}): {exc}")
-
-        if drifted_anchors:
+        # Relevant files changed! Evaluate anchors and semantics via authoritative shared gate.
+        gate_res = evaluate_semantic_gate(
+            "xxksu",
+            upstream_contents=fetched_contents,
+            repo_root=self.repo_root,
+            source_identity=new_commit,
+            baseline_identity=old_commit,
+        )
+        if not gate_res.passed:
             return SourceResult(
                 source_id=source_id,
                 source_type="authoritative",
-                classification=WatchClassification.ANCHOR_DRIFT,
+                classification=gate_res.classification,
                 old_identity=old_commit,
                 new_identity=new_commit,
                 old_content_hash=old_hash,
                 new_content_hash=new_hash,
                 affected_files=tuple(affected_files),
-                affected_semantics=tuple(drifted_anchors),
-                details=f"Semantic anchor drift in {len(drifted_anchors)} operations:\n" + "\n".join(drifted_anchors),
+                affected_semantics=gate_res.affected_semantics,
+                details=gate_res.details,
                 reproduction_command=repro_cmd,
             )
 
@@ -429,39 +427,6 @@ class UpstreamWatcher:
                 reproduction_command=repro_cmd,
             )
 
-        # Authoritative SuSFS files changed! Verify against target adapter anchors
-        adapter = get_adapter(target_id)
-        bundle = load_authoritative_bundle(target_id, self.repo_root)
-
-        drifted_anchors: list[str] = []
-        if bundle is not None:
-            for entry in bundle.files:
-                if entry.content is None:
-                    continue
-                # Verify standard anchors
-                for anchor_key in ("exec_hook", "access_hook", "stat_hook", "reboot_hook"):
-                    try:
-                        spec = adapter.get_anchor_spec(anchor_key)
-                        if spec.file_path == entry.path:
-                            adapter.locate_anchor(entry.content, spec, file_path=entry.path, function=spec.function)
-                    except (MissingSemanticAnchor, MultipleSemanticAnchors, AnchorConflict) as exc:
-                        drifted_anchors.append(f"{anchor_key} ({entry.path}): {exc}")
-
-        if drifted_anchors:
-            return SourceResult(
-                source_id=source_id,
-                source_type="authoritative",
-                classification=WatchClassification.ANCHOR_DRIFT,
-                old_identity=old_commit,
-                new_identity=new_commit,
-                old_content_hash=old_hash,
-                new_content_hash=new_hash,
-                affected_files=tuple(affected_files),
-                affected_semantics=tuple(drifted_anchors),
-                details=f"Anchor drift on {target_id}:\n" + "\n".join(drifted_anchors),
-                reproduction_command=repro_cmd,
-            )
-
         # Locate candidate Patch 51 filename from target baseline
         baseline_path = self.repo_root / "patches" / target_id / "BASELINE.json"
         patch_file = (
@@ -499,6 +464,39 @@ class UpstreamWatcher:
                 reproduction_command=repro_cmd,
             )
 
+        # Fetch baseline files from old commit if available
+        old_contents: dict[str, str] = {}
+        patch10_file = "kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+        fetch_keys = [k for k in (patch50_file, patch10_file) if k]
+        try:
+            old_contents = fetch_git_files(repo_url, old_commit, fetch_keys)
+        except Exception as exc:
+            logger.warning("Failed to fetch baseline files for semantic comparison: %s", exc)
+
+        # Authoritative shared semantic gate: evaluate anchors, Patch 50, and Patch 10
+        gate_res = evaluate_semantic_gate(
+            target_id,
+            upstream_contents=fetched_contents,
+            baseline_contents=old_contents,
+            repo_root=self.repo_root,
+            source_identity=new_commit,
+            baseline_identity=old_commit,
+        )
+        if not gate_res.passed:
+            return SourceResult(
+                source_id=source_id,
+                source_type="authoritative",
+                classification=gate_res.classification,
+                old_identity=old_commit,
+                new_identity=new_commit,
+                old_content_hash=old_hash,
+                new_content_hash=new_hash,
+                affected_files=tuple(affected_files),
+                affected_semantics=gate_res.affected_semantics,
+                details=gate_res.details,
+                reproduction_command=repro_cmd,
+            )
+
         # 1. Regenerate candidate Patch 51 from the NEW immutable upstream input
         try:
             candidate_patch_text = deinline_patch_content(fetched_contents[patch50_file], target=target_id)
@@ -521,6 +519,7 @@ class UpstreamWatcher:
             )
 
         # 2. Check for missing newly-required source files in authoritative bundle (e.g. Sultan fs/super.c)
+        bundle = load_authoritative_bundle(target_id, self.repo_root)
         if bundle is not None:
             bundle_files = {entry.path for entry in bundle.files}
             candidate_files = {
@@ -564,102 +563,6 @@ class UpstreamWatcher:
                     details=f"Candidate Patch 51 failed strict application on {target_id}: {exc}",
                     reproduction_command=repro_cmd,
                 )
-
-        # 4. Semantic inventory verification: SAFE_REGEN_CANDIDATE requires zero UNKNOWN semantic changes
-        new_unknowns: list[Any] = []
-        try:
-            old_contents = fetch_git_files(repo_url, old_commit, [patch50_file])
-            if patch50_file in old_contents:
-                inv_old = inventory_patch(
-                    parse_patch(old_contents[patch50_file]),
-                    source_identity=old_commit,
-                    source_type="official_50",
-                )
-                inv_new = inventory_patch(
-                    parse_patch(fetched_contents[patch50_file]),
-                    source_identity=new_commit,
-                    source_type="official_50",
-                )
-                old_digests = {u.evidence[0].fingerprint.digest.value for u in inv_old.units}
-                new_unknowns = [
-                    u for u in inv_new.units
-                    if u.kind == SemanticKind.UNKNOWN and u.evidence[0].fingerprint.digest.value not in old_digests
-                ]
-        except Exception as exc:
-            logger.warning("Failed semantic inventory comparison for %s: %s", source_id, exc)
-            return SourceResult(
-                source_id=source_id,
-                source_type="authoritative",
-                classification=WatchClassification.SEMANTIC_DRIFT,
-                old_identity=old_commit,
-                new_identity=new_commit,
-                old_content_hash=old_hash,
-                new_content_hash=new_hash,
-                affected_files=tuple(affected_files),
-                details=f"Semantic inventory verification failed for {source_id}: {exc}",
-                reproduction_command=repro_cmd,
-            )
-
-        if new_unknowns:
-            affected_paths = sorted(set(u.location.path for u in new_unknowns))
-            return SourceResult(
-                source_id=source_id,
-                source_type="authoritative",
-                classification=WatchClassification.SEMANTIC_DRIFT,
-                old_identity=old_commit,
-                new_identity=new_commit,
-                old_content_hash=old_hash,
-                new_content_hash=new_hash,
-                affected_files=tuple(affected_files),
-                affected_semantics=tuple(f"unknown:{u.location.path}:{u.location.start_line}" for u in new_unknowns[:20]),
-                details=(
-                    f"Upstream SuSFS update introduces {len(new_unknowns)} new UNKNOWN semantic units across "
-                    f"{len(affected_paths)} files ({', '.join(affected_paths[:5])}). Semantic reconciliation required."
-                ),
-                reproduction_command=repro_cmd,
-            )
-
-        # 5. Check Patch 10 if tracked and changed
-        patch10_file = "kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-        if patch10_file in affected_files and patch10_file in fetched_contents:
-            try:
-                old_10 = fetch_git_files(repo_url, old_commit, [patch10_file])
-                if patch10_file in old_10:
-                    inv_10_old = inventory_patch(
-                        parse_patch(old_10[patch10_file]),
-                        source_identity=old_commit,
-                        source_type="official_10",
-                    )
-                    inv_10_new = inventory_patch(
-                        parse_patch(fetched_contents[patch10_file]),
-                        source_identity=new_commit,
-                        source_type="official_10",
-                    )
-                    old_10_digests = {u.evidence[0].fingerprint.digest.value for u in inv_10_old.units}
-                    new_unknowns_10 = [
-                        u for u in inv_10_new.units
-                        if u.kind == SemanticKind.UNKNOWN and u.evidence[0].fingerprint.digest.value not in old_10_digests
-                    ]
-                    if new_unknowns_10:
-                        affected_paths = sorted(set(u.location.path for u in new_unknowns_10))
-                        return SourceResult(
-                            source_id=source_id,
-                            source_type="authoritative",
-                            classification=WatchClassification.SEMANTIC_DRIFT,
-                            old_identity=old_commit,
-                            new_identity=new_commit,
-                            old_content_hash=old_hash,
-                            new_content_hash=new_hash,
-                            affected_files=tuple(affected_files),
-                            affected_semantics=tuple(f"unknown:{u.location.path}:{u.location.start_line}" for u in new_unknowns_10[:20]),
-                            details=(
-                                f"Upstream SuSFS Patch 10 update introduces {len(new_unknowns_10)} new UNKNOWN semantic units across "
-                                f"{len(affected_paths)} files ({', '.join(affected_paths[:5])}). Semantic reconciliation required."
-                            ),
-                            reproduction_command=repro_cmd,
-                        )
-            except Exception as exc:
-                logger.warning("Failed Patch 10 semantic inventory comparison for %s: %s", source_id, exc)
 
         return SourceResult(
             source_id=source_id,

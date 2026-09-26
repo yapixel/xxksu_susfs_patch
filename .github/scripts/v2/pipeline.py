@@ -33,6 +33,8 @@ from typing import Mapping, Optional, Sequence, Tuple
 from .adapters.xxksu import PATCH11_CANONICAL_FILES, generate_patch11
 from .engine.diff_parser import parse_patch
 from .manifests.patch_manifest import verify_patch_manifest, write_patch_manifest
+from .semantic.gate import verify_semantic_gate_for_pipeline
+from .semantic.registry import SemanticRegistry
 from .source.bundle import SourceBundle, create_source_bundle
 from .validation.exact_patch import (
     validate_exact_patch_on_tree,
@@ -56,6 +58,11 @@ TARGET_PATCH_NAMES = {
 
 class PipelineError(Exception):
     """Base class for pipeline failures."""
+    pass
+
+
+class SemanticApprovalError(PipelineError):
+    """Raised when upstream candidate fails semantic inventory or policy approval."""
     pass
 
 
@@ -222,6 +229,7 @@ def run_pipeline(
     repo_root: Optional[Path] = None,
     promote: bool = False,
     check_only: bool = False,
+    registry: Optional[SemanticRegistry] = None,
 ) -> PipelineResult:
     """Execute the full generation -> candidate -> validation -> promotion pipeline."""
     if repo_root is None:
@@ -246,6 +254,23 @@ def run_pipeline(
 
     # Record public path content before running to guarantee fail-closed invariance
     public_bytes_before = public_path.read_bytes() if public_path.is_file() else None
+
+    # Step 0: Shared semantic inventory and policy validation gate
+    # Any unapproved semantic drift or anchor drift immediately fails closed
+    gate_result = verify_semantic_gate_for_pipeline(
+        patch_id,
+        upstream_input,
+        repo_root=repo_root,
+        registry=registry,
+    )
+    if not gate_result.passed:
+        # Crucial fail-closed invariance: verify public patch was not modified
+        if public_bytes_before is not None:
+            assert public_path.read_bytes() == public_bytes_before, "INVARIANT VIOLATION: public patch was modified on blocked semantic gate"
+        raise SemanticApprovalError(
+            f"Semantic gate evaluation failed for {patch_id} ({gate_result.classification.value}):\n"
+            f"{gate_result.details}"
+        )
 
     # Step 1: Deterministic candidate generation (writes ONLY to candidate path)
     candidate_text_1 = generate_candidate_patch(patch_id, upstream_input, repo_root)

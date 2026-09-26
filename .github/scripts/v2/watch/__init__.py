@@ -1,5 +1,6 @@
 """Phase 1 Upstream Auto-Maintenance and Watch subsystem."""
 
+from .model import SourceResult, WatchClassification, WatchReport
 from .checker import UpstreamWatcher, compute_composite_hash, fetch_remote_commit
 from .dashboard import (
     DASHBOARD_LABEL,
@@ -10,7 +11,6 @@ from .dashboard import (
     sync_dashboard_issue,
 )
 from .escalation import escalate_issue, format_issue_body, format_issue_title
-from .model import SourceResult, WatchClassification, WatchReport
 
 __all__ = [
     "WatchClassification",
