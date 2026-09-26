@@ -43,8 +43,10 @@ Final Delivery / Write-Back (`origin/main`)
 
 ## 12 Hard Repository Invariants
 
-1. **`patches/` is FINAL VERIFIED OUTPUT only:**
-   - Published, immutable production artifacts for downstream consumers (e.g. via direct `curl`).
+1. **`patches/` is FINAL VERIFIED OUTPUT and Sole Distribution Channel:**
+   - The sole distribution channel for downstream consumers is the tracked `patches/` directory on `origin/main`, consumed via direct `curl` from stable `raw.githubusercontent.com` URLs.
+   - GitHub Actions workflow artifacts are strictly diagnostic/ephemeral and do NOT constitute publication. Downstream users do not download Actions artifacts.
+   - An update is NOT complete until the validated generated patch is committed/pushed to `origin/main` and the public raw URL serves the exact same SHA-256 as the validated candidate and manifest.
    - `patches/` must **NEVER** be read as the source input to generate or validate a candidate production patch.
 
 2. **Universal Shared Semantic Gate:**
