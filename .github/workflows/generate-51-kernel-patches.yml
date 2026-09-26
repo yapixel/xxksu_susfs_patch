@@ -17,8 +17,12 @@ on:
       - "patches/**/51_*.patch"
       - "patches/manifest.json"
 
+concurrency:
+  group: "production-promotion"
+  cancel-in-progress: false
+
 permissions:
-  contents: write
+  contents: read
 
 env:
   SUSFS_REPO_URL: "https://gitlab.com/simonpunk/susfs4ksu.git"
@@ -29,6 +33,8 @@ jobs:
   matrix_51_patch:
     name: "${{ matrix.name }}"
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -174,22 +180,12 @@ jobs:
           git apply --stat "${{ matrix.out_dir }}/${{ matrix.out_patch }}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
-      - name: Upload Candidate 51 Patch Artifact (${{ matrix.name }})
-        uses: actions/upload-artifact@v4
-        with:
-          name: 51_patch_${{ matrix.target }}_candidate
-          path: candidate_patches/${{ matrix.target }}-patch51/${{ matrix.out_patch }}
-
-      - name: Upload Public 51 Patch Artifact (${{ matrix.name }})
-        uses: actions/upload-artifact@v4
-        with:
-          name: 51_patch_${{ matrix.target }}
-          path: ${{ matrix.out_dir }}/${{ matrix.out_patch }}
-
   validate_gki_r38_compat:
     name: "GKI 6.12 (Android 16 r38 Compatibility)"
     needs: [matrix_51_patch]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -302,15 +298,3 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
           git apply --stat "${{ github.workspace }}/patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-
-      - name: Upload Candidate 51 Patch Artifact (r38 Compatibility)
-        uses: actions/upload-artifact@v4
-        with:
-          name: 51_patch_gki-android16-6.12-r38_candidate
-          path: candidate_patches/gki-android16-6.12-r38-patch51/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch
-
-      - name: Upload Public 51 Patch Artifact (r38 Compatibility)
-        uses: actions/upload-artifact@v4
-        with:
-          name: 51_patch_gki-android16-6.12-r38
-          path: patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch

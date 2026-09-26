@@ -16,8 +16,12 @@ on:
       - "patches/xxksu/11_enable_susfs_for_ksu.patch"
       - "patches/manifest.json"
 
+concurrency:
+  group: "production-promotion"
+  cancel-in-progress: false
+
 permissions:
-  contents: write
+  contents: read
 
 env:
   KSU_REPO: "backslashxx/KernelSU"
@@ -27,6 +31,8 @@ jobs:
   pipeline_11_patch:
     name: "Pipeline 11 Patch (Generate -> Validate -> Promote -> Deliver)"
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -92,15 +98,3 @@ jobs:
           git apply --stat patches/xxksu/11_enable_susfs_for_ksu.patch >> report_11.md
           echo '```' >> report_11.md
           cat report_11.md >> $GITHUB_STEP_SUMMARY
-
-      - name: Upload Candidate 11 Patch Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: 11_enable_susfs_for_ksu_candidate.patch
-          path: candidate_patches/xxksu-patch11/11_enable_susfs_for_ksu.patch
-
-      - name: Upload Public 11 Patch Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: 11_enable_susfs_for_ksu.patch
-          path: patches/xxksu/11_enable_susfs_for_ksu.patch
