@@ -94,8 +94,11 @@ Final Delivery / Write-Back (`origin/main`)
 10. **Downstream Boundaries (No Kernel Compilation):**
     - Kernel compilation, defconfig modifications, compiler toolchains, packaging, and device runtime validation are strictly downstream responsibilities outside this repository's scope.
 
-11. **Midori Sources Are Reference Only:**
-    - Downstream trackers in `upstream-state.json` (e.g. `midori_kernelsu_xx_patch`, `midori_gki_patch_50`) are reference-only trackers and can never independently authorize production patch changes.
+11. **Midori Sources Are Reference Only (Independent Cross-Check):**
+    - Downstream trackers in `upstream-state.json` (e.g. `midori_kernelsu_xx_patch`, `midori_gki_patch_50`) and reference patches (`midori01/KernelSU:xx.patch`, Midori's GKI 50->51 conversion) are reference-only trackers and can never independently authorize production patch changes.
+    - An independent Midori reference cross-check gate runs during validation prior to promotion.
+    - Classifications: `SEMANTIC_MATCH`, `IMPLEMENTATION_DIFFERENCE`, `OUR_EXTRA`, `REFERENCE_EXTRA`, `SEMANTIC_CONFLICT`, `REFERENCE_UNAVAILABLE`.
+    - Only `SEMANTIC_CONFLICT` blocks promotion; reference differences never modify production patches or authorize production changes.
 
 12. **Patch 11 Mutation Scope Restrictions:**
     - Under current policy, `kernel/feature/kernel_umount.c` and `kernel/downstream/ksu_hostsredirect.h` are NOT Patch 11 mutation targets.
@@ -122,5 +125,5 @@ PYTHONPATH=.github/scripts python3 -m v2.watch.cli
 
 # 4. Focused Unit & Regression Test Suites
 PYTHONPATH=.github/scripts:.github/scripts/v2/tests python3 -m unittest \
-  test_delivery test_semantic_gate test_pipeline test_watch test_baseline test_patch_manifest
+  test_delivery test_semantic_gate test_pipeline test_watch test_baseline test_patch_manifest test_reference_cross_check
 ```

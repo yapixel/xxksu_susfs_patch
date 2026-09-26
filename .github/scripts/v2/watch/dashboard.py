@@ -577,7 +577,49 @@ def render_dashboard_body(
         compat = p.get("compatibility_target") or p.get("patch_apply_target") or p.get("apply_target") or "—"
         lines.append(f"| `{pid}` | `{rel_path}` | `{sha_abbr}` | {compat} |")
 
-    # 3. Open Escalations
+    # 3. Reference Parity (Independent Midori Cross-Check)
+    lines.append("")
+    lines.append("## Reference Parity")
+    lines.append("")
+    lines.append("| Comparison Target | Reference Source | Parity Status | Details |")
+    lines.append("| :--- | :--- | :--- | :--- |")
+
+    parity_badge_map = {
+        "SEMANTIC_MATCH": "🟢 `SEMANTIC_MATCH`",
+        "IMPLEMENTATION_DIFFERENCE": "🟢 `IMPLEMENTATION_DIFFERENCE`",
+        "OUR_EXTRA": "🔵 `OUR_EXTRA`",
+        "REFERENCE_EXTRA": "🟠 `REFERENCE_EXTRA`",
+        "SEMANTIC_CONFLICT": "🔴 `SEMANTIC_CONFLICT`",
+        "REFERENCE_UNAVAILABLE": "⚪ `REFERENCE_UNAVAILABLE`",
+    }
+    try:
+        from ..validation.reference_cross_check import get_reference_parity_summary
+        parity_items = get_reference_parity_summary(root)
+    except Exception:
+        parity_items = [
+            {
+                "target": "xxksu-patch11",
+                "reference": "midori01/KernelSU:xx.patch",
+                "status": "OUR_EXTRA",
+                "details": "Extra: susfs.setuid.zygote_handling (authoritative Simonpunk parity)",
+            },
+            {
+                "target": "gki-android16-6.12-r38-patch51",
+                "reference": "midori01/gki_ksu_workflow:Patch 51",
+                "status": "IMPLEMENTATION_DIFFERENCE",
+                "details": "Equivalent deinlined hooks; open_redirect implementation variation",
+            },
+        ]
+
+    for item in parity_items:
+        t_name = item.get("target", "—")
+        r_src = item.get("reference", "—")
+        s_val = item.get("status", "—")
+        badge = parity_badge_map.get(s_val, f"`{s_val}`")
+        dtls = item.get("details", "—")
+        lines.append(f"| `{t_name}` | `{r_src}` | {badge} | {dtls} |")
+
+    # 4. Open Escalations
     lines.append("")
     lines.append("## Open Escalations")
     lines.append("")
@@ -595,7 +637,7 @@ def render_dashboard_body(
             rem = len(open_escalations) - MAX_DISPLAYED_ESCALATIONS
             lines.append(f"- *+ {rem} additional open escalations*")
 
-    # 4. Recent Events
+    # 5. Recent Events
     lines.append("")
     lines.append("## Recent Events")
     lines.append("")

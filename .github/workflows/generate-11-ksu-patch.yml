@@ -99,3 +99,14 @@ jobs:
           git apply --stat patches/xxksu/11_enable_susfs_for_ksu.patch >> report_11.md
           echo '```' >> report_11.md
           cat report_11.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Report Independent Midori Reference Cross-Check
+        if: always()
+        run: |
+          if [ -f "candidate_patches/xxksu-patch11/reference_cross_check.json" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 🔍 Independent Midori Reference Cross-Check Parity Report" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            cat candidate_patches/xxksu-patch11/reference_cross_check.json >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi

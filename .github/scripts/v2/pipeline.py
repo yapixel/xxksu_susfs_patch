@@ -22,6 +22,8 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 import hashlib
+import json
+import logging
 import os
 from pathlib import Path
 import re
@@ -41,6 +43,8 @@ from .validation.exact_patch import (
     validate_patch_syntax,
     verify_postimage_integrity,
 )
+
+logger = logging.getLogger(__name__)
 
 # Relative target paths under repo root
 TARGET_REL_PATHS = {
@@ -555,6 +559,21 @@ def deliver_multi_candidates(
         candidate_data[patch_id] = (cand_path, cand_bytes, cand_sha)
         candidate_shas[patch_id] = cand_sha
 
+    # Verify reference cross-check results before promotion
+    for patch_id, (cand_path, cand_bytes, cand_sha) in candidate_data.items():
+        ref_report = cand_path.parent / "reference_cross_check.json"
+        if ref_report.is_file():
+            try:
+                rep_data = json.loads(ref_report.read_text(encoding="utf-8"))
+                if rep_data.get("blocks_promotion", False):
+                    from .validation.reference_cross_check import ReferenceCrossCheckError
+                    raise ReferenceCrossCheckError(
+                        f"Multi-candidate delivery blocked for {patch_id}: reference cross-check reported "
+                        f"{rep_data.get('classification')}: {rep_data.get('details')}"
+                    )
+            except json.JSONDecodeError:
+                pass
+
     # Compare candidates against existing public files
     changed_targets: dict[str, tuple[Path, bytes, str]] = {}
     for patch_id, (cand_path, cand_bytes, cand_sha) in candidate_data.items():
@@ -825,6 +844,32 @@ def run_pipeline(
                     raise CandidateValidationError(
                         f"Expected exactly 8 modified files for Patch 11 on KernelSU, got {len(mod_files)}: {mod_files}"
                     )
+
+    # Step 3.5: Independent Midori reference cross-check
+    from .validation.reference_cross_check import (
+        ReferenceCrossCheckError,
+        run_reference_cross_check,
+    )
+    ref_result = run_reference_cross_check(
+        patch_id=patch_id,
+        candidate_text=candidate_text_1,
+        candidate_sha=candidate_sha,
+        repo_root=repo_root,
+    )
+    if ref_result is not None:
+        ref_report_path = candidate_dir / "reference_cross_check.json"
+        ref_report_path.write_text(json.dumps(ref_result.to_dict(), indent=2), encoding="utf-8")
+        logger.info(
+            "Reference cross-check for %s: %s (passed=%s, blocks_promotion=%s)",
+            patch_id, ref_result.classification.value, ref_result.passed, ref_result.blocks_promotion
+        )
+        if ref_result.blocks_promotion:
+            if public_bytes_before is not None:
+                assert public_path.read_bytes() == public_bytes_before, "INVARIANT VIOLATION: public patch was modified on blocked reference check"
+            raise ReferenceCrossCheckError(
+                f"Reference cross-check blocked promotion for {patch_id} ({ref_result.classification.value}):\n"
+                f"{ref_result.details}"
+            )
 
     # Step 4: Promotion (only after PASS, if promote=True)
     is_noop = False

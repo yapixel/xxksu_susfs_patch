@@ -261,11 +261,22 @@ jobs:
 
           echo "✅ Full r38 kernel tree integration (Patch 51 + xxKSU Patch 11) verified successfully!"
 
+      - name: Report Independent Midori Reference Cross-Check
+        if: always()
+        run: |
+          if [ -f "candidate_patches/gki-android16-6.12-r38-patch51/reference_cross_check.json" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 🔍 Independent Midori Reference Cross-Check Parity Report (GKI r38)" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            cat candidate_patches/gki-android16-6.12-r38-patch51/reference_cross_check.json >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
       - name: Upload Validated GKI r38 Candidate (Intra-Workflow Transport)
         uses: actions/upload-artifact@v4
         with:
           name: candidate-gki-r38-51
-          path: candidate_patches/gki-android16-6.12-r38-patch51/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch
+          path: candidate_patches/gki-android16-6.12-r38-patch51/
           retention-days: 1
 
   promote_and_deliver:
@@ -318,3 +329,10 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
           git apply --stat patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch >> $GITHUB_STEP_SUMMARY || true
           echo '```' >> $GITHUB_STEP_SUMMARY
+          if [ -f "candidate_patches/gki-android16-6.12-r38-patch51/reference_cross_check.json" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 🔍 Midori Reference Parity (Consumed by Single Writer)" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            cat candidate_patches/gki-android16-6.12-r38-patch51/reference_cross_check.json >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
