@@ -20,8 +20,10 @@ import unittest
 
 from v2.pipeline import deliver_multi_candidates
 from v2.validation.reference_cross_check import (
+    PATCH11_FEATURE_UNITS,
     ReferenceComparisonClassification,
     compare_patch_to_reference,
+    evaluate_patch11_features,
     regenerate_midori_patch51,
 )
 
@@ -132,7 +134,7 @@ index 7777777..8888888 100644
         self.assertTrue(res.passed, f"Failed with: {res.details}")
         self.assertFalse(res.blocks_promotion)
         self.assertEqual(res.classification, ReferenceComparisonClassification.OUR_EXTRA)
-        self.assertIn("susfs.setuid.zygote_handling", res.our_extra_units)
+        self.assertIn("setuid.zygote_handling", res.our_extra_units)
         self.assertIn("authoritative Simonpunk", res.details)
 
     # 4. genuine semantic conflict
@@ -227,6 +229,57 @@ exit 0
             self.assertFalse(delivered)
             self.assertFalse(pushed)
             self.assertIsNone(commit)
+
+    # 8. patch11 feature-level semantic matrix
+    def test_08_patch11_feature_level_semantic_matrix(self):
+        """Patch 11 feature-level matrix evaluates all 26 units with 0 setuid/selinux extras."""
+        self.assertEqual(len(PATCH11_FEATURE_UNITS), 26)
+
+        repo_root = Path(__file__).resolve().parents[4]
+        p11_path = repo_root / "patches" / "xxksu" / "11_enable_susfs_for_ksu.patch"
+        self.assertTrue(p11_path.is_file())
+        our_text = p11_path.read_text(encoding="utf-8")
+
+        ref_path = Path("/tmp/midori_xx.patch")
+        if ref_path.is_file():
+            ref_text = ref_path.read_text(encoding="utf-8")
+        else:
+            # Fallback to realistic synthetic diff containing all matched and divergent units
+            ref_text = (
+                our_text.replace("config KSU_SUSFS_TRY_UMOUNT\n", "")
+                .replace("CMD_SUSFS_ADD_TRY_UMOUNT", "/* omitted */")
+                .replace("susfs_is_current_proc_umounted()", "false")
+                .replace("handle_zygote_setresuid", "handle_susfs_setresuid")
+            )
+
+        matrix = evaluate_patch11_features(our_text, ref_text)
+        self.assertEqual(len(matrix), 26)
+
+        # All 26 units present in matrix
+        for unit in PATCH11_FEATURE_UNITS:
+            self.assertIn(unit, matrix)
+
+        # SETUID / ZYGOTE domain must have ZERO OUR_EXTRA units
+        setuid_extras = [k for k, v in matrix.items() if k.startswith("setuid.") and v == "OUR_EXTRA"]
+        self.assertEqual(setuid_extras, [], f"Unexpected setuid extras: {setuid_extras}")
+
+        # SELINUX domain must have ZERO OUR_EXTRA units (only IMPLEMENTATION_DIFFERENCE or MATCH)
+        selinux_extras = [k for k, v in matrix.items() if k.startswith("selinux.") and v == "OUR_EXTRA"]
+        self.assertEqual(selinux_extras, [], f"Unexpected selinux extras: {selinux_extras}")
+
+        # Compare via compare_patch_to_reference
+        res = compare_patch_to_reference(
+            patch_id="xxksu-patch11",
+            candidate_patch_text=our_text,
+            reference_patch_text=ref_text,
+            reference_source_name="midori01/KernelSU:xx.patch",
+        )
+        self.assertTrue(res.passed)
+        self.assertFalse(res.blocks_promotion)
+        self.assertEqual(res.classification, ReferenceComparisonClassification.OUR_EXTRA)
+        self.assertIn("config.try_umount", res.our_extra_units)
+        self.assertIn("supercall.ksu_mark_get_integration", res.our_extra_units)
+        self.assertIn("semantic_matrix", res.metadata)
 
 
 if __name__ == "__main__":

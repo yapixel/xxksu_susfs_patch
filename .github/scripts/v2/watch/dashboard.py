@@ -601,7 +601,7 @@ def render_dashboard_body(
                 "target": "xxksu-patch11",
                 "reference": "midori01/KernelSU:xx.patch",
                 "status": "OUR_EXTRA",
-                "details": "Extra: susfs.setuid.zygote_handling (authoritative Simonpunk parity)",
+                "details": "Extra: try_umount, ksu_mark_get (authoritative Simonpunk parity; setuid/zygote matched)",
             },
             {
                 "target": "gki-android16-6.12-r38-patch51",

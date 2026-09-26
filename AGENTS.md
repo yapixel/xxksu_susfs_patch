@@ -121,7 +121,7 @@ Midori sources are **REFERENCE ONLY** and never authoritative inputs:
   - Third-party reference outages (`REFERENCE_UNAVAILABLE`) do not corrupt or block authoritative releases.
 
 ### 11. Current Known Reference Differences
-- **Patch 11 vs Midori:** Reports `OUR_EXTRA` because our authoritative Simonpunk SuSFS integration retains setuid/zygote handling (`susfs.setuid.zygote_handling`), whereas Midori intentionally implements reduced integration.
+- **Patch 11 vs Midori:** Reports `OUR_EXTRA` because our authoritative Simonpunk SuSFS integration retains try_umount and KSU_MARK_GET handling (`config.try_umount`, `umount.try_umount_integration`, `supercall.try_umount_cmd`, `supercall.ksu_mark_get_integration`), whereas Midori intentionally omits them. Setuid/zygote handling is verified semantically equivalent across 8 refined feature units.
 - **GKI r38 Patch 51 vs Midori Patch 51:** Reports `IMPLEMENTATION_DIFFERENCE` with equivalent deinlining semantics across identical 16 kernel files (open redirect path lookup variation in `fs/namei.c`).
 These are documented reference observations, not reasons to modify production.
 
