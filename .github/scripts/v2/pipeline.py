@@ -237,7 +237,10 @@ def run_pipeline(
 
     if candidate_dir is None:
         candidate_dir = repo_root / "candidate_patches" / patch_id
-    candidate_dir = Path(candidate_dir).resolve()
+    else:
+        candidate_dir = Path(candidate_dir).resolve()
+        if candidate_dir.name != patch_id:
+            candidate_dir = candidate_dir / patch_id
     candidate_dir.mkdir(parents=True, exist_ok=True)
     candidate_path = candidate_dir / patch_filename
 
