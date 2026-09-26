@@ -23,6 +23,7 @@ from v2.manifests.patch_manifest import verify_patch_manifest
 from v2.pipeline import (
     CandidateValidationError,
     PipelineResult,
+    deliver_multi_candidates,
     run_pipeline,
 )
 from v2.source.baseline import load_authoritative_bundle
@@ -442,6 +443,164 @@ class TestPipelineDelivery(unittest.TestCase):
         )
         self.assertTrue(rerun.is_noop)
         self.assertFalse(rerun.committed)
+
+    def test_11_multi_candidate_both_changed_single_commit(self):
+        """Invariant: Both Sultan and GKI candidates changing produces exactly ONE delivery commit."""
+        real_root = Path(__file__).resolve().parents[4]
+        sultan_patch = self.repo_root / "patches" / "sultan-android14-6.1" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
+        gki_patch = self.repo_root / "patches" / "gki-android16-6.12" / "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
+
+        sultan_patch.write_text("old sultan patch placeholder\n", encoding="utf-8")
+        gki_patch.write_text("old gki patch placeholder\n", encoding="utf-8")
+        subprocess.run(["git", "add", str(sultan_patch), str(gki_patch)], cwd=self.repo_root, check=True)
+        subprocess.run(["git", "commit", "-m", "mock: simulate older sultan and gki patches"], cwd=self.repo_root, check=True)
+        subprocess.run(["git", "push", "origin", "main"], cwd=self.repo_root, check=True)
+
+        head_before = subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.repo_root, capture_output=True, text=True, check=True).stdout.strip()
+
+        cand_sultan = real_root / ".github" / "fixtures" / "sultan" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
+        cand_gki = real_root / ".github" / "fixtures" / "r38" / "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
+
+        promoted, pushed, commit_sha, shas = deliver_multi_candidates(
+            {
+                "sultan-android14-6.1-patch51": cand_sultan,
+                "gki-android16-6.12-r38-patch51": cand_gki,
+            },
+            repo_root=self.repo_root,
+            write_back=True,
+            verify_raw_url=False,
+        )
+
+        self.assertTrue(promoted, "Both targets should be promoted")
+        self.assertTrue(pushed, "Changes should be pushed")
+        self.assertIsNotNone(commit_sha)
+
+        # Verify exactly ONE new commit was created on main
+        rev_count = subprocess.run(
+            ["git", "rev-list", "--count", f"{head_before}..HEAD"],
+            cwd=self.repo_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        self.assertEqual(rev_count, "1", f"Expected exactly 1 delivery commit, got {rev_count}")
+
+        # Check commit message
+        log_msg = subprocess.run(["git", "log", "-1", "--pretty=%B"], cwd=self.repo_root, capture_output=True, text=True, check=True).stdout
+        self.assertIn("auto(pipeline): deliver verified 51 patch production outputs", log_msg)
+        self.assertIn(shas["sultan-android14-6.1-patch51"], log_msg)
+        self.assertIn(shas["gki-android16-6.12-r38-patch51"], log_msg)
+
+        # Byte equality on origin/main
+        self.assertEqual(sultan_patch.read_bytes(), cand_sultan.read_bytes())
+        self.assertEqual(gki_patch.read_bytes(), cand_gki.read_bytes())
+
+        show_sultan = subprocess.run(
+            ["git", "show", "origin/main:patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch"],
+            cwd=self.repo_root,
+            capture_output=True,
+            check=True,
+        ).stdout
+        self.assertEqual(show_sultan, cand_sultan.read_bytes())
+
+        show_gki = subprocess.run(
+            ["git", "show", "origin/main:patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"],
+            cwd=self.repo_root,
+            capture_output=True,
+            check=True,
+        ).stdout
+        self.assertEqual(show_gki, cand_gki.read_bytes())
+
+        # Manifest consistency
+        valid, errors = verify_patch_manifest(self.repo_root)
+        self.assertTrue(valid, f"Manifest invalid after multi-delivery: {errors}")
+
+    def test_12_multi_candidate_one_changed_one_unchanged(self):
+        """Invariant: When one candidate changed and one unchanged, still exactly one delivery commit."""
+        real_root = Path(__file__).resolve().parents[4]
+        sultan_patch = self.repo_root / "patches" / "sultan-android14-6.1" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
+        sultan_patch.write_text("old sultan patch placeholder\n", encoding="utf-8")
+        subprocess.run(["git", "add", str(sultan_patch)], cwd=self.repo_root, check=True)
+        subprocess.run(["git", "commit", "-m", "mock: simulate older sultan patch only"], cwd=self.repo_root, check=True)
+        subprocess.run(["git", "push", "origin", "main"], cwd=self.repo_root, check=True)
+
+        head_before = subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.repo_root, capture_output=True, text=True, check=True).stdout.strip()
+
+        cand_sultan = real_root / ".github" / "fixtures" / "sultan" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
+        cand_gki = real_root / ".github" / "fixtures" / "r38" / "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
+
+        promoted, pushed, commit_sha, _ = deliver_multi_candidates(
+            {
+                "sultan-android14-6.1-patch51": cand_sultan,
+                "gki-android16-6.12-r38-patch51": cand_gki,
+            },
+            repo_root=self.repo_root,
+            write_back=True,
+            verify_raw_url=False,
+        )
+
+        self.assertTrue(promoted)
+        self.assertTrue(pushed)
+        rev_count = subprocess.run(
+            ["git", "rev-list", "--count", f"{head_before}..HEAD"],
+            cwd=self.repo_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        self.assertEqual(rev_count, "1")
+
+        valid, errors = verify_patch_manifest(self.repo_root)
+        self.assertTrue(valid, f"Manifest invalid: {errors}")
+
+    def test_13_multi_candidate_both_unchanged_noop(self):
+        """Invariant: When both candidates are already up to date, clean NO_OP with 0 commits."""
+        real_root = Path(__file__).resolve().parents[4]
+        cand_sultan = real_root / ".github" / "fixtures" / "sultan" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
+        cand_gki = real_root / ".github" / "fixtures" / "r38" / "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
+
+        promoted, pushed, commit_sha, _ = deliver_multi_candidates(
+            {
+                "sultan-android14-6.1-patch51": cand_sultan,
+                "gki-android16-6.12-r38-patch51": cand_gki,
+            },
+            repo_root=self.repo_root,
+            write_back=True,
+            verify_raw_url=False,
+        )
+        self.assertFalse(promoted)
+        self.assertFalse(pushed)
+        self.assertIsNone(commit_sha)
+
+    def test_14_validation_run_is_read_only(self):
+        """Invariant: Validation-only run produces candidate without touching patches/ or metadata."""
+        real_root = Path(__file__).resolve().parents[4]
+        public_patch = self.repo_root / "patches" / "sultan-android14-6.1" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
+        orig_bytes = public_patch.read_bytes()
+        orig_manifest = (self.repo_root / "patches" / "manifest.json").read_bytes()
+
+        cand_dir = self.repo_root / "test_candidate_dir"
+        res = run_pipeline(
+            "sultan-android14-6.1-patch51",
+            real_root / ".github" / "fixtures" / "sultan" / "50_add_susfs_in_gki-android14-6.1.patch",
+            target_tree=None,
+            candidate_dir=cand_dir,
+            repo_root=self.repo_root,
+            promote=False,
+            check_only=True,
+            write_back=False,
+            verify_raw_url=False,
+        )
+
+        self.assertTrue(res.validated)
+        self.assertFalse(res.promoted)
+        self.assertFalse(res.committed)
+        self.assertFalse(res.pushed)
+        self.assertTrue(res.candidate_path.is_file())
+
+        # Public files completely unmodified
+        self.assertEqual(public_patch.read_bytes(), orig_bytes)
+        self.assertEqual((self.repo_root / "patches" / "manifest.json").read_bytes(), orig_manifest)
 
 
 if __name__ == "__main__":

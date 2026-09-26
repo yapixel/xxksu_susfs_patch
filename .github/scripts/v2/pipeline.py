@@ -516,6 +516,214 @@ def deliver_promotion(
     return True, pushed, commit_sha
 
 
+def deliver_multi_candidates(
+    candidate_targets: Mapping[str, Path],
+    *,
+    repo_root: Optional[Path] = None,
+    write_back: bool = False,
+    git_remote: str = "origin",
+    git_branch: str = "main",
+    verify_raw_url: bool = True,
+    upstream_commits: Optional[Mapping[str, str]] = None,
+) -> Tuple[bool, bool, Optional[str], dict[str, str]]:
+    """Atomically promote and deliver multiple validated candidates to git.
+
+    Returns (promoted: bool, committed: bool, commit_sha: Optional[str], candidate_shas: dict[str, str]).
+    """
+    if repo_root is None:
+        repo_root = Path.cwd()
+    repo_root = Path(repo_root).resolve()
+
+    for patch_id, cand_path in candidate_targets.items():
+        if patch_id not in TARGET_REL_PATHS:
+            raise ValueError(f"Unknown patch_id: {patch_id}. Valid IDs: {list(TARGET_REL_PATHS.keys())}")
+        if not cand_path.is_file():
+            raise FileNotFoundError(f"Candidate file not found for {patch_id}: {cand_path}")
+
+    # Validate syntax and compute SHA for all candidates
+    candidate_data: dict[str, tuple[Path, bytes, str]] = {}
+    candidate_shas: dict[str, str] = {}
+    for patch_id, cand_path in candidate_targets.items():
+        text = cand_path.read_text(encoding="utf-8")
+        syntax_errors = validate_patch_syntax(text)
+        if syntax_errors:
+            raise CandidateValidationError(
+                f"Candidate patch syntax validation failed for {patch_id}:\n" + "\n".join(f"  - {e}" for e in syntax_errors)
+            )
+        cand_bytes = cand_path.read_bytes()
+        cand_sha = hashlib.sha256(cand_bytes).hexdigest()
+        candidate_data[patch_id] = (cand_path, cand_bytes, cand_sha)
+        candidate_shas[patch_id] = cand_sha
+
+    # Compare candidates against existing public files
+    changed_targets: dict[str, tuple[Path, bytes, str]] = {}
+    for patch_id, (cand_path, cand_bytes, cand_sha) in candidate_data.items():
+        public_path = repo_root / TARGET_REL_PATHS[patch_id]
+        public_bytes = public_path.read_bytes() if public_path.is_file() else None
+        if public_bytes != cand_bytes:
+            changed_targets[patch_id] = (cand_path, cand_bytes, cand_sha)
+
+    if not changed_targets:
+        # All candidates are already up to date on disk
+        if write_back and verify_raw_url:
+            for patch_id, (cand_path, cand_bytes, cand_sha) in candidate_data.items():
+                _verify_existing_delivery(patch_id, cand_sha, cand_bytes, repo_root, git_remote, git_branch)
+        return False, False, None, candidate_shas
+
+    # Promote changed candidates into patches/
+    for patch_id, (cand_path, cand_bytes, cand_sha) in changed_targets.items():
+        public_path = repo_root / TARGET_REL_PATHS[patch_id]
+        public_path.parent.mkdir(parents=True, exist_ok=True)
+        public_path.write_bytes(cand_bytes)
+        if public_path.read_bytes() != cand_bytes:
+            raise PromotionError(f"Promoted file at {public_path} does not match candidate bytes")
+
+        up_commit = upstream_commits.get(patch_id) if upstream_commits else None
+        _update_baseline_record(patch_id, cand_sha, repo_root, upstream_commit=up_commit)
+
+    # Regenerate manifest and verify
+    manifest_path = repo_root / "patches" / "manifest.json"
+    if manifest_path.is_file():
+        write_patch_manifest(repo_root)
+        valid, errors = verify_patch_manifest(repo_root)
+        if not valid:
+            raise PromotionError("Manifest consistency check failed after multi-promotion:\n" + "\n".join(errors))
+
+    if not write_back:
+        return True, False, None, candidate_shas
+
+    # Write-back to git
+    git_dir = repo_root / ".git"
+    if not git_dir.exists():
+        return True, False, None, candidate_shas
+
+    allowed_paths = [Path("patches/manifest.json")]
+    for patch_id in changed_targets:
+        allowed_paths.append(TARGET_REL_PATHS[patch_id])
+        if patch_id == "xxksu-patch11":
+            allowed_paths.append(Path("patches/xxksu/BASELINE.json"))
+        elif patch_id == "sultan-android14-6.1-patch51":
+            allowed_paths.append(Path("patches/sultan-android14-6.1/BASELINE.json"))
+        elif patch_id == "gki-android16-6.12-r38-patch51":
+            allowed_paths.append(Path("patches/gki-android16-6.12/BASELINE.json"))
+
+    if (repo_root / ".github" / "upstream-state.json").is_file():
+        allowed_paths.append(Path(".github/upstream-state.json"))
+
+    for rel_path in allowed_paths:
+        full_path = repo_root / rel_path
+        if not full_path.is_file():
+            continue
+        status_proc = subprocess.run(
+            ["git", "status", "--porcelain", "--", str(rel_path)],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+        )
+        if status_proc.returncode == 0 and status_proc.stdout.strip():
+            add_proc = subprocess.run(
+                ["git", "add", "--", str(rel_path)],
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+            )
+            if add_proc.returncode != 0:
+                raise DeliveryError(f"Failed to git add {rel_path}: {add_proc.stderr}")
+
+    diff_proc = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=repo_root)
+    if diff_proc.returncode == 0:
+        if verify_raw_url:
+            for patch_id, (cand_path, cand_bytes, cand_sha) in candidate_data.items():
+                _verify_existing_delivery(patch_id, cand_sha, cand_bytes, repo_root, git_remote, git_branch)
+        return True, False, None, candidate_shas
+
+    # Configure author
+    name_proc = subprocess.run(["git", "config", "user.name"], cwd=repo_root, capture_output=True, text=True)
+    if not name_proc.stdout.strip():
+        subprocess.run(["git", "config", "user.name", "github-actions[bot]"], cwd=repo_root, check=True)
+    email_proc = subprocess.run(["git", "config", "user.email"], cwd=repo_root, capture_output=True, text=True)
+    if not email_proc.stdout.strip():
+        subprocess.run(["git", "config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"], cwd=repo_root, check=True)
+
+    summary_lines = "\n".join(f"- {pid}: {csha}" for pid, (_, _, csha) in changed_targets.items())
+    commit_msg = (
+        "auto(pipeline): deliver verified 51 patch production outputs [skip ci]\n\n"
+        f"Promoted candidates:\n{summary_lines}\n"
+    )
+
+    commit_proc = subprocess.run(
+        ["git", "commit", "-m", commit_msg],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+    )
+    if commit_proc.returncode != 0:
+        raise DeliveryError(f"git commit failed:\n{commit_proc.stderr}\n{commit_proc.stdout}")
+
+    commit_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+
+    remotes_proc = subprocess.run(["git", "remote"], cwd=repo_root, capture_output=True, text=True)
+    remotes = remotes_proc.stdout.split()
+    pushed = False
+    if git_remote in remotes:
+        pull_proc = subprocess.run(
+            ["git", "pull", "--rebase", git_remote, git_branch],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+        )
+        if pull_proc.returncode != 0:
+            subprocess.run(["git", "rebase", "--abort"], cwd=repo_root, capture_output=True)
+            raise DeliveryError(f"git pull --rebase failed:\n{pull_proc.stderr}")
+
+        commit_sha = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+
+        push_proc = subprocess.run(
+            ["git", "push", git_remote, f"HEAD:{git_branch}"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+        )
+        if push_proc.returncode != 0:
+            raise DeliveryError(f"git push failed:\n{push_proc.stderr}\n{push_proc.stdout}")
+        pushed = True
+
+        subprocess.run(["git", "fetch", git_remote, git_branch], cwd=repo_root, capture_output=True)
+
+        # Verify all candidates match on origin/main
+        for patch_id, (_, cand_bytes, _) in candidate_data.items():
+            show_proc = subprocess.run(
+                ["git", "show", f"{git_remote}/{git_branch}:{TARGET_REL_PATHS[patch_id]}"],
+                cwd=repo_root,
+                capture_output=True,
+                check=True,
+            )
+            if show_proc.stdout != cand_bytes:
+                raise DeliveryVerificationError(
+                    f"Byte mismatch on {git_remote}/{git_branch}:{TARGET_REL_PATHS[patch_id]} vs candidate"
+                )
+
+        if verify_raw_url:
+            repo_slug = _resolve_repo_slug(repo_root, git_remote)
+            if repo_slug:
+                for patch_id, (_, _, cand_sha) in candidate_data.items():
+                    _verify_raw_github_url(repo_slug, commit_sha, TARGET_REL_PATHS[patch_id], cand_sha)
+
+    return True, pushed, commit_sha, candidate_shas
+
+
 def run_pipeline(
     patch_id: str,
     upstream_input: Path,
@@ -691,8 +899,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description="V2 Authoritative Generation, Validation, and Promotion Pipeline"
     )
-    parser.add_argument("--patch-id", required=True, choices=list(TARGET_REL_PATHS.keys()), help="Patch target ID")
-    parser.add_argument("--upstream-input", required=True, type=Path, help="Path to upstream source repository or patch")
+    parser.add_argument("--patch-id", required=False, choices=list(TARGET_REL_PATHS.keys()), help="Patch target ID")
+    parser.add_argument("--upstream-input", required=False, type=Path, help="Path to upstream source repository or patch")
     parser.add_argument("--target-tree", type=Path, default=None, help="Target kernel/KSU source tree for exact validation")
     parser.add_argument("--candidate-dir", type=Path, default=None, help="Directory to store candidate patches")
     parser.add_argument("--repo-root", type=Path, default=None, help="Repository root path")
@@ -700,10 +908,40 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--check-only", action="store_true", default=False, help="Perform check-only validation without modifying target tree")
     parser.add_argument("--write-back", action="store_true", default=False, help="Commit and push verified promoted changes to git origin/main")
     parser.add_argument("--no-verify-raw", action="store_true", default=False, help="Skip raw.githubusercontent.com network verification (for offline tests)")
+    parser.add_argument("--deliver-candidates", action="store_true", default=False, help="Atomically deliver multiple validated candidates")
+    parser.add_argument("--candidate-target", action="append", default=[], help="Target candidate in format patch_id:candidate_file_path")
 
     args = parser.parse_args(argv)
 
     try:
+        if args.deliver_candidates:
+            if not args.candidate_target:
+                raise ValueError("--deliver-candidates requires at least one --candidate-target <patch_id>:<file_path>")
+            targets = {}
+            for item in args.candidate_target:
+                if ":" not in item:
+                    raise ValueError(f"Invalid --candidate-target format (expected patch_id:path): {item}")
+                pid, path_str = item.split(":", 1)
+                targets[pid.strip()] = Path(path_str.strip()).resolve()
+
+            promoted, pushed, commit_sha, candidate_shas = deliver_multi_candidates(
+                targets,
+                repo_root=args.repo_root,
+                write_back=args.write_back,
+                verify_raw_url=not args.no_verify_raw,
+            )
+            status_str = "DELIVERED" if pushed else ("PROMOTED" if promoted else "NO_OP (up to date)")
+            print(f"✅ Multi-candidate delivery SUCCESS [{status_str}]:")
+            for pid, csha in candidate_shas.items():
+                print(f"  - {pid}: {csha}")
+            if commit_sha:
+                print(f"  - Commit: {commit_sha}")
+                print(f"  - Pushed: {pushed}")
+            return 0
+
+        if not args.patch_id or not args.upstream_input:
+            parser.error("--patch-id and --upstream-input are required when not using --deliver-candidates")
+
         promote = args.promote or args.write_back
         res = run_pipeline(
             args.patch_id,
