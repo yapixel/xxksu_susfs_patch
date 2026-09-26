@@ -58,7 +58,14 @@ def _normalize_target_id(identifier: str) -> str:
 
 def _find_patch_key(contents: Mapping[str, str], target_id: str) -> Optional[str]:
     target_cands = []
-    if "sultan" in target_id or "6.1" in target_id:
+    if "6.12" in target_id or "r38" in target_id or "gki" in target_id:
+        target_cands = (
+            "kernel_patches/50_add_susfs_in_gki-android16-6.12.patch",
+            "50_add_susfs_in_gki-android16-6.12.patch",
+            "kernel_patches/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
+            "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
+        )
+    elif "sultan" in target_id or "6.1" in target_id:
         target_cands = (
             "kernel_patches/50_add_susfs_in_sultan-kernel-6.1.patch",
             "kernel_patches/50_add_susfs_in_gki-android14-6.1.patch",
@@ -66,13 +73,6 @@ def _find_patch_key(contents: Mapping[str, str], target_id: str) -> Optional[str
             "50_add_susfs_in_gki-android14-6.1.patch",
             "kernel_patches/51_deinlined_susfs_hooks_sultan-android14-6.1.patch",
             "51_deinlined_susfs_hooks_sultan-android14-6.1.patch",
-        )
-    elif "6.12" in target_id or "r38" in target_id or "gki" in target_id:
-        target_cands = (
-            "kernel_patches/50_add_susfs_in_gki-android16-6.12.patch",
-            "50_add_susfs_in_gki-android16-6.12.patch",
-            "kernel_patches/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
-            "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
         )
     for c in target_cands:
         if c in contents:
@@ -308,7 +308,14 @@ def evaluate_semantic_gate(
             patch10_key = k
             break
 
-    if patch10_key in upstream_contents:
+    # 2C. Check Patch 10 in SuSFS tree if present and baseline comparison is requested
+    patch10_key = None
+    for k in upstream_contents:
+        if "10_enable_susfs_for_ksu" in k and k.endswith(".patch"):
+            patch10_key = k
+            break
+
+    if patch10_key in upstream_contents and baseline_contents and patch10_key in baseline_contents:
         try:
             inv_10_new = inventory_patch(
                 parse_patch(upstream_contents[patch10_key]),
@@ -316,7 +323,7 @@ def evaluate_semantic_gate(
                 source_type="official_10",
                 registry=registry,
             )
-            old_10_text = baseline_contents.get(patch10_key) if baseline_contents else None
+            old_10_text = baseline_contents.get(patch10_key)
             old_10_digests: set[str] = set()
             if old_10_text:
                 inv_10_old = inventory_patch(
@@ -384,23 +391,28 @@ def verify_semantic_gate_for_pipeline(
         if upstream_input.is_file():
             upstream_contents[upstream_input.name] = upstream_input.read_text(encoding="utf-8", errors="ignore")
         elif upstream_input.is_dir():
-            for cand_rel in (
-                "kernel_patches/50_add_susfs_in_gki-android14-6.1.patch",
-                "kernel_patches/50_add_susfs_in_gki-android16-6.12.patch",
-                "kernel_patches/50_add_susfs_in_sultan-kernel-6.1.patch",
-                "50_add_susfs_in_gki-android14-6.1.patch",
-                "50_add_susfs_in_gki-android16-6.12.patch",
-                "50_add_susfs_in_sultan-kernel-6.1.patch",
-                "kernel_patches/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
-                "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
-                "kernel_patches/51_deinlined_susfs_hooks_sultan-android14-6.1.patch",
-                "51_deinlined_susfs_hooks_sultan-android14-6.1.patch",
-                "kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch",
-                "10_enable_susfs_for_ksu.patch",
-            ):
+            target_cands = []
+            if "6.12" in target_id or "r38" in target_id or "gki" in target_id:
+                target_cands = (
+                    "kernel_patches/50_add_susfs_in_gki-android16-6.12.patch",
+                    "50_add_susfs_in_gki-android16-6.12.patch",
+                    "kernel_patches/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
+                    "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
+                )
+            elif "sultan" in target_id or "6.1" in target_id:
+                target_cands = (
+                    "kernel_patches/50_add_susfs_in_sultan-kernel-6.1.patch",
+                    "kernel_patches/50_add_susfs_in_gki-android14-6.1.patch",
+                    "50_add_susfs_in_sultan-kernel-6.1.patch",
+                    "50_add_susfs_in_gki-android14-6.1.patch",
+                    "kernel_patches/51_deinlined_susfs_hooks_sultan-android14-6.1.patch",
+                    "51_deinlined_susfs_hooks_sultan-android14-6.1.patch",
+                )
+            for cand_rel in target_cands:
                 p = upstream_input / cand_rel
                 if p.is_file():
                     upstream_contents[cand_rel] = p.read_text(encoding="utf-8", errors="ignore")
+                    break
 
     return evaluate_semantic_gate(
         patch_id,
