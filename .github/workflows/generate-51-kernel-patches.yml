@@ -12,6 +12,8 @@ on:
       - main
     paths:
       - ".github/workflows/generate-51-kernel-patches.yml"
+      - ".github/scripts/v2/pipeline.py"
+      - ".github/fixtures/**"
       - "patches/**/51_*.patch"
       - "patches/manifest.json"
 
@@ -54,7 +56,7 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Verify Patches Manifest Consistency
+      - name: Verify Initial Patches Manifest Consistency
         run: |
           set -euo pipefail
           PYTHONPATH=.github/scripts python3 -m v2.manifests.patch_manifest --check
@@ -94,27 +96,28 @@ jobs:
             git commit --no-gpg-sign -m "base: initial clean kernel tree" || true
           fi
 
-      - name: Apply & Verify Authoritative 51 Patch (${{ matrix.name }})
+      - name: Setup SuSFS Core Source Files (${{ matrix.name }})
         run: |
           set -euo pipefail
-          
-          # 1. Setup SuSFS core source files in kernel tree
           cd kernel_tree
           mkdir -p fs/ include/linux/
           cp -r "${{ github.workspace }}/susfs_src/kernel_patches/fs/susfs.c" fs/ || true
           cp -r "${{ github.workspace }}/susfs_src/kernel_patches/include/linux/susfs.h" include/linux/ || true
           cp -r "${{ github.workspace }}/susfs_src/kernel_patches/include/linux/susfs_def.h" include/linux/ || true
 
-          # 2. Authoritatively apply & verify the deinlined 51 patch (single-pass: 0 fuzz, 0 offsets, 0 rejects)
-          echo "🧪 Applying authoritative 51 patch from ${{ matrix.out_dir }}/${{ matrix.out_patch }}..."
-          PYTHONPATH="${{ github.workspace }}/.github/scripts" python3 -m v2.validation.exact_patch \
-            --patch "${{ github.workspace }}/${{ matrix.out_dir }}/${{ matrix.out_patch }}" \
-            --target-tree .
+      - name: Run Patch 51 Authoritative Pipeline (${{ matrix.name }})
+        run: |
+          set -euo pipefail
+          echo "🚀 Running Authoritative Pipeline for ${{ matrix.target }}-patch51..."
+          PYTHONPATH="${{ github.workspace }}/.github/scripts" python3 -m v2.pipeline \
+            --patch-id "${{ matrix.target }}-patch51" \
+            --upstream-input susfs_src \
+            --target-tree kernel_tree \
+            --candidate-dir candidate_patches \
+            --promote
 
-          # Clean up any auxiliary artifacts
+          cd kernel_tree
           find . -type f \( -name "*.orig" -o -name "*~" \) -delete
-
-          # 5. Commit SuSFS integration on kernel tree
           git add -A
           git commit --no-gpg-sign -m "SUSFS de-inlined hooks for ${{ matrix.target }}" || true
           
@@ -167,11 +170,17 @@ jobs:
       - name: Generate Statistics Report
         run: |
           echo "### 📄 ${{ matrix.name }} 51 Patch Diffstat" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
           git apply --stat "${{ matrix.out_dir }}/${{ matrix.out_patch }}" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
-      - name: Upload 51 Patch Artifact (${{ matrix.name }})
+      - name: Upload Candidate 51 Patch Artifact (${{ matrix.name }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: 51_patch_${{ matrix.target }}_candidate
+          path: candidate_patches/${{ matrix.target }}-patch51/${{ matrix.out_patch }}
+
+      - name: Upload Public 51 Patch Artifact (${{ matrix.name }})
         uses: actions/upload-artifact@v4
         with:
           name: 51_patch_${{ matrix.target }}
@@ -191,7 +200,7 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Verify Patches Manifest Consistency
+      - name: Verify Initial Patches Manifest Consistency
         run: |
           set -euo pipefail
           PYTHONPATH=.github/scripts python3 -m v2.manifests.patch_manifest --check
@@ -222,41 +231,28 @@ jobs:
             git commit --no-gpg-sign -m "base: initial clean kernel tree r38" || true
           fi
 
-      - name: Verify r38 Compatibility Patch 51 Integrity and Checksum
+      - name: Setup SuSFS Core Source Files (r38)
         run: |
           set -euo pipefail
-          PATCH_FILE="patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
-          if [ ! -f "$PATCH_FILE" ]; then
-            echo "❌ Error: $PATCH_FILE not found"
-            exit 1
-          fi
-          EXPECTED_SHA="74bb2685f2b97caf032e638f10a0bd69fef74143a671d7c975c641a75211ec8c"
-          ACTUAL_SHA="$(sha256sum "$PATCH_FILE" | cut -d' ' -f1)"
-          echo "Expected SHA-256: $EXPECTED_SHA"
-          echo "Actual SHA-256:   $ACTUAL_SHA"
-          if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
-            echo "❌ r38 Patch 51 SHA-256 mismatch!"
-            exit 1
-          fi
-          echo "✅ r38 Patch 51 integrity and checksum verified!"
-
-      - name: Apply & Verify r38 Compatibility Patch 51 on r38 Source Tree
-        run: |
-          set -euo pipefail
-
           cd kernel_tree
           mkdir -p fs/ include/linux/
           cp -r "${{ github.workspace }}/susfs_src/kernel_patches/fs/susfs.c" fs/ || true
           cp -r "${{ github.workspace }}/susfs_src/kernel_patches/include/linux/susfs.h" include/linux/ || true
           cp -r "${{ github.workspace }}/susfs_src/kernel_patches/include/linux/susfs_def.h" include/linux/ || true
 
-          echo "🧪 Applying r38 compatibility Patch 51 from patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch..."
-          PYTHONPATH="${{ github.workspace }}/.github/scripts" python3 -m v2.validation.exact_patch \
-            --patch "${{ github.workspace }}/patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch" \
-            --target-tree .
+      - name: Run Patch 51 Authoritative Pipeline (r38 Compatibility)
+        run: |
+          set -euo pipefail
+          echo "🚀 Running Authoritative Pipeline for gki-android16-6.12-r38-patch51..."
+          PYTHONPATH="${{ github.workspace }}/.github/scripts" python3 -m v2.pipeline \
+            --patch-id gki-android16-6.12-r38-patch51 \
+            --upstream-input susfs_src \
+            --target-tree kernel_tree \
+            --candidate-dir candidate_patches \
+            --promote
 
+          cd kernel_tree
           find . -type f \( -name "*.orig" -o -name "*~" \) -delete
-
           git add -A
           git commit --no-gpg-sign -m "SUSFS de-inlined hooks for android16-6.12-2025-09_r38" || true
           echo "✅ r38 Compatibility Patch 51 applied cleanly with 0 rejects, 0 fuzz, and 0 offsets!"
@@ -305,7 +301,13 @@ jobs:
           git apply --stat "${{ github.workspace }}/patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
-      - name: Upload 51 Patch Artifact (r38 Compatibility)
+      - name: Upload Candidate 51 Patch Artifact (r38 Compatibility)
+        uses: actions/upload-artifact@v4
+        with:
+          name: 51_patch_gki-android16-6.12-r38_candidate
+          path: candidate_patches/gki-android16-6.12-r38-patch51/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch
+
+      - name: Upload Public 51 Patch Artifact (r38 Compatibility)
         uses: actions/upload-artifact@v4
         with:
           name: 51_patch_gki-android16-6.12-r38

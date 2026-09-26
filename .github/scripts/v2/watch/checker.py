@@ -29,6 +29,7 @@ from ..semantic import SemanticInventory, SemanticKind, inventory_patch
 from ..source.baseline import load_authoritative_bundle
 from ..source.bundle import SourceBundle, create_source_bundle
 from ..source.patch_apply import SourceBundlePatchError, apply_patch_to_bundle
+from ..validation.exact_patch import validate_patch_syntax
 from .model import SourceResult, WatchClassification, WatchReport
 
 try:
@@ -501,6 +502,9 @@ class UpstreamWatcher:
         # 1. Regenerate candidate Patch 51 from the NEW immutable upstream input
         try:
             candidate_patch_text = deinline_patch_content(fetched_contents[patch50_file], target=target_id)
+            syntax_errors = validate_patch_syntax(candidate_patch_text)
+            if syntax_errors:
+                raise ValueError("Syntax errors in candidate patch: " + "; ".join(syntax_errors))
             parsed_candidate = parse_patch(candidate_patch_text)
         except Exception as exc:
             return SourceResult(
