@@ -1,5 +1,5 @@
 From: yapixel <yapixel@users.noreply.github.com>
-Date: Fri, 25 Sep 2026 22:14:22 +0000
+Date: Thu, 27 Aug 2026 15:43:33 +0000
 Subject: [PATCH] SUSFS de-inlined hooks for sultan-android14-6.1
 
 ---
@@ -15,14 +15,14 @@ Subject: [PATCH] SUSFS de-inlined hooks for sultan-android14-6.1
  fs/proc_namespace.c   |  178 +++++++++++++++++++++++++++++++++++++
  fs/readdir.c          |  197 +++++++++++++++++++++++++++++++++++++++++
  fs/stat.c             |   52 +++++++++++
- fs/statfs.c           |   81 +++++++++++++++++
+ fs/statfs.c           |   77 ++++++++++++++++
  fs/super.c            |   24 +++++
  fs/susfs.c            |   64 +++++++++++++
  include/linux/susfs.h |   20 ++++
  kernel/kallsyms.c     |   31 ++++++
  kernel/sys.c          |   26 ++---
  mm/memory.c           |    8 ++
- 19 files changed, 1411 insertions(+), 18 deletions(-)
+ 19 files changed, 1407 insertions(+), 18 deletions(-)
 
 diff --git a/drivers/input/input.c b/drivers/input/input.c
 index 78be582b5766..ca17a064ac9a 100644
@@ -1975,7 +1975,7 @@ index ef50573c7..60b31f5e4 100644
  	if (path.mnt->mnt_root == path.dentry)
 
 diff --git a/fs/statfs.c b/fs/statfs.c
-index 96d1c3edf..320223f57 100644
+index 96d1c3edf..4cb840a69 100644
 --- a/fs/statfs.c
 +++ b/fs/statfs.c
 @@ -9,8 +9,20 @@
@@ -1999,16 +1999,12 @@ index 96d1c3edf..320223f57 100644
  static int flags_by_mnt(int mnt_flags)
  {
  	int flags = 0;
-@@ -69,6 +81,42 @@ static int statfs_by_dentry(struct dentry *dentry, struct kstatfs *buf)
+@@ -69,6 +81,38 @@ static int statfs_by_dentry(struct dentry *dentry, struct kstatfs *buf)
  	return retval;
  }
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-+int statfs_by_dentry_wrapper(struct dentry *dentry, struct kstatfs *buf){
-+	return statfs_by_dentry(dentry, buf);
-+}
-+
-+int calculate_f_flags_wrapper(struct vfsmount *mnt)
++int susfs_calculate_f_flags(struct vfsmount *mnt)
 +{
 +	return calculate_f_flags(mnt);
 +}
@@ -2042,7 +2038,7 @@ index 96d1c3edf..320223f57 100644
  int vfs_get_fsid(struct dentry *dentry, __kernel_fsid_t *fsid)
  {
  	struct kstatfs st;
-@@ -87,6 +135,39 @@ int vfs_statfs(const struct path *path, struct kstatfs *buf)
+@@ -87,6 +131,39 @@ int vfs_statfs(const struct path *path, struct kstatfs *buf)
  {
  	int error;
  
@@ -2154,7 +2150,7 @@ index f0ea0561195b..4c2895f80f7d 100755
  	struct st_susfs_sus_path_list *cursor = NULL;
  	struct path path;
  	struct inode *inode;
-@@ -707,6 +708,62 @@ void susfs_sus_kstat_spoof_proc_fd_seq_show(int *out_target_mnt_id, unsigned lo
+@@ -723,6 +724,62 @@ void susfs_sus_kstat_spoof_proc_fd_seq_show(int *out_target_mnt_id, unsigned lo
  }
  #endif // #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
  
@@ -2217,7 +2213,7 @@ index f0ea0561195b..4c2895f80f7d 100755
  /* spoof_uname */
  #ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
  static struct st_susfs_uname my_uname = {0};
-@@ -1267,6 +1324,11 @@ void susfs_get_enabled_features(void __user **user_info) {
+@@ -1283,6 +1340,11 @@ void susfs_get_enabled_features(void __user **user_info) {
  	if (info->err) goto out_copy_to_user;
  	buf_ptr = info->enabled_features + copied_size;
  #endif

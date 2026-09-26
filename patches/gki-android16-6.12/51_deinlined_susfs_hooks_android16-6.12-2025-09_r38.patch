@@ -1924,16 +1924,12 @@ index 83c5d3febbb8..6975513ebc36 100644
  static int flags_by_mnt(int mnt_flags)
  {
  	int flags = 0;
-@@ -69,6 +81,42 @@ static int statfs_by_dentry(struct dentry *dentry, struct kstatfs *buf)
+@@ -69,6 +81,38 @@ static int statfs_by_dentry(struct dentry *dentry, struct kstatfs *buf)
  	return retval;
  }
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-+int statfs_by_dentry_wrapper(struct dentry *dentry, struct kstatfs *buf){
-+	return statfs_by_dentry(dentry, buf);
-+}
-+
-+int calculate_f_flags_wrapper(struct vfsmount *mnt)
++int susfs_calculate_f_flags(struct vfsmount *mnt)
 +{
 +	return calculate_f_flags(mnt);
 +}
@@ -1967,7 +1963,7 @@ index 83c5d3febbb8..6975513ebc36 100644
  int vfs_get_fsid(struct dentry *dentry, __kernel_fsid_t *fsid)
  {
  	struct kstatfs st;
-@@ -87,6 +135,39 @@ int vfs_statfs(const struct path *path, struct kstatfs *buf)
+@@ -87,6 +131,39 @@ int vfs_statfs(const struct path *path, struct kstatfs *buf)
  {
  	int error;
  
