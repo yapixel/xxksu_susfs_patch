@@ -5,16 +5,14 @@ Subject: [PATCH] Enable SUSFS for backslashxx KernelSU
 
 ---
  kernel/Kconfig                        |  98 +++++++++++++++
- kernel/downstream/ksu_hostsredirect.h |   4 +
- kernel/feature/kernel_umount.c        |  44 ++++++---
- kernel/hook/setuid_hook.c             | 169 +++++++++++++++++++++++---
+ kernel/hook/setuid_hook.c             |  40 +++++++++++++++++-
  kernel/ksu.c                          |   8 ++
  kernel/selinux/rules.c                |   7 ++
  kernel/selinux/selinux.c              | 103 ++++++++++++++++
  kernel/selinux/selinux.h              |  14 +++
  kernel/supercall/dispatch.c           |  24 ++++
  kernel/supercall/supercall.c          |  99 +++++++++++++++
- 10 files changed, 536 insertions(+), 34 deletions(-)
+ 8 files changed, 392 insertions(+), 1 deletion(-)
 
 diff --git a/kernel/Kconfig b/kernel/Kconfig
 index 45e09d1..e783e43 100644
@@ -123,291 +121,61 @@ index 45e09d1..e783e43 100644
 +endmenu
 +
  endmenu
-diff --git a/kernel/downstream/ksu_hostsredirect.h b/kernel/downstream/ksu_hostsredirect.h
-index 4d98a8b..67da4cc 100644
---- a/kernel/downstream/ksu_hostsredirect.h
-+++ b/kernel/downstream/ksu_hostsredirect.h
-@@ -14,7 +14,11 @@
- #ifndef __KSU_H_HOSTSREDIRECT
- #define __KSU_H_HOSTSREDIRECT
- 
-+#ifndef CONFIG_KSU_SUSFS
- static bool ksu_kernel_umount_enabled __read_mostly;
-+#else
-+extern bool ksu_kernel_umount_enabled;
-+#endif
- 
- static __always_inline void ksu_hosts_file_redirect(const char __user *filename, int flags, int *fd_ptr)
- {
-diff --git a/kernel/feature/kernel_umount.c b/kernel/feature/kernel_umount.c
-index 704e000..e1ae756 100644
---- a/kernel/feature/kernel_umount.c
-+++ b/kernel/feature/kernel_umount.c
-@@ -1,4 +1,14 @@
-+#ifndef CONFIG_KSU_SUSFS
- static bool ksu_kernel_umount_enabled __read_mostly = true;
-+#else
-+bool ksu_kernel_umount_enabled = true;
-+#endif // #ifndef CONFIG_KSU_SUSFS
-+bool ksu_webview_zygote_umount_enabled = true;
-+
-+bool ksu_is_webview_zygote_umount_enabled(void)
-+{
-+	return READ_ONCE(ksu_webview_zygote_umount_enabled);
-+}
- 
- static int kernel_umount_feature_get(u64 *value)
- {
-@@ -56,7 +66,11 @@
- }
- #endif
- 
--static inline void try_umount(const char *mnt, int flags)
-+#if !defined(CONFIG_KSU_SUSFS) || !defined(CONFIG_KSU_SUSFS_TRY_UMOUNT)
-+static void try_umount(const char *mnt, int flags)
-+#else
-+void try_umount(const char *mnt, int flags)
-+#endif
- {
- 	struct path path;
- 	int err = kern_path(mnt, 0, &path);
-@@ -70,14 +84,20 @@ static inline void try_umount(const char *mnt, int flags)
- 		return;
- 	}
- 
-+#ifndef KSU_HAS_PATH_UMOUNT
- 	ksu_umount_mnt(mnt, &path, flags);
-+#else
-+	ksu_umount_mnt(&path, flags);
-+#endif
-+	path_put(&path);
- }
- 
--static inline int ksu_handle_umount(struct cred *new, const struct cred *old)
-+#ifdef CONFIG_KSU_SUSFS
-+int ksu_handle_umount(uid_t old_uid, uid_t new_uid)
-+#else
-+static inline int ksu_handle_umount(uid_t old_uid, uid_t new_uid)
-+#endif
- {
--	uid_t new_uid = ksu_get_uid_t(new->uid);
--	uid_t old_uid = ksu_get_uid_t(old->uid);
--
- 	if (!ksu_kernel_umount_enabled)
- 		return 0;
- 
-@@ -85,6 +105,10 @@ static inline int ksu_handle_umount(struct cred *new, const struct cred *old)
- 	if (!ksu_module_mounted)
- 		return 0;
- 
-+	// Handle webview zygote umount policy
-+	if (new_uid == WEBVIEW_ZYGOTE_UID && !ksu_is_webview_zygote_umount_enabled())
-+		return 0;
-+
- 	// There are 6 scenarios:
- 	// 1. Normal app: zygote -> appuid
- 	// 2. Isolated process forked from zygote: zygote -> isolated_process
-@@ -98,16 +122,6 @@ static inline int ksu_handle_umount(struct cred *new, const struct cred *old)
- 	if (!ksu_uid_should_umount(new_uid) && !is_isolated_process(new_uid))
- 		return 0;
- 
--	// check old process's selinux context, if it is not zygote, ignore it!
--	// because some su apps may setuid to untrusted_app but they are in global mount namespace
--	// when we umount for such process, that is a disaster!
--	// also handle case 4 and 5
--	bool is_zygote_child = is_zygote(old);
--	if (!is_zygote_child) {
--		pr_info("handle umount ignore non zygote child: %d\n", current->pid);
--		return 0;
--	}
--
- #ifdef CONFIG_KSU_HOSTSREDIRECT
- 	set_thread_flag(TIF_KSU_UNMOUNTABLE);
- #endif
 diff --git a/kernel/hook/setuid_hook.c b/kernel/hook/setuid_hook.c
-index 9257980..c0cdcad 100644
+index 9257980..d42a673 100644
 --- a/kernel/hook/setuid_hook.c
 +++ b/kernel/hook/setuid_hook.c
-@@ -1,4 +1,137 @@
--static __always_inline void ksu_handle_setresuid_cred(struct cred *new, const struct cred *old)
+@@ -1,3 +1,33 @@
 +#ifdef CONFIG_KSU_SUSFS
 +#include <linux/susfs_def.h>
 +#include "selinux/selinux.h"
-+#endif
 +
-+#ifdef CONFIG_KSU_SUSFS
-+extern u32 susfs_zygote_sid;
-+extern u32 susfs_zygote_next_sid;
-+extern void disable_seccomp(void);
 +extern struct work_struct susfs_extra_works;
-+extern bool ksu_is_webview_zygote_umount_enabled(void);
-+#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
-+extern void susfs_try_umount(uid_t uid);
-+#endif
 +
 +static inline void ksu_handle_extra_susfs_work(void)
 +{
-+	if (work_pending(&susfs_extra_works))
-+		return;
-+
-+	schedule_work(&susfs_extra_works);
++	if (!work_pending(&susfs_extra_works))
++		schedule_work(&susfs_extra_works);
 +}
 +
-+static int handle_zygote_setresuid(uid_t ruid) {
-+	// Check if spawned process is isolated service first, and force to do umount if so
-+	if (is_isolated_process(ruid)) {
-+		susfs_set_current_proc_no_su();
-+		susfs_set_current_proc_umounted();
-+		goto do_umount;
-+	}
-+
-+	// Check if webview zygote should be umounted
-+	if (unlikely(ruid == WEBVIEW_ZYGOTE_UID)) {
-+		if (ksu_is_webview_zygote_umount_enabled()) {
-+			susfs_set_current_proc_no_su();
-+			susfs_set_current_proc_umounted();
-+			goto do_umount;
-+		}
-+		susfs_set_current_proc_no_su();
-+		return 0;
-+	}
-+
-+	// Normal app that needs umount
-+	if (likely(is_appuid(ruid) && ksu_uid_should_umount(ruid))) {
-+		susfs_set_current_proc_no_su();
-+		susfs_set_current_proc_umounted();
-+		goto do_umount;
-+	}
-+
-+	// Root allowed apps
-+	if (ksu_is_allow_uid_for_current(ruid)) {
-+		disable_seccomp();
-+		return 0;
-+	}
-+
-+	susfs_set_current_proc_no_su();
-+	return 0;
-+
-+do_umount:
-+	{
-+#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
-+		susfs_try_umount(ruid);
-+#endif
-+		ksu_handle_umount(current_uid().val, ruid);
-+		ksu_handle_extra_susfs_work();
-+	}
-+
-+	return 0;
-+}
-+
-+static int handle_zygote_next_setresuid(uid_t ruid) {
-+	// zygote_next: do NOT umount, just set flags
-+	if (is_isolated_process(ruid)) {
-+		susfs_set_current_proc_no_su();
-+		susfs_set_current_proc_umounted();
-+		susfs_set_current_proc_umounted_for_zygote_next();
-+		goto do_susfs_work;
-+	}
-+
-+	if (unlikely(ruid == WEBVIEW_ZYGOTE_UID)) {
-+		if (ksu_is_webview_zygote_umount_enabled()) {
-+			susfs_set_current_proc_no_su();
-+			susfs_set_current_proc_umounted();
-+			susfs_set_current_proc_umounted_for_zygote_next();
-+			goto do_susfs_work;
-+		}
-+		susfs_set_current_proc_no_su();
-+		return 0;
-+	}
-+
-+	if (likely(is_appuid(ruid) && ksu_uid_should_umount(ruid))) {
-+		susfs_set_current_proc_no_su();
-+		susfs_set_current_proc_umounted();
-+		susfs_set_current_proc_umounted_for_zygote_next();
-+		goto do_susfs_work;
-+	}
-+
-+	if (ksu_is_allow_uid_for_current(ruid)) {
-+		disable_seccomp();
-+		return 0;
-+	}
-+
-+	susfs_set_current_proc_no_su();
-+	return 0;
-+
-+do_susfs_work:
-+	{
-+#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
-+		susfs_try_umount(ruid);
-+#endif
-+		ksu_handle_extra_susfs_work();
-+	}
-+
-+	return 0;
-+}
-+
-+int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
++static inline void handle_zygote_setresuid(struct cred *new, const struct cred *old, uid_t new_uid, bool is_zygote_next)
 +{
-+	uid_t cur_uid = current_uid().val;
++	bool is_isolated = is_isolated_process(new_uid);
++	bool should_umount = likely((is_appuid(new_uid) || new_uid == WEBVIEW_ZYGOTE_UID) && ksu_uid_should_umount(new_uid));
 +
-+	if (cur_uid != 0)
-+		return 0;
++	susfs_set_current_proc_no_su();
 +
-+	if (susfs_is_sid_equal(current_cred(), susfs_zygote_sid))
-+		return handle_zygote_setresuid(ruid);
-+
-+	if (susfs_is_sid_equal(current_cred(), susfs_zygote_next_sid))
-+		return handle_zygote_next_setresuid(ruid);
-+
-+	return 0;
++	if (is_isolated || should_umount) {
++		susfs_set_current_proc_umounted();
++		if (is_zygote_next)
++			susfs_set_current_proc_umounted_for_zygote_next();
++		if (!is_zygote_next)
++			ksu_handle_umount(new, old);
++		ksu_handle_extra_susfs_work();
++	}
 +}
 +#endif // #ifdef CONFIG_KSU_SUSFS
 +
-+void ksu_handle_setresuid_cred(struct cred *new, const struct cred *old)
+ static __always_inline void ksu_handle_setresuid_cred(struct cred *new, const struct cred *old)
  {
  	if (!new || !old)
- 		return;
-@@ -13,24 +146,22 @@ static __always_inline void ksu_handle_setresuid_cred(struct cred *new, const st
- 	if (IS_ENABLED(CONFIG_KSU_DEBUG))
- 		pr_info("handle_setresuid from %d to %d\n", old_uid, new_uid);
+@@ -22,7 +52,15 @@ static __always_inline void ksu_handle_setresuid_cred(struct cred *new, const st
+ 		goto kill_seccomp;
  
--	// we dont have those new fancy things upstream has
--	// lets just do the original thing where we disable seccomp
--	if (unlikely(is_uid_manager(new_uid)))
--		goto install_ksu_fd;
--
--	if (ksu_is_allow_uid_for_current(new_uid))
--		goto kill_seccomp;
--
--	// Handle kernel umount
+ 	// Handle kernel umount
 -	ksu_handle_umount(new, old);
--	return;
 +#ifdef CONFIG_KSU_SUSFS
-+	if (unlikely(is_uid_manager(new_uid))) {
-+		disable_seccomp();
-+		set_thread_flag(TIF_KSU_MANAGED); // sucompat fast-path
-+		pr_info("install fd for manager: %d\n", new_uid);
-+		ksu_install_fd();
-+		return;
++	if (susfs_is_current_zygote_domain() || new_uid == WEBVIEW_ZYGOTE_UID) {
++		handle_zygote_setresuid(new, old, new_uid, false);
++	} else if (susfs_is_current_zygote_next_domain()) {
++		handle_zygote_setresuid(new, old, new_uid, true);
 +	}
- 
--install_ksu_fd:
--	pr_info("install fd for manager: %d\n", new_uid);
--	ksu_install_fd();
-+	if (ksu_is_allow_uid_for_current(new_uid)) {
-+		disable_seccomp();
-+		return;
-+	}
- 
--kill_seccomp:
--	disable_seccomp();
--	set_thread_flag(TIF_KSU_MANAGED); // sucompat fast-path
--	return;
-+	ksu_handle_setresuid(new_uid, new_uid, new_uid);
 +#else
-+	ksu_handle_umount(old_uid, new_uid);
-+#endif
- }
++	ksu_handle_umount(new, old);
++#endif // #ifdef CONFIG_KSU_SUSFS
+ 	return;
+ 
+ install_ksu_fd:
 diff --git a/kernel/ksu.c b/kernel/ksu.c
 index 06df055..77210ba 100644
 --- a/kernel/ksu.c
