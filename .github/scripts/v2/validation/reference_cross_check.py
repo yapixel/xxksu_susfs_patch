@@ -34,13 +34,35 @@ from ..source.hashing import hash_bytes
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MIDORI_XX_PATCH_URL = "https://github.com/midori01/KernelSU/commit/xx.patch"
-DEFAULT_MIDORI_GKI_PATCH_50_URL = "https://raw.githubusercontent.com/midori01/gki_ksu_workflow/main/.github/patches/android16-6.12/50_add_susfs_in_gki-android16-6.12.38.patch"
-DEFAULT_MIDORI_CONVERSION_SCRIPT_URL = "https://raw.githubusercontent.com/midori01/gki_ksu_workflow/main/.github/scripts/susfs_deinlined.sh"
+PINNED_MIDORI_GKI_PATCH_50_COMMIT = "54b1647db92ead90acf263e0dd48836163b40da5"
+PINNED_MIDORI_CONVERSION_SCRIPT_COMMIT = PINNED_MIDORI_GKI_PATCH_50_COMMIT
+PINNED_MIDORI_XX_PATCH_COMMIT = "d09d7a875dce2a97c64c7e6bf336a76e03ce883b"
+DEFAULT_MIDORI_XX_PATCH_URL = f"https://github.com/midori01/KernelSU/commit/{PINNED_MIDORI_XX_PATCH_COMMIT}.patch"
+DEFAULT_MIDORI_GKI_PATCH_50_URL = f"https://raw.githubusercontent.com/midori01/gki_ksu_workflow/{PINNED_MIDORI_GKI_PATCH_50_COMMIT}/.github/patches/android16-6.12/50_add_susfs_in_gki-android16-6.12.38.patch"
+DEFAULT_MIDORI_CONVERSION_SCRIPT_URL = f"https://raw.githubusercontent.com/midori01/gki_ksu_workflow/{PINNED_MIDORI_CONVERSION_SCRIPT_COMMIT}/.github/scripts/susfs_deinlined.sh"
+REFERENCE_HASHES = {
+    DEFAULT_MIDORI_XX_PATCH_URL: "5718592eda702d15d6c5e6b59cd45c696b1a740176c31a3839f7885f5527c91d",
+    DEFAULT_MIDORI_GKI_PATCH_50_URL: "862a60184970b821fa69a188b5fa70cb37c1b82d1d59e08b9a3b5daf67208ce1",
+    DEFAULT_MIDORI_CONVERSION_SCRIPT_URL: "1e402acaaac7c611319aa2a112f92fdeabce4fafcb6e39204c13b8d18546e54b",
+}
 
-PINNED_MIDORI_GKI_PATCH_50_COMMIT = "6d0ee7e891de16793a87abad6caf6584559f156d"
-PINNED_MIDORI_CONVERSION_SCRIPT_COMMIT = "a612f23dfb2abd7551a1c4873c513bad733f1e4c"
-PINNED_MIDORI_XX_PATCH_COMMIT = "5fe0e96fb1642bb2f3b70bcf23f21765b6d76a09"
+# Exact file-diff pairs reviewed against the authenticated r38 postimages.
+# No filename/symbol wildcard: even a one-line lifecycle change requires review.
+# Evidence and behavioral regression coverage: PATCH51_CORRECTIONS.md.
+REVIEWED_LIFECYCLE_DIFFERENCES = {
+    "fs/namei.c": (
+        "ee94ae51552dce2352dac178a2b0e75f7ae8ddb79504d623f628dfeebb835a3c",
+        "17a68048d5ee940ed0e62ea7079aeeef57de6c13565ef21831737043f6c18c67",
+        "Local filename_lookup and old_name restoration agree; declaration order only."),
+    "fs/namespace.c": (
+        "ed9af3d926f9072cc75387728b0d004f89bd433cf6359933c9393f6b14c70a42",
+        "4a6bff8267d35326dfed3ef23cef9e1a1cdb6ca6971c368bbbdb8e9c7fa6527e",
+        "Allocation provenance plus inherited-flag clearing and early-error accounting; retain locked non-sus lookup instead of reference early returns."),
+    "fs/proc/task_mmu.c": (
+        "2d468a038a169a916b514140f35bf5d54e0f5edc40c09950bdc607a8849a83b8",
+        "91d7d11a43f12105e5797189e135a5e09a0c95aa5f2bd903a6cee2282a8437be",
+        "Intentional correction: VMA-bounded zero pagemap entries and shared gather guard; reference retains both defects."),
+}
 
 HOOK_PATTERN = re.compile(r"\b(ksu_handle_\w+|ksu_hook_\w+|susfs_\w+)\b")
 
@@ -52,6 +74,7 @@ class ReferenceComparisonClassification(str, Enum):
     OUR_EXTRA = "OUR_EXTRA"
     SEMANTIC_CONFLICT = "SEMANTIC_CONFLICT"
     REFERENCE_UNAVAILABLE = "REFERENCE_UNAVAILABLE"
+    REVIEW_REQUIRED = "REVIEW_REQUIRED"
 
 
 class ReferenceCrossCheckError(Exception):
@@ -122,6 +145,8 @@ def fetch_reference_url(url: str, timeout: int = 30) -> tuple[str, str]:
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         data = resp.read()
         sha256 = hashlib.sha256(data).hexdigest()
+        if url in REFERENCE_HASHES and sha256 != REFERENCE_HASHES[url]:
+            raise ValueError(f"Reference content hash mismatch: {url}")
         text = data.decode("utf-8", errors="replace")
         return text, sha256
 
@@ -142,8 +167,8 @@ def regenerate_midori_patch51(
     metadata: dict[str, str] = {
         "patch50_url": patch50_url,
         "script_url": script_url,
-        "pinned_patch50_commit": PINNED_MIDORI_GKI_PATCH_50_COMMIT,
-        "pinned_script_commit": PINNED_MIDORI_CONVERSION_SCRIPT_COMMIT,
+        "pinned_patch50_commit": PINNED_MIDORI_GKI_PATCH_50_COMMIT if patch50_url == DEFAULT_MIDORI_GKI_PATCH_50_URL and patch50_content is None else "OVERRIDE",
+        "pinned_script_commit": PINNED_MIDORI_CONVERSION_SCRIPT_COMMIT if script_url == DEFAULT_MIDORI_CONVERSION_SCRIPT_URL and script_content is None else "OVERRIDE",
     }
 
     try:
@@ -509,7 +534,7 @@ def compare_patch_to_reference(
             blocks_promotion=False,
             our_sha256=our_sha,
             ref_sha256="UNKNOWN",
-            details="Reference source is unavailable. Promotion authorized (third-party reference outage does not corrupt authoritative state).",
+            details="Reference unavailable, NOT a semantic match. Authoritative validation remains mandatory; the reference cannot authorize production.",
             touched_files_our=(),
             touched_files_ref=(),
             metadata=meta,
@@ -606,6 +631,39 @@ def compare_patch_to_reference(
             removed_ksu_hooks_ref=removed_ksu_ref,
             metadata=meta,
         )
+
+    if "51" in patch_id:
+        from ..engine.emitter import emit_patch
+        from ..model.patch import Patch
+        def file_hashes(patch):
+            return {normalize_file_path(f.new_path or f.old_path):
+                    hashlib.sha256(emit_patch(Patch(files=[f])).encode()).hexdigest()
+                    for f in patch.files}
+        ours, refs = file_hashes(p_our), file_hashes(p_ref)
+        reviewed, pending = {}, []
+        for path, (ours_hash, ref_hash, reason) in REVIEWED_LIFECYCLE_DIFFERENCES.items():
+            if ours.get(path) == refs.get(path):
+                continue
+            if ours.get(path) == ours_hash and refs.get(path) == ref_hash:
+                reviewed[path] = reason
+            else:
+                pending.append(path)
+        meta["reviewed_lifecycle_differences"] = reviewed
+        meta["review_required_files"] = pending
+        if pending:
+            return ReferenceComparisonResult(
+                patch_id, reference_source_name, ReferenceComparisonClassification.REVIEW_REQUIRED,
+                False, True, our_sha, ref_sha,
+                "Unreviewed lifecycle/concurrency differences: " + ", ".join(pending),
+                files_our_tuple, files_ref_tuple, metadata=meta)
+        if reviewed:
+            return ReferenceComparisonResult(
+                patch_id, reference_source_name, ReferenceComparisonClassification.IMPLEMENTATION_DIFFERENCE,
+                True, False, our_sha, ref_sha,
+                "Explicitly reviewed differences; NOT blanket semantic equivalence. " + " ".join(reviewed.values()),
+                files_our_tuple, files_ref_tuple,
+                retained_susfs_hooks_our=retained_susfs_our, retained_susfs_hooks_ref=retained_susfs_ref,
+                removed_ksu_hooks_our=removed_ksu_our, removed_ksu_hooks_ref=removed_ksu_ref, metadata=meta)
 
     # 6. Evaluate specific patch policies
     # Patch 11 vs Midori xx.patch policy:
@@ -798,8 +856,8 @@ def compare_patch_to_reference(
             )
         else:
             diff_details = (
-                f"Candidate and reference modify identical {len(files_our)} files with equivalent deinlined semantics. "
-                "Minor implementation variations (e.g. open redirect path lookup / hunk context offsets) detected."
+                f"Candidate and reference modify identical {len(files_our)} files. "
+                "Non-lifecycle implementation differences; file/symbol equality alone is not semantic proof."
             )
             return ReferenceComparisonResult(
                 patch_id=patch_id,
@@ -943,7 +1001,7 @@ def format_gki_patch51_parity_details(rep: Mapping[str, Any]) -> str:
     """Derive compact reference parity details for GKI Patch 51 from machine-readable report."""
     classification = rep.get("classification", "")
     if classification == ReferenceComparisonClassification.IMPLEMENTATION_DIFFERENCE.value:
-        return "Equivalent deinlined hooks across 16 files; open_redirect implementation variation."
+        return str(rep.get("details", "Reviewed implementation differences; not byte parity."))
     elif classification == ReferenceComparisonClassification.SEMANTIC_MATCH.value:
         return "Exact semantic match for deinlined hooks across 16 files."
     elif classification == ReferenceComparisonClassification.SEMANTIC_CONFLICT.value:

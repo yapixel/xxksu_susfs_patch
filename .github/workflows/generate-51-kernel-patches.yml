@@ -17,6 +17,8 @@ on:
     paths:
       - ".github/workflows/generate-51-kernel-patches.yml"
       - ".github/scripts/v2/pipeline.py"
+      - ".github/scripts/v2/policy/lifecycle.py"
+      - ".github/scripts/v2/validation/reference_cross_check.py"
       - ".github/fixtures/**"
       - "patches/**/51_*.patch"
       - "patches/manifest.json"
@@ -70,9 +72,11 @@ jobs:
           set -euo pipefail
           mkdir -p kernel_tree
           echo "📥 Cloning kernel tree from https://github.com/kerneltoast/android_kernel_google_tensynos.git (16.0.0-sultan)..."
-          git clone --depth=1 --single-branch -b "16.0.0-sultan" "https://github.com/kerneltoast/android_kernel_google_tensynos.git" kernel_tree
           cd kernel_tree
-          git checkout "af5c65b9547a9f33c5f566430d0434aecab5a8b5" || true
+          git init
+          git remote add origin "https://github.com/kerneltoast/android_kernel_google_tensynos.git"
+          git fetch --depth=1 origin "af5c65b9547a9f33c5f566430d0434aecab5a8b5"
+          git checkout --detach FETCH_HEAD
 
       - name: Setup SuSFS Core Source Files (Sultan 6.1)
         run: |
@@ -184,7 +188,11 @@ jobs:
           set -euo pipefail
           mkdir -p kernel_tree
           echo "📥 Downloading r38 kernel source archive..."
-          curl -LSs "https://github.com/yapixel/gki-build-assets/releases/download/android16-6.12-2025-09_r38/common-android16-6.12-2025-09_r38.tar.gz" | tar -xz -C kernel_tree
+          archive_url=$(python3 -c 'import json; print(json.load(open(".github/fixtures/v2/r38-sources.json"))["archive_url"])')
+          archive_sha=$(python3 -c 'import json; print(json.load(open(".github/fixtures/v2/r38-sources.json"))["archive_sha256"])')
+          curl --fail --location --silent --show-error "$archive_url" -o r38-source.tar.gz
+          printf '%s  %s\n' "$archive_sha" r38-source.tar.gz | sha256sum --check --strict
+          tar -xzf r38-source.tar.gz -C kernel_tree
 
           cd kernel_tree
           if [ ! -d ".git" ]; then

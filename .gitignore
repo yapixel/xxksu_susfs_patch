@@ -6,3 +6,5 @@ __pycache__/
 *.rej
 *~
 candidate_patches/
+# Local append-only signing fallback ledger (also records its documentation commits).
+.codex/HANDOFF.md

@@ -168,17 +168,17 @@ class TestNormalizer(unittest.TestCase):
             normalize_patch_offsets(patch_text, {"other.c": "ctx\n"})
 
     def test_r38_manual_fixture_normalization_and_bundle_reapply(self):
-        r38_dir = Path("/home/codex/.gemini/antigravity-cli/brain/d3167f18-714c-4639-9a70-e941c706fe60/scratch/r38_files")
-        if not r38_dir.exists():
-            self.skipTest("r38 scratch files not available")
-
-        target_sources = {
-            "fs/exec.c": (r38_dir / "fs/exec.c").read_text(encoding="utf-8"),
-            "fs/open.c": (r38_dir / "fs/open.c").read_text(encoding="utf-8"),
-            "fs/stat.c": (r38_dir / "fs/stat.c").read_text(encoding="utf-8"),
-            "kernel/reboot.c": (r38_dir / "kernel/reboot.c").read_text(encoding="utf-8"),
-            "security/security.c": (r38_dir / "security/security.c").read_text(encoding="utf-8"),
-        }
+        from v2.policy.lifecycle import r38_sources
+        sources = r38_sources(Path(__file__).resolve().parents[4])
+        target_sources = {path: sources[path] for path in
+                          ("fs/exec.c", "fs/open.c", "fs/stat.c", "kernel/reboot.c", "security/security.c")}
+        # Manual hooks are applied AFTER Patch 51. The old scratch directory
+        # silently contained the patched stat.c (+67 lines), not a clean tree.
+        from v2.model.patch import Patch
+        base51 = parse_patch(next(Path(".github/fixtures/r38").glob("51_*.patch")).read_text())
+        stat_patch = Patch(files=[f for f in base51.files if f.old_path == "a/fs/stat.c"])
+        stat_bundle = create_source_bundle("gki-android16-6.12", "6.12", {"fs/stat.c": sources["fs/stat.c"]})
+        target_sources["fs/stat.c"] = apply_patch_to_bundle(stat_bundle, emit_patch(stat_patch)).files[0].content
 
         # 1. The normalized r38 fixture on disk has 0 drift and applies directly at offset 0
         patch_scope_text = Path(".github/fixtures/r38/scope-min-manual-hooks-v2.3.patch").read_text(encoding="utf-8")

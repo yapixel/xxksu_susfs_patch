@@ -166,7 +166,7 @@ index 7777777..8888888 100644
         self.assertFalse(res.blocks_promotion)
         self.assertEqual(res.classification, ReferenceComparisonClassification.REFERENCE_UNAVAILABLE)
         self.assertEqual(res.ref_sha256, "UNKNOWN")
-        self.assertIn("Promotion authorized", res.details)
+        self.assertIn("NOT a semantic match", res.details)
 
     # 6. Midori converter uses Midori Patch 50, never ours
     def test_06_midori_converter_uses_midori_patch_50_never_ours(self):
