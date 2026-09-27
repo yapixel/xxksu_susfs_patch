@@ -42,7 +42,6 @@ jobs:
     permissions:
       contents: read
     env:
-      TMPDIR: ${{ runner.temp }}
       PYTHONDONTWRITEBYTECODE: "1"
     steps:
       - name: Checkout Repository
@@ -64,6 +63,7 @@ jobs:
           KSU_OVERRIDE: ${{ github.event.inputs.ksu_branch || '' }}
         run: |
           set -euo pipefail
+          echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
           PYTHONPATH=.github/scripts python3 - <<'PY' >> "$GITHUB_ENV"
           import os, re, json
           from v2.manifests.defaults import accepted_sources
@@ -157,7 +157,6 @@ jobs:
     permissions:
       contents: read
     env:
-      TMPDIR: ${{ runner.temp }}
       PYTHONDONTWRITEBYTECODE: "1"
     steps:
       - name: Checkout Repository
@@ -179,6 +178,7 @@ jobs:
           KSU_OVERRIDE: ${{ github.event.inputs.ksu_branch || '' }}
         run: |
           set -euo pipefail
+          echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
           PYTHONPATH=.github/scripts python3 - <<'PY' >> "$GITHUB_ENV"
           import os, re, json
           from v2.manifests.defaults import accepted_sources
