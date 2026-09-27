@@ -168,9 +168,9 @@ def generate_sultan_patch51_from_input(upstream_input: Path, repo_root: Path) ->
 
 def generate_gki_r38_patch51_from_input(upstream_input: Path, repo_root: Path) -> str:
     """Reconstruct from accepted Patch 50 and authenticated r38 preimages."""
-    from .policy.gki_r38 import reconstruct
+    from .policy.patch51_source import generate
     try:
-        return reconstruct(upstream_input, repo_root)
+        return generate("gki-android16-6.12-r38-patch51", upstream_input, repo_root)[0]
     except (ValueError, KeyError, OSError) as exc:
         raise CandidateGenerationError(str(exc)) from exc
 
