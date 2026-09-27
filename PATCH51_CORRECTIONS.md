@@ -47,9 +47,9 @@ Compiled tests enumerate all 256 visible/hidden arrangements across eight VMA bo
 
 ### P1 GKI smaps_rollup reacquire — CONFIRMED + FIXED
 
-The original normal loop and case-4 path guard hidden VMAs, but the case-1/2 `smap_gather_stats(vma, &mss, last_vma_end)` after mmap-lock reacquire does not. The shared `smap_gather_stats` now returns before any shmem swap accounting or page walk for a hidden VMA. All call sites—including partial-VMA and reacquire paths—converge on this guard. Caller progress/last_vma_end handling and visible statistics are unchanged.
+The original normal loop and case-4 path guard hidden VMAs, but the case-1/2 `smap_gather_stats(vma, &mss, 0)` after mmap-lock reacquire does not. The shared `smap_gather_stats` now returns before any shmem swap accounting or page walk for a hidden VMA. All call sites—including partial-VMA (`last_vma_end`) and reacquire paths—converge on this guard. Caller progress/last_vma_end handling and visible statistics are unchanged.
 
-Compiled actual gather code tests normal, partial/reacquired and exhausted ranges with ordinary/shmem mappings, hidden and visible. The original gather fails this test. Pinned official GKI and Midori retain the inherited missing guard.
+Compiled actual gather code tests normal, partial/reacquired and exhausted ranges with ordinary/shmem mappings, hidden and visible. A second harness executes the actual rollup loop and its lock-contention branches for cases 1–4, checking visible totals and lock state. The original gather fails both harnesses. Pinned official GKI and Midori retain the inherited missing guard.
 
 ### P2 r38 archive authentication — CONFIRMED + FIXED
 

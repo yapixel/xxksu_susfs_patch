@@ -97,6 +97,21 @@ class LifecycleTests(unittest.TestCase):
         old = function(postimages(True, False)["fs/proc/task_mmu.c"], "static void smap_gather_stats(")
         self.assertNotEqual(run_c(SMAPS_MOCKS + old + SMAPS_CASES), 0)
 
+    def test_smaps_actual_rollup_reacquire_branches(self):
+        source = self.gki["fs/proc/task_mmu.c"]
+        rollup = function(source, "static int show_smaps_rollup(")
+        loop = rollup[rollup.index("\tdo {"):rollup.index("\nempty_set:")]
+        wrapper = ("static unsigned long run_rollup(void) {\n"
+                   "struct mem_size_stats mss={0}; struct mm_struct *mm=NULL;\n"
+                   "void *priv=NULL; int ret=0,vmi=0; unsigned long last_vma_end=0;\n"
+                   "struct vm_area_struct *vma=vma_next(&vmi);\n" + loop +
+                   "\nout_put_mm: return mss.swap;\n}\n")
+        gather = function(source, "static void smap_gather_stats(")
+        harness = SMAPS_MOCKS + ROLLUP_MOCKS + gather + wrapper + ROLLUP_CASES
+        self.assertEqual(run_c(harness), 0)
+        old = function(postimages(True, False)["fs/proc/task_mmu.c"], "static void smap_gather_stats(")
+        self.assertNotEqual(run_c(SMAPS_MOCKS + ROLLUP_MOCKS + old + wrapper + ROLLUP_CASES), 0)
+
     def test_generation_deterministic_and_changed_preimage_fails(self):
         for gki in (True, False):
             directory = ROOT / ".github/fixtures" / ("r38" if gki else "sultan")
@@ -310,6 +325,35 @@ int main(void) {
   smap_gather_stats(&v,&m,mode==0?0:mode==1?8192:16384);
   if(hidden||mode==2) assert(calls==0 && m.swap==0);
   else assert(calls==1 && m.swap>0);
+ } return 0;
+}
+'''
+
+ROLLUP_MOCKS = r'''
+#include <stdbool.h>
+#define for_each_vma(iter,vma) while (((vma)=vma_next(&(iter))) != NULL)
+struct mm_struct {int unused;};
+static struct vm_area_struct sequence[2];
+static int total,contended,lock_held;
+static struct vm_area_struct *vma_next(int *i) {return *i<total?&sequence[(*i)++]:NULL;}
+static int mmap_lock_is_contended(struct mm_struct *mm) {int ret=contended;contended=0;return ret;}
+static void vma_iter_invalidate(int *i) {}
+static void mmap_read_unlock(struct mm_struct *mm) {assert(lock_held);lock_held=0;}
+static int mmap_read_lock_killable(struct mm_struct *mm) {assert(!lock_held);lock_held=1;return 0;}
+static void release_task_mempolicy(void *p) {}
+'''
+ROLLUP_CASES = r'''
+int main(void) {
+ for(int contend=0;contend<2;contend++) for(int hidden=0;hidden<2;hidden++)
+ for(int kind=1;kind<=4;kind++) {
+  struct file visible={0,0},second={hidden,0};
+  sequence[0]=(struct vm_area_struct){4096,8192,0,&visible,NULL};
+  sequence[1]=(struct vm_area_struct){kind==4?4096:8192,16384,0,&second,NULL};
+  total=kind==3?1:2;contended=contend;lock_held=1;calls=0;
+  unsigned long expected=4096;
+  if(total==2 && !hidden) expected+=contend&&kind==4?8192:16384-sequence[1].vm_start;
+  assert(run_rollup()==expected);
+  assert(lock_held);
  } return 0;
 }
 '''
