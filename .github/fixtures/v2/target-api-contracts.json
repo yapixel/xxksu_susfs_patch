@@ -3,6 +3,8 @@
     "archive_sha256": "accf8f9348280116792c9608f420f8d4554da52499119a8536883c5eefd429ff",
     "excerpts": {
       "find_vma": "extern struct vm_area_struct * find_vma(struct mm_struct * mm, unsigned long addr);",
+      "get_user_page_vma_remote": "static inline struct page *get_user_page_vma_remote(struct mm_struct *mm,\n\t\t\t\t\t\t    unsigned long addr,\n\t\t\t\t\t\t    int gup_flags,\n\t\t\t\t\t\t    struct vm_area_struct **vmap)\n{\n\tstruct page *page;\n\tstruct vm_area_struct *vma;\n\tint got;\n\n\tif (WARN_ON_ONCE(unlikely(gup_flags & FOLL_NOWAIT)))\n\t\treturn ERR_PTR(-EINVAL);\n\n\tgot = get_user_pages_remote(mm, addr, 1, gup_flags, &page, NULL);\n\n\tif (got < 0)\n\t\treturn ERR_PTR(got);\n\n\tvma = vma_lookup(mm, addr);\n\tif (WARN_ON_ONCE(!vma)) {\n\t\tput_page(page);\n\t\treturn ERR_PTR(-EINVAL);\n\t}\n\n\t*vmap = vma;\n\treturn page;\n}\n",
+      "get_user_pages_remote": "long get_user_pages_remote(struct mm_struct *mm,\n\t\t\t   unsigned long start, unsigned long nr_pages,\n\t\t\t   unsigned int gup_flags, struct page **pages,\n\t\t\t   int *locked);",
       "vma_iter_invalidate": "static inline void vma_iter_invalidate(struct vma_iterator *vmi)\n{\n\tmas_pause(&vmi->mas);\n}\n",
       "vma_iterator": "struct vma_iterator {\n\tstruct ma_state mas;\n};\n",
       "vma_next": "static inline struct vm_area_struct *vma_next(struct vma_iterator *vmi)\n{\n\t/*\n\t * Uses mas_find() to get the first VMA when the iterator starts.\n\t * Calling mas_next() could skip the first entry.\n\t */\n\treturn mas_find(&vmi->mas, ULONG_MAX);\n}\n",
@@ -19,6 +21,7 @@
     "archive_sha256": null,
     "excerpts": {
       "find_vma": "extern struct vm_area_struct * find_vma(struct mm_struct * mm, unsigned long addr);",
+      "get_user_pages_remote": "long get_user_pages_remote(struct mm_struct *mm,\n\t\t\t    unsigned long start, unsigned long nr_pages,\n\t\t\t    unsigned int gup_flags, struct page **pages,\n\t\t\t    struct vm_area_struct **vmas, int *locked);",
       "vma_iterator": "struct vma_iterator {\n\tstruct ma_state mas;\n};\n",
       "vma_next": "static inline struct vm_area_struct *vma_next(struct vma_iterator *vmi)\n{\n\t/*\n\t * Uses vma_find() to get the first VMA when the iterator starts.\n\t * Calling mas_next() could skip the first entry.\n\t */\n\treturn vma_find(vmi, ULONG_MAX);\n}\n",
       "walk_page_range": "int walk_page_range(struct mm_struct *mm, unsigned long start,\n\t\tunsigned long end, const struct mm_walk_ops *ops,\n\t\tvoid *private);"

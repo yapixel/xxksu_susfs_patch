@@ -161,13 +161,24 @@ def fix_task_mmu(source: str, *, gki: bool) -> str:
     return source
 
 
+def fix_remote_memory(source: str) -> str:
+    # UPSTREAM_INHERITED_DEFECT: GKI tests NULL; Sultan tests the prior VMA.
+    # REVIEWED_LOCAL_CORRECTION: current-address lookup under mmap_read_lock,
+    # before GUP takes a page reference; stack retries re-enter this check.
+    start = source.index("int __access_remote_vm(")
+    guard = "\t\tif (vma && vma->vm_file && SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))"
+    return source[:start] + replace_once(source[start:], guard,
+        "\t\tvma = vma_lookup(mm, addr);\n" + guard)
+
+
 def correct_patch51(text: str, root: Path, *, gki: bool) -> str:
     if gki:
         sources = r38_sources(root)
     else:
         bundle = load_source_bundle(root / ".github/fixtures/v2/v29-baselines/sultan-android14-6.1.json")
         sources = {entry.path: entry.content for entry in bundle.files}
-    transforms = {"fs/namespace.c": fix_namespace,
+    transforms = {"mm/memory.c": fix_remote_memory,
+                  "fs/namespace.c": fix_namespace,
                   "fs/proc/task_mmu.c": lambda src: fix_task_mmu(src, gki=gki)}
     if gki:
         transforms["fs/namei.c"] = fix_namei

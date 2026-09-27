@@ -50,6 +50,12 @@ REFERENCE_HASHES = {
 # No filename/symbol wildcard: even a one-line lifecycle change requires review.
 # Evidence and behavioral regression coverage: PATCH51_CORRECTIONS.md.
 REVIEWED_LIFECYCLE_DIFFERENCES = {
+    "mm/memory.c": (
+        "d7bfa1bddc3b7d93b37feebcf4921a60a2f99bb25e9f1ad86165155a77132db4",
+        "b152ef003898da9a639124e7fbd1a2d57655b8a2afb823869460e9d9609c7dd0",
+        "OURS refreshes the current-address VMA under mmap_lock before GUP; "
+        "REFERENCE retains the inherited NULL-VMA guard, exposing SUS_MAP remote memory. "
+        "Stop-before-GUP preserves page ownership and native partial-access semantics."),
     "fs/namei.c": (
         "ee94ae51552dce2352dac178a2b0e75f7ae8ddb79504d623f628dfeebb835a3c",
         "17a68048d5ee940ed0e62ea7079aeeef57de6c13565ef21831737043f6c18c67",
@@ -1015,15 +1021,20 @@ def format_gki_patch51_parity_details(rep: Mapping[str, Any]) -> str:
     if classification == ReferenceComparisonClassification.IMPLEMENTATION_DIFFERENCE.value:
         reviewed = rep.get("metadata", {}).get("reviewed_lifecycle_differences", {})
         if {"fs/namei.c", "fs/namespace.c", "fs/proc/task_mmu.c"} <= reviewed.keys():
+            remote_ours = (" OURS corrects inherited __access_remote_vm()/SUS_MAP /proc/<pid>/mem "
+                           "access by checking the current VMA before GUP (reads and writes stop at hidden memory)."
+                           if "mm/memory.c" in reviewed else "")
+            remote_ref = (" REFERENCE retains the inherited unreachable NULL-VMA remote-memory guard."
+                          if "mm/memory.c" in reviewed else "")
             return (
                 "**AGREES:** lifetime-safe filename_lookup / old_name handling; "
                 "OURS vs REFERENCE fs/super.c difference is declaration placement only. "
                 "**OURS:** mount allocation-provenance tracking, inherited-flag clearing, "
                 "early-error accounting, locked non-SuS lookup, VMA-bounded zero pagemap entries, "
-                "and shared smaps gather guard. "
+                f"and shared smaps gather guard.{remote_ours} "
                 "**REFERENCE:** uses early returns for the corresponding non-SuS lookup and "
                 "retains inherited pagemap VMA-boundary and smaps_rollup hidden-VMA gather defects "
-                "that OURS intentionally corrects. **RESULT:** IMPLEMENTATION_DIFFERENCE; explicitly reviewed differences, not blanket semantic or byte/code equivalence."
+                f"that OURS intentionally corrects.{remote_ref} **RESULT:** IMPLEMENTATION_DIFFERENCE; explicitly reviewed differences, not blanket semantic or byte/code equivalence."
             )
         return str(rep.get("details", "OURS vs REFERENCE: reviewed implementation differences; not byte parity."))
     elif classification == ReferenceComparisonClassification.SEMANTIC_MATCH.value:

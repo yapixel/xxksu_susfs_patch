@@ -97,7 +97,7 @@ contexts match at their unchanged declared positions.
 | fs/super.c 37,1206 | declarations/minor-ID allocation / 37,1191,1206 | None | Move declarations to includes; no behavior change | U,T |
 | kernel/kallsyms.c 31,748 | include/symbol hiding / same starts | None | None | U |
 | kernel/sys.c 1326 | uname spoofing / 1326 | Remove 678/692 KSU setresuid declarations/call | None | U,D |
-| mm/memory.c 79,6837 | include/remote access hook / 79,6829 | None | Full-context relocation +8 | U,T |
+| mm/memory.c 79,6837 | include/remote access hook / 79,6829 | None | Full-context relocation +8; refresh current VMA before GUP (inherited NULL guard correction) | U,T,R |
 
 Evidence: accepted Patch 50 hunks, authenticated r38 full file preimages, and
 existing fix_namespace/fix_task_mmu rules. The locked-helper policy is also

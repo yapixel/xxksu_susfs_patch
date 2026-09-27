@@ -125,3 +125,66 @@ python3 -m unittest discover -s .github/scripts/v2/tests -p 'test_*.py' -v
 ```
 
 The environment-only Git settings allow disposable test repositories to commit without interactive signing; they do not modify repository/global configuration. Production diffstats were also independently checked directly on all three published patches, not merely generated fixtures.
+
+
+## Remote-memory SUS_MAP correction (2026-09-27)
+
+Provenance: **UPSTREAM_INHERITED_DEFECT + REVIEWED_LOCAL_CORRECTION**.
+Audited main: 6c3c9f669a2c9ccb2a21a0be54256cf5f735c862. Accepted Simonpunk
+Sultan a8324101bca5e5a2dd7d0dc82b1650e10923eec9 and GKI
+b213c54126fb243595ce7876e91d84d6e0861fec both insert the guard before GUP.
+Real Sultan af5c65b9547a9f33c5f566430d0434aecab5a8b5 sources and the authenticated
+r38 archive (accf8f9348280116792c9608f420f8d4554da52499119a8536883c5eefd429ff)
+confirm the postimages independently of repository source fixtures.
+
+In GKI, __access_remote_vm initializes vma=NULL each iteration; the inherited
+check can never hide anything. Sultan initially looks up/expands the VMA before
+the loop, but the inherited check subsequently tests the previous GUP's VMA.
+A request crossing visible into hidden memory can therefore transfer hidden bytes;
+even proc mem's PAGE_SIZE request can cross a boundary when its address is unaligned.
+This is not a deinlining error. Authenticated Midori 54b1647db92ead90acf263e0dd48836163b40da5
+Patch 50 plus its own converter retains the GKI NULL-VMA check. Current Midori main
+0a41be581964a7dee9ca6163a64ebea663133876 was checked independently: both inputs
+and the reproduced output match the pinned reference bytes.
+
+The correction adds one vma_lookup(mm, addr) immediately before the existing
+SUS_MAP test on every iteration, under the already-held mmap read lock. GKI's
+get_user_page_vma_remote calls its six-argument get_user_pages_remote with locked=NULL;
+Sultan uses the seven-argument API with vmas=&vma and locked=NULL. Neither permits
+fault retry to drop the lock here. No reference has been acquired when hiding
+breaks the loop. Native successful-page cleanup remains unchanged (Sultan
+kunmap/put_page; GKI unmap_and_put_page). A naive post-GUP break would leak a reference;
+it also allows hidden write faults before rejection, so it is not used.
+
+Upstream's Kconfig promises hiding real file mappings from mem, excludes anonymous
+memory, and the existing break establishes stop semantics. We preserve the native
+inaccessible-region convention: return transferred prefix bytes; a hidden start
+returns zero internally, becoming -EIO in proc mem_rw with unchanged position.
+Visible-to-hidden returns only the visible prefix; hidden-to-visible does not skip
+hidden memory. Writes obey the same boundary and do not dirty hidden pages. This
+is deliberately different from pagemap's fixed-entry-count zero representation.
+Maps/smaps/rollup/map_files continue omitting hidden mappings as already reviewed.
+Other callers of access_remote_vm/access_process_vm share this correction; direct
+GUP users (for example process_vm_readv/writev) are outside this specific call path.
+
+Anonymous/visible access, FOLL_WRITE/FOLL_FORCE, unmapped errors, and native stack
+expansion are retained. expand_stack may drop/reacquire mmap_lock; successful
+initial expansion reaches the new lookup, and GKI's later expansion continues back
+to it. Failure returns with the lock already dropped, as before. No VMA pointer
+is reused across that transition. Sultan retains its native initial-only expansion
+behavior. IO/PFNMAP fallback is rejected before GUP for a hidden VMA; visible
+vm_ops->access dispatch and native return handling are unchanged.
+
+The target-native remote-memory regression executes the real generated function,
+access_remote_vm wrapper, and proc mem_rw. It covers read/write, partial/unaligned
+boundaries, anonymous mappings, holes, expansion/reacquisition, IO fallback,
+configuration-disabled cases, and page reference/lock balance. Native GUP declarations
+and the GKI wrapper come from authenticated target header excerpts. These bounded
+regressions do not claim full kernel runtime proof.
+
+Patch 11 SID note (read-only): native xxKSU is_sid_match uses a context fallback
+when cached SID is zero. Added susfs_* values are populated after apply_kernelsu_rules
+but direct equality helpers lack that fallback; a pre-initialization or failed
+context conversion can yield a false negative. Classify as LOW robustness concern,
+not proof of a failure under normal successful policy initialization. No Patch 11
+change is part of this correction; no universal policy-reload correctness claim is made.

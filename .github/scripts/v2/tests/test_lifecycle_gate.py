@@ -26,10 +26,12 @@ class LifecycleGateTests(unittest.TestCase):
         result = compare_patch_to_reference(PATCH_ID, ours, ref, "pinned Midori")
         self.assertTrue(result.passed)
         self.assertFalse(result.blocks_promotion)
-        self.assertEqual(len(result.metadata["reviewed_lifecycle_differences"]), 3)
+        self.assertEqual(set(result.metadata["reviewed_lifecycle_differences"]),
+                         {"fs/namei.c", "fs/namespace.c", "fs/proc/task_mmu.c", "mm/memory.c"})
         for old, new in (("+\t\tnd->name = old_name;", "+\t\told_name = nd->name;"),
                          ("+\tif (!is_mnt_ksu_unshared)", "+\tif (is_mnt_ksu_unshared)"),
-                         ("+\t\tstart = next;", "+\t\tstart = end;")):
+                         ("+\t\tstart = next;", "+\t\tstart = end;"),
+                         ("+\t\tvma = vma_lookup(mm, addr);", "+\t\tvma = NULL;")):
             self.assertIn(old, ours)
             result = compare_patch_to_reference(PATCH_ID, ours.replace(old, new), ref, "pinned Midori")
             self.assertEqual(result.classification, Classification.REVIEW_REQUIRED)

@@ -16,7 +16,7 @@ import tempfile
 from ..engine.diff_parser import parse_patch
 from ..engine.emitter import emit_patch
 from ..model.patch import AddedLine, RemovedLine, Patch
-from .lifecycle import r38_sources, replace_once, fix_namespace, fix_task_mmu
+from .lifecycle import r38_sources, replace_once, fix_namespace, fix_task_mmu, fix_remote_memory
 
 # KSU transport/credential hooks in the other Patch 50 files belong to xxKSU.
 FILES = (
@@ -74,6 +74,8 @@ def _adapt(path, source):
         source = replace_once(source, "\tbool is_mnt_ksu_unshared = false;\n\n",
             "\tbool is_mnt_ksu_unshared = false;\n#endif\n\n"
             "#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT\n")
+    elif path == "mm/memory.c":
+        source = fix_remote_memory(source)
     elif path == "fs/namei.c":
         # Upstream already supplies nested filename_lookup and old_name restore.
         # Only place the saved name alongside the saved dfd; do not replay a fix.
