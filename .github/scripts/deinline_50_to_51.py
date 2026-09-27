@@ -274,7 +274,12 @@ def deinline_patch_content(content: str, target: str = "gki", date_str: str | No
             is_ksu_hook = False
             if re.search(r'ksu_handle_|ksu_is_input_hook|ksu_is_init_rc_hook', added_text):
                 is_ksu_hook = True
-            elif '#ifdef CONFIG_KSU_SUSFS' in added_text and not '#include' in added_text and not 'CONFIG_KSU_SUSFS_' in added_text and not 'obj-$(CONFIG_KSU_SUSFS)' in added_text and not 'susfs_is_sus_su_ready' in added_text:
+            # Sultan namespace's base-SUSFS hunk defines required mount lookup
+            # helpers, not inline KSU transport. A CONFIG guard is not ownership.
+            elif (not (is_sultan_target(target) and file_path == 'fs/namespace.c')
+                  and '#ifdef CONFIG_KSU_SUSFS' in added_text and not '#include' in added_text
+                  and not 'CONFIG_KSU_SUSFS_' in added_text and not 'obj-$(CONFIG_KSU_SUSFS)' in added_text
+                  and not 'susfs_is_sus_su_ready' in added_text):
                 is_ksu_hook = True
 
             if not is_ksu_hook:

@@ -1,4 +1,4 @@
-"""Compile the complete generated stat.c against real Sultan ARM64 headers.
+"""Compile generated Sultan translation units and link their SuSFS mount helpers.
 
 No SuSFS declaration, constant, or native kernel type is mocked here.
 The small header closure is captured from the authenticated target via Kbuild.
@@ -69,3 +69,43 @@ class SultanStatCompileTests(unittest.TestCase):
                 with self.subTest(susfs=susfs, kstat=kstat):
                     result = compile_stat(tree, source, metadata["compiler_flags"], susfs=susfs, kstat=kstat)
                     self.assertEqual(result.returncode, 0, result.stderr)
+
+            # Link full generated callers and definitions, not a handwritten model.
+            # A relocatable link alone allows undefineds, so enforce this exact
+            # historical closure at the real linker boundary with DEFINED assertions.
+            candidate = generate_candidate_patch("sultan-android14-6.1-patch51",
+                                                 ROOT / ".github/fixtures/sultan", ROOT)
+            post = apply_patch_to_bundle(load_authoritative_bundle("sultan-android14-6.1", ROOT),
+                                         candidate)
+            for name in ("include/linux/susfs.h", "fs/namespace.c", "fs/susfs.c",
+                         "fs/statfs.c", "fs/proc/fd.c"):
+                path = tree / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(post.get_file(name).content)
+            objects = []
+            flags = [f for f in metadata["compiler_flags"]
+                     if f != "-fsyntax-only" and not f.startswith("-DKBUILD_")
+                     and not f.startswith("-D__KBUILD_")]
+            for name in ("namespace", "susfs", "statfs", "proc/fd"):
+                obj = tree / (name.replace("/", "_") + ".o")
+                stem = Path(name).name
+                result = subprocess.run([
+                    "clang", *flags, "-O2", "-fno-pie", "-fno-stack-protector",
+                    "-DCONFIG_KSU_SUSFS", "-DCONFIG_KSU_SUSFS_SUS_MOUNT",
+                    "-DCONFIG_KSU_SUSFS_SUS_KSTAT",
+                    f'-DKBUILD_MODNAME="{stem}"', f'-DKBUILD_BASENAME="{stem}"',
+                    f'-DKBUILD_MODFILE="fs/{name}"', f'-D__KBUILD_MODNAME=kmod_{stem}',
+                    "-DKBUILD_IS_MODULE=1", "-c", f"../fs/{name}.c", "-o", str(obj)],
+                    cwd=tree / "out", capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                objects.append(str(obj))
+            symbols = ("susfs_get_non_sus_mnt_id_from_mnt",
+                       "susfs_get_non_sus_vfsmnt_from_vfsmnt")
+            script = tree / "mount-closure.lds"
+            script.write_text("\n".join(
+                f'ASSERT(DEFINED({symbol}), "undefined reference to {symbol}");'
+                for symbol in symbols))
+            result = subprocess.run(["ld.lld", "-r", "-T", str(script),
+                                     "-o", str(tree / "mount-closure.o"), *objects],
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
