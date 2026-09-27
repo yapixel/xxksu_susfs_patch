@@ -133,7 +133,7 @@ def _sultan_source_date(repo_root: Path) -> str:
     return format_datetime(datetime.fromtimestamp(timestamp, timezone.utc))
 
 
-def generate_patch11_from_tree(ksu_tree: Path) -> str:
+def generate_patch11_from_tree(ksu_tree: Path, repo_root: Optional[Path] = None) -> str:
     """Generate from xxKSU and reviewed repository policy; Patch 10 is watched lineage."""
     kernel_dir = ksu_tree / "kernel" if (ksu_tree / "kernel").is_dir() else ksu_tree
     entries: dict[str, str] = {}
@@ -154,7 +154,7 @@ def generate_patch11_from_tree(ksu_tree: Path) -> str:
         raise CandidateGenerationError(f"Missing required KernelSU files for Patch 11: {missing}")
 
     bundle = create_source_bundle("xxksu", "main", entries)
-    return generate_patch11(bundle)
+    return generate_patch11(bundle, repo_root)
 
 
 def generate_sultan_patch51_from_input(upstream_input: Path, repo_root: Path) -> str:
@@ -201,7 +201,7 @@ def generate_gki_r38_patch51_from_input(upstream_input: Path, repo_root: Path) -
 def generate_candidate_patch(patch_id: str, upstream_input: Path, repo_root: Path) -> str:
     """Deterministic generator dispatcher: upstream inputs -> candidate patch text."""
     if patch_id == "xxksu-patch11":
-        return generate_patch11_from_tree(upstream_input)
+        return generate_patch11_from_tree(upstream_input, repo_root)
     elif patch_id == "sultan-android14-6.1-patch51":
         from .policy.lifecycle import correct_patch51
         return correct_patch51(generate_sultan_patch51_from_input(upstream_input, repo_root), repo_root, gki=False)

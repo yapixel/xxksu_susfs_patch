@@ -21,7 +21,12 @@
   },
   "policy": {
     "v27_policy_identity": "v2.policy.patch11",
-    "generation_policy": "v2.adapters.xxksu.get_patch11_operation_specs"
+    "generation_policy": "v2.adapters.xxksu.get_patch11_operation_specs",
+    "reviewed_revision": {
+      "repository": "https://github.com/yapixel/xxksu_susfs_patch",
+      "resolved_commit": "f138d2ed35d101c16172294489cc5ce7e8868939",
+      "commit_object": ".github/fixtures/v2/patch11-policy-commit.txt"
+    }
   },
   "retained_file_hashes": {
     "kernel/Kconfig": "sha256:e736aec3f381cbaf5c11e71714b65cd7f1d74578a10ec33d8fa883d9e7c45e22",

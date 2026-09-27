@@ -3,6 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from email.utils import format_datetime
+import hashlib
+import json
+from pathlib import Path
 from typing import Mapping, Optional, Sequence, Tuple
 
 from ..engine.emitter import emit_patch
@@ -52,9 +57,7 @@ PATCH11_FILE_INDEXES: Mapping[str, str] = {
 }
 
 PATCH11_PREAMBLE: Tuple[str, ...] = (
-    "From 37eee69d83424bba4b2ae3d3dd38cbbbb1ef9824 Mon Sep 17 00:00:00 2001",
     "From: yapixel <yapixel@users.noreply.github.com>",
-    "Date: Thu, 27 Aug 2026 14:43:32 +0000",
     "Subject: [PATCH] Enable SUSFS for backslashxx KernelSU",
     "",
     "---",
@@ -75,6 +78,25 @@ PATCH11_TRAILER: Tuple[str, ...] = (
     "2.55.0",
     "",
 )
+
+
+def patch11_envelope_id(canonical_diff: bytes) -> str:
+    """SHA1(domain + NUL + UTF-8/LF diff), excluding mail headers and trailer."""
+    return hashlib.sha1(b"xxksu-patch11-mail-v1\0" + canonical_diff).hexdigest()
+
+
+def patch11_policy_date(repo_root: Optional[Path] = None) -> str:
+    """Authenticate the explicitly reviewed policy object; never scan history."""
+    root = repo_root if repo_root is not None else Path(__file__).resolve().parents[4]
+    policy = json.loads((root / "patches/xxksu/BASELINE.json").read_text())["policy"]["reviewed_revision"]
+    raw = (root / policy["commit_object"]).read_bytes()
+    identity = hashlib.sha1(b"commit " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
+    if identity != policy["resolved_commit"]:
+        raise ValueError("Patch 11 policy commit metadata identity mismatch")
+    headers = raw.split(b"\n\n", 1)[0].splitlines()
+    committer = next(line for line in headers if line.startswith(b"committer "))
+    timestamp = int(committer.rsplit(b" ", 2)[1])
+    return format_datetime(datetime.fromtimestamp(timestamp, timezone.utc))
 
 
 @dataclass(frozen=True)
@@ -346,7 +368,7 @@ class XxksuAdapter(TargetAdapter):
         plan = self.build_adaptation_plan(bundle)
         return plan.apply_to_bundle(bundle)
 
-    def generate_patch11(self, bundle: SourceBundle) -> str:
+    def generate_patch11(self, bundle: SourceBundle, repo_root: Optional[Path] = None) -> str:
         """Validate clean xxKSU bundle against all anchors and emit deterministic patch 11."""
         plan = self.build_adaptation_plan(bundle)
         by_file: dict[str, list[AdaptationOperation]] = {}
@@ -411,8 +433,14 @@ class XxksuAdapter(TargetAdapter):
             )
             file_patches.append(fp)
 
+        # Emitting files alone gives canonical UTF-8/LF diff bytes, excluding
+        # mail headers, diffstat and signature by construction.
+        canonical_diff = emit_patch(Patch(files=file_patches)).encode("utf-8")
+        preamble = list(PATCH11_PREAMBLE)
+        preamble.insert(1, f"Date: {patch11_policy_date(repo_root)}")
+        preamble.insert(0, f"From {patch11_envelope_id(canonical_diff)} Mon Sep 17 00:00:00 2001")
         patch = Patch(
-            preamble=list(PATCH11_PREAMBLE),
+            preamble=preamble,
             files=file_patches,
             trailer=list(PATCH11_TRAILER),
         )
@@ -433,6 +461,6 @@ def apply_patch11_to_bundle(bundle: SourceBundle) -> SourceBundle:
     return adapter.apply_to_bundle(bundle)
 
 
-def generate_patch11(bundle: SourceBundle) -> str:
+def generate_patch11(bundle: SourceBundle, repo_root: Optional[Path] = None) -> str:
     adapter = XxksuAdapter()
-    return adapter.generate_patch11(bundle)
+    return adapter.generate_patch11(bundle, repo_root)

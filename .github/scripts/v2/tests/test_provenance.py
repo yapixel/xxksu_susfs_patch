@@ -51,7 +51,9 @@ class ProvenanceTests(unittest.TestCase):
     def test_patch11_reconstructs_without_outputs_or_patch10_and_requires_xxksu(self):
         expected = (ROOT / TARGET_REL_PATHS["xxksu-patch11"]).read_bytes()
         self.assertFalse(list(self.root.rglob("*10_enable_susfs*")))
-        self.assertEqual(self.fresh("xxksu-patch11", self.ksu), expected)
+        first = self.fresh("xxksu-patch11", self.ksu)
+        self.assertEqual(first, self.fresh("xxksu-patch11", self.ksu))
+        self.assertEqual(first, expected)
         source = self.ksu / "kernel/Kconfig"
         original = source.read_text()
         source.unlink()
@@ -60,6 +62,68 @@ class ProvenanceTests(unittest.TestCase):
         source.write_text(original.replace("endmenu", "missing_semantic_anchor", 1))
         with self.assertRaises(ValueError):
             generate_candidate_patch("xxksu-patch11", self.ksu, self.root)
+
+    def test_patch11_policy_date_and_diff_identity_are_independent(self):
+        from v2.adapters.xxksu import patch11_envelope_id
+        first = self.fresh("xxksu-patch11", self.ksu)
+        baseline = self.root / "patches/xxksu/BASELINE.json"
+        data = json.loads(baseline.read_text())
+        policy = data["policy"]["reviewed_revision"]
+        metadata = self.root / policy["commit_object"]
+        original = metadata.read_bytes()
+        # A controlled, authenticated test commit: same policy tree, later
+        # committer timestamp. Git calculates its identity, not a mock loader.
+        changed = re.sub(rb"(committer .* )([0-9]+)( [+-][0-9]{4})",
+                         lambda m: m[1] + str(int(m[2]) + 86400).encode() + m[3], original, count=1)
+        self.assertNotEqual(changed, original)
+        policy["resolved_commit"] = subprocess.check_output(
+            ["git", "hash-object", "-t", "commit", "--stdin"], input=changed).decode().strip()
+        metadata.write_bytes(changed)
+        baseline.write_text(json.dumps(data))
+        second = self.fresh("xxksu-patch11", self.ksu)
+        self.assertEqual(first.splitlines()[0], second.splitlines()[0])
+        self.assertNotEqual(first.splitlines()[2], second.splitlines()[2])
+        self.assertEqual(first.split(b"diff --git", 1)[1], second.split(b"diff --git", 1)[1])
+
+        # Real transformation mutation, using the actual adapter and ID function.
+        from dataclasses import replace
+        from v2.adapters.xxksu import generate_patch11, _SPECS_BY_ID
+        bundle = load_authoritative_bundle("xxksu", ROOT)
+        spec = next(v for v in _SPECS_BY_ID.values() if "susfs_init();" in v.payload)
+        unmodified = generate_patch11(bundle, self.root)
+        modified_spec = replace(spec, diff_body=tuple(
+            (prefix, text.replace("susfs_init();", "susfs_init_reviewed_probe();"))
+            for prefix, text in spec.get_diff_body()))
+        with patch.dict(_SPECS_BY_ID, {spec.operation_id: modified_spec}):
+            modified = generate_patch11(bundle, self.root)
+        def diff(text):
+            return text[text.index("diff --git "):text.rindex("-- \n")].encode()
+        self.assertNotEqual(diff(unmodified), diff(modified))
+        self.assertNotEqual(patch11_envelope_id(diff(unmodified)), patch11_envelope_id(diff(modified)))
+        self.assertNotEqual(unmodified.splitlines()[0], modified.splitlines()[0])
+        self.assertEqual(unmodified.splitlines()[2], modified.splitlines()[2])
+
+    def test_patch11_policy_provenance_fails_closed(self):
+        baseline = self.root / "patches/xxksu/BASELINE.json"
+        data = json.loads(baseline.read_text())
+        record = data["policy"]["reviewed_revision"]
+        metadata = self.root / record["commit_object"]
+        saved = metadata.read_bytes()
+        metadata.unlink()
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.fresh("xxksu-patch11", self.ksu)
+        metadata.write_bytes(saved + b"tampered")
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.fresh("xxksu-patch11", self.ksu)
+        metadata.write_bytes(saved)
+        record["resolved_commit"] = "0" * 40
+        baseline.write_text(json.dumps(data))
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.fresh("xxksu-patch11", self.ksu)
+        del data["policy"]["reviewed_revision"]
+        baseline.write_text(json.dumps(data))
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.fresh("xxksu-patch11", self.ksu)
 
     def test_sultan_without_outputs_is_deterministic_and_inputs_are_required(self):
         # Production is a final assertion only, never a generation input.

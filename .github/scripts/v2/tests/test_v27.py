@@ -411,7 +411,16 @@ class XxksuAdapterTests(unittest.TestCase):
                 try:
                     os.chdir(td)
                     self.assertFalse(Path("patches/xxksu/11_enable_susfs_for_ksu.patch").exists())
-                    with patch.object(Path, "read_text", side_effect=FileNotFoundError("golden unavailable")),                      patch.object(Path, "read_bytes", side_effect=FileNotFoundError("golden unavailable")),                      patch("builtins.open", side_effect=FileNotFoundError("golden unavailable")):
+                    def without_golden(func):
+                        def read(path, *args, **kwargs):
+                            if str(path).endswith(".patch"):
+                                raise FileNotFoundError("golden unavailable")
+                            return func(path, *args, **kwargs)
+                        return read
+                    # Policy commit metadata is a legitimate input; final patches are not.
+                    with patch.object(Path, "read_text", without_golden(real_read_text)), \
+                         patch.object(Path, "read_bytes", without_golden(real_read_bytes)), \
+                         patch("builtins.open", without_golden(real_open)):
                         generated = generate_patch11(bundle)
                 finally:
                     os.chdir(previous)

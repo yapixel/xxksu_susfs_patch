@@ -47,6 +47,10 @@ class TestPipelineArchitecture(unittest.TestCase):
         shutil.copy(real_root / "patches" / "gki-android16-6.12" / "BASELINE.json", self.repo_root / "patches" / "gki-android16-6.12" / "BASELINE.json")
         shutil.copy(real_root / "patches" / "manifest.json", self.repo_root / "patches" / "manifest.json")
 
+        policy_object = Path(".github/fixtures/v2/patch11-policy-commit.txt")
+        (self.repo_root / policy_object).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(real_root / policy_object, self.repo_root / policy_object)
+
         # Copy existing public patches so manifest check initially passes
         shutil.copy(real_root / "patches" / "xxksu" / "11_enable_susfs_for_ksu.patch", self.repo_root / "patches" / "xxksu" / "11_enable_susfs_for_ksu.patch")
         shutil.copy(real_root / "patches" / "sultan-android14-6.1" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch", self.repo_root / "patches" / "sultan-android14-6.1" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch")

@@ -36,6 +36,17 @@ into correctness evidence. Keep README downstream-facing and HANDOVER a dated sn
 
 - **Generation input — Patch 11:** accepted xxKSU source + reviewed repository
   policy (`v2.adapters.xxksu.get_patch11_operation_specs`) → Patch 11.
+- **Patch 11 mail provenance:** BASELINE policy.reviewed_revision explicitly
+  identifies an authenticated retained policy commit object. Date is its committer
+  time in UTC. The envelope is a synthetic SHA1 of xxksu-patch11-mail-v1 + NUL +
+  generated unified-diff bytes (first diff --git through immediately before the
+  signature; UTF-8/LF, including indexes/hunks, excluding headers/diffstat/trailer).
+  From attribution and Subject are static repository policy. Unchanged integration
+  content across xxKSU rewrites preserves the artifact; diff changes change the ID.
+  After a substantive adaptation is reviewed and committed, explicitly record that
+  exact revision/object before production Actions publication; Date may advance.
+  Never auto-advance this policy record for tests, docs, watcher changes, unrelated
+  commits, or xxKSU accepted-revision-only updates.
 - **Semantic lineage / watch input:** Simonpunk Patch 10 and SuSFS APIs inform
   Patch 11 review. Patch 10 is watched, but is not a runtime byte-generation input.
 - **Generation input — Sultan:** accepted Simonpunk Sultan Patch 50 + accepted
