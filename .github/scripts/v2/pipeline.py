@@ -206,9 +206,11 @@ def generate_candidate_patch(patch_id: str, upstream_input: Path, repo_root: Pat
     if patch_id == "xxksu-patch11":
         return generate_patch11_from_tree(upstream_input)
     elif patch_id == "sultan-android14-6.1-patch51":
-        return generate_sultan_patch51_from_input(upstream_input, repo_root)
+        from .policy.lifecycle import correct_patch51
+        return correct_patch51(generate_sultan_patch51_from_input(upstream_input, repo_root), repo_root, gki=False)
     elif patch_id == "gki-android16-6.12-r38-patch51":
-        return generate_gki_r38_patch51_from_input(upstream_input, repo_root)
+        from .policy.lifecycle import correct_patch51
+        return correct_patch51(generate_gki_r38_patch51_from_input(upstream_input, repo_root), repo_root, gki=True)
     else:
         raise ValueError(f"Unknown patch_id: {patch_id}")
 
