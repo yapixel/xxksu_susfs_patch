@@ -54,6 +54,17 @@ def run_c(source):
         return subprocess.run([str(Path(tmp) / "test")], capture_output=True).returncode
 
 
+def pagemap_harness(source, *, gki):
+    # Keep each target's real types, constants, make_pme and add_to_pagemap.
+    # In particular, Sultan takes an address argument and GKI does not.
+    start = source.index("typedef struct {\n\tu64 pme;")
+    end = source.index("static int pagemap_pte_hole(", start)
+    native = source[start:end]
+    walk = PAGEMAP_WALK_MOCK.replace(
+        "APPEND_ENTRY", "add_to_pagemap(&p, pm)" if gki else "add_to_pagemap(s, &p, pm)")
+    return PAGEMAP_MOCKS + native + walk
+
+
 class LifecycleTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -61,9 +72,31 @@ class LifecycleTests(unittest.TestCase):
         cls.sultan = postimages(False)
 
     def test_pagemap_vma_boundaries_both_targets(self):
-        for sources in (self.gki, self.sultan):
-            helper = function(sources["fs/proc/task_mmu.c"], "static int susfs_pagemap_walk(")
-            self.assertEqual(run_c(PAGEMAP_MOCKS + helper + PAGEMAP_CASES), 0)
+        for gki, sources in ((True, self.gki), (False, self.sultan)):
+            source = sources["fs/proc/task_mmu.c"]
+            helper = function(source, "static int susfs_pagemap_walk(")
+            self.assertEqual(run_c(pagemap_harness(source, gki=gki) + helper + PAGEMAP_CASES), 0)
+
+    def test_pagemap_rejects_other_targets_append_api(self):
+        for gki, sources in ((True, self.gki), (False, self.sultan)):
+            source = sources["fs/proc/task_mmu.c"]
+            helper = function(source, "static int susfs_pagemap_walk(")
+            correct = "add_to_pagemap(&pme, pm)" if gki else "add_to_pagemap(start, &pme, pm)"
+            wrong = "add_to_pagemap(start, &pme, pm)" if gki else "add_to_pagemap(&pme, pm)"
+            self.assertEqual(helper.count(correct), 1)
+            with self.assertRaisesRegex(AssertionError, "too (few|many) arguments"):
+                run_c(pagemap_harness(source, gki=gki) +
+                      helper.replace(correct, wrong) + PAGEMAP_CASES)
+
+    def test_pagemap_actual_read_lengths_offsets_and_partial_vmas(self):
+        for gki, sources in ((True, self.gki), (False, self.sultan)):
+            source = sources["fs/proc/task_mmu.c"]
+            functions = function(source, "static int susfs_pagemap_walk(")
+            if gki:
+                functions += function(source, "static inline void __collapse_pagemap_result(")
+            functions += function(source, "static ssize_t pagemap_read(")
+            self.assertEqual(run_c(pagemap_harness(source, gki=gki) +
+                                   PAGEMAP_READ_MOCKS + functions + PAGEMAP_READ_CASES), 0)
 
     def test_nameidata_retries_and_local_lookup_ownership(self):
         names = ("static int do_tmpfile(", "static int do_o_path(",
@@ -124,26 +157,33 @@ class LifecycleTests(unittest.TestCase):
 PAGEMAP_MOCKS = r'''
 #include <assert.h>
 #include <stddef.h>
+#include <stdint.h>
+#define CONFIG_KSU_SUSFS_SUS_MAP 1
+#define PAGE_SHIFT 12
 #define PAGE_SIZE 4096UL
+#define __PAGE_SIZE PAGE_SIZE
+#define PMD_SIZE (8 * PAGE_SIZE)
+#define PMD_MASK (~(PMD_SIZE - 1))
+#define BIT_ULL(n) (1ULL << (n))
+#define GENMASK_ULL(h,l) ((~0ULL << (l)) & (~0ULL >> (63-(h))))
 #define min(a,b) ((a)<(b)?(a):(b))
 #define file_inode(f) (f)
 #define SUSFS_IS_INODE_SUS_MAP(f) (*(f))
-typedef unsigned long pagemap_entry_t;
+typedef uint64_t u64;
+#include <stdbool.h>
 struct vm_area_struct { unsigned long vm_start,vm_end; int *vm_file; };
-struct mm_struct { struct vm_area_struct *v; int n; };
-struct pagemapread { int pos,len; pagemap_entry_t buffer[32]; };
+struct mm_struct { struct vm_area_struct *v; int n; unsigned long task_size; };
 static int pagemap_ops;
 static struct vm_area_struct *find_vma(struct mm_struct *mm,unsigned long s) {
  for(int i=0;i<mm->n;i++) if(mm->v[i].vm_end>s) return &mm->v[i]; return NULL;
 }
-static pagemap_entry_t make_pme(unsigned long f,unsigned long flags) { return f|flags; }
-static int add_to_pagemap(pagemap_entry_t *e,struct pagemapread *pm) {
- assert(pm->pos<pm->len); pm->buffer[pm->pos++]=*e; return pm->pos==pm->len;
-}
+'''
+PAGEMAP_WALK_MOCK = r'''
 static int walk_page_range(struct mm_struct *mm,unsigned long s,unsigned long e,void *ops,struct pagemapread *pm) {
  for(;s<e;s+=PAGE_SIZE) { struct vm_area_struct *v=find_vma(mm,s);
-  pagemap_entry_t p=v && s>=v->vm_start ? 123+s/PAGE_SIZE:0;
-  int ret=add_to_pagemap(&p,pm); if(ret) return ret;
+  pagemap_entry_t p=make_pme(v && s>=v->vm_start ? 123+s/PAGE_SIZE:0,0);
+  assert(pm->pos<pm->len);
+  int ret=APPEND_ENTRY; if(ret) return ret;
  } return 0;
 }
 '''
@@ -156,16 +196,73 @@ int main(void) {
   struct vm_area_struct v[8]; struct mm_struct mm={v,8};
   for(int i=0;i<8;i++) v[i]=(struct vm_area_struct){i*PAGE_SIZE,(i+1)*PAGE_SIZE,mask&(1<<i)?&hidden:&visible};
   for(int first=0;first<8;first++) for(int last=first+1;last<=8;last++) {
-   struct pagemapread pm={.len=32};
+   pagemap_entry_t buffer[32]; struct pagemapread pm={.len=32,.buffer=buffer};
    assert(susfs_pagemap_walk(&mm,first*PAGE_SIZE,last*PAGE_SIZE,&pm)==0);
    assert(pm.pos==last-first);
-   for(int i=first;i<last;i++) assert(pm.buffer[i-first]==(mask&(1<<i)?0:123UL+i));
+   for(int i=first;i<last;i++) assert(pm.buffer[i-first].pme==(mask&(1<<i)?0:123UL+i));
   }
  }
  struct vm_area_struct v[]={{PAGE_SIZE,2*PAGE_SIZE,&hidden},{3*PAGE_SIZE,5*PAGE_SIZE,&visible}};
- struct mm_struct mm={v,2}; struct pagemapread pm={.len=6};
+ struct mm_struct mm={v,2}; pagemap_entry_t buffer[6]; struct pagemapread pm={.len=6,.buffer=buffer};
  assert(susfs_pagemap_walk(&mm,0,6*PAGE_SIZE,&pm)==1 && pm.pos==6);
- assert(pm.buffer[0]==0 && pm.buffer[1]==0 && pm.buffer[2]==0 && pm.buffer[3]==126 && pm.buffer[4]==127 && pm.buffer[5]==0);
+ assert(pm.buffer[0].pme==0 && pm.buffer[1].pme==0 && pm.buffer[2].pme==0 && pm.buffer[3].pme==126 && pm.buffer[4].pme==127 && pm.buffer[5].pme==0);
+ return 0;
+}
+'''
+
+
+PAGEMAP_READ_MOCKS = r'''
+#include <stdlib.h>
+#include <string.h>
+#include <limits.h>
+#include <errno.h>
+#include <sys/types.h>
+#define GFP_KERNEL 0
+#define CAP_SYS_ADMIN 0
+#define __user
+#define unlikely(x) (x)
+struct file {struct mm_struct *private_data;};
+static int init_user_ns,lock_held;
+static int mmget_not_zero(struct mm_struct *mm) {return 1;}
+static void mmput(struct mm_struct *mm) {}
+static int file_ns_capable(struct file *f,int *ns,int cap) {return 1;}
+static void *kmalloc_array(size_t n,size_t size,int flags) {return calloc(n,size);}
+static void *kcalloc(size_t n,size_t size,int flags) {return calloc(n,size);}
+static void kfree(void *p) {free(p);}
+static int mmap_read_lock_killable(struct mm_struct *mm) {assert(!lock_held);lock_held=1;return 0;}
+static void mmap_read_unlock(struct mm_struct *mm) {assert(lock_held);lock_held=0;}
+static unsigned long untagged_addr(unsigned long a) {return a;}
+static unsigned long untagged_addr_remote(struct mm_struct *mm,unsigned long a) {assert(lock_held);return a;}
+static int copy_to_user(void *d,const void *s,size_t n) {assert(!lock_held);memcpy(d,s,n);return 0;}
+'''
+PAGEMAP_READ_CASES = r'''
+int main(void) {
+ int hidden=1,visible=0;
+ /* Both transitions and visible-hidden-visible within one 8-page chunk;
+  * longer VMAs exercise starts/ends inside a VMA, plus holes and EOF. */
+ struct vm_area_struct v[]={{PAGE_SIZE,3*PAGE_SIZE,&visible},
+  {3*PAGE_SIZE,5*PAGE_SIZE,&hidden},{5*PAGE_SIZE,17*PAGE_SIZE,&visible},
+  {20*PAGE_SIZE,24*PAGE_SIZE,&hidden}};
+ struct mm_struct mm={v,4,32*PAGE_SIZE}; struct file f={&mm};
+ for(int first=0;first<=33;first++) for(int n=1;n<=35;n++) {
+  u64 out[40]; for(int j=0;j<40;j++)out[j]=~0ULL;
+  loff_t pos=first*PM_ENTRY_BYTES;
+  ssize_t got=pagemap_read(&f,(char*)out,n*PM_ENTRY_BYTES,&pos);
+  int entries=first>=32?0:min(n,32-first);
+  assert(got==entries*PM_ENTRY_BYTES);
+  assert(pos==(first+entries)*PM_ENTRY_BYTES && !lock_held);
+  for(int j=0;j<entries;j++) {
+   int a=first+j,vis=(a>=1&&a<3)||(a>=5&&a<17);
+   assert(out[j]==(vis?123UL+a:0));
+  }
+  assert(out[entries]==~0ULL);
+  /* A following read must start at the next virtual page, not a VMA/chunk edge. */
+  if(first+entries<32) {
+   int a=first+entries,vis=(a>=1&&a<3)||(a>=5&&a<17);
+   assert(pagemap_read(&f,(char*)out,PM_ENTRY_BYTES,&pos)==PM_ENTRY_BYTES);
+   assert(out[0]==(vis?123UL+a:0) && pos==(a+1)*PM_ENTRY_BYTES);
+  }
+ }
  return 0;
 }
 '''

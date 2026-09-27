@@ -144,7 +144,12 @@ def fix_task_mmu(source: str, *, gki: bool) -> str:
     part = replace_once(part, old, "#ifdef CONFIG_KSU_SUSFS_SUS_MAP\n"
                         "\t\tret = susfs_pagemap_walk(mm, start_vaddr, end, &pm);\n#else\n"
                         "\t\tret = walk_page_range(mm, start_vaddr, end, &pagemap_ops, &pm);\n#endif")
-    source = source[:start] + PAGEMAP_WALK + part
+    walk = PAGEMAP_WALK
+    if not gki:
+        # Sultan 6.1 keeps the current page address as the first argument.
+        walk = replace_once(walk, "add_to_pagemap(&pme, pm)",
+                            "add_to_pagemap(start, &pme, pm)")
+    source = source[:start] + walk + part
     if gki:
         # All normal and lock-reacquire callers converge here, including the
         # partial-VMA gather (start != 0). Filtering here cannot skip progress.
