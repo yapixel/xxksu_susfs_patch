@@ -72,8 +72,13 @@ Public Delivery Verification
   diffstat. No Patch 51 supplies bytes or metadata. The retained r38 Patch 51 is
   a historical negative-test golden only. See .github/fixtures/r38/README.md for
   the complete hunk provenance and metadata migration review.
-- **Clean-room status:** independent GKI reconstruction is implemented; a separate
-  fresh-runner clean-room verification task is still required. Local validation
+- **Development environment:** local WSL is the default for development and audits
+  on Windows hosts.
+- **Clean-room verification:** GitHub Actions clean-room.yml is the authoritative
+  fresh-environment reproducibility check. It independently fetches accepted
+  inputs, reconstructs without final-output copies, and verifies all three
+  production artifacts. It is read-only and never publishes patches; publication
+  remains exclusively owned by the production update workflows. Local validation
   alone must not be reported as CLEAN_ROOM_VERIFIED.
 
 ## 15 Hard Repository Invariants
