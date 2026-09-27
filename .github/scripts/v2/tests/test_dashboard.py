@@ -304,15 +304,14 @@ class DashboardTests(unittest.TestCase):
             {"timestamp": "2026-09-24", "source_id": "backslashxx_kernelsu", "text": "Resolved #4"},
         ]
         body1 = render_dashboard_body(report=report, repo_root=REPO_ROOT, recent_events=events, revision="84743b5", branch="main")
-        len1 = len(body1.encode("utf-8"))
 
         current_events = events
         for _ in range(15):
             transitions = extract_transition_events(report, "2026-09-24")
             current_events = combine_recent_events(current_events, transitions)
             body_n = render_dashboard_body(report=report, repo_root=REPO_ROOT, recent_events=current_events, revision="84743b5", branch="main")
-            len_n = len(body_n.encode("utf-8"))
-            self.assertEqual(len1, len_n)
+            self.assertEqual(body_n.encode("utf-8"), body1.encode("utf-8"))
+            self.assertEqual(current_events, events)
 
     # 14. commit/rebase-only Midori change with identical normalized content remains NO_CHANGE
     def test_14_commit_rebase_only_midori_with_identical_normalized_content_remains_no_change(self):
@@ -375,6 +374,8 @@ class DashboardTests(unittest.TestCase):
 
     # 17. dashboard failure does not modify production state
     def test_17_dashboard_failure_does_not_modify_production_state(self):
+        protected = list((REPO_ROOT / "patches").rglob("*")) + [REPO_ROOT / ".github/upstream-state.json"]
+        before = {p: p.read_bytes() for p in protected if p.is_file()}
         # 1. Verify manifest passes before
         ok_before, errs_before = verify_patch_manifest(REPO_ROOT)
         self.assertTrue(ok_before, f"Manifest verification failed before test: {errs_before}")
@@ -388,6 +389,7 @@ class DashboardTests(unittest.TestCase):
         # 3. Verify manifest and production patches are still 100% untouched and passing
         ok_after, errs_after = verify_patch_manifest(REPO_ROOT)
         self.assertTrue(ok_after, f"Manifest verification failed after simulated error: {errs_after}")
+        self.assertEqual({p: p.read_bytes() for p in before}, before)
 
     # 18. transient SOURCE_IDENTITY_ERROR never persisted to Recent Events
     def test_18_transient_source_identity_error_never_persisted_to_recent_events(self):

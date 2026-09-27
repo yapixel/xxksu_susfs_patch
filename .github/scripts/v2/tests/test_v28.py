@@ -56,6 +56,7 @@ from v2.validation import (
     AbiContract,
     AbiSignature,
     OwnershipClaim,
+    SymbolContract,
     make_default_lsm_bl_claims,
     make_default_manual_claims,
     validate_abi,
@@ -399,13 +400,20 @@ class V28NegativeValidationTests(unittest.TestCase):
         with self.assertRaises(AmbiguousAbiMapping):
             validate_abi(bundle=tampered_bundle, raise_on_failure=True)
 
+
     def test_14_missing_declaration_definition_fails(self):
-        # When validating against contract directly
+        # ABI matching permits optional absent handlers. Required presence belongs
+        # to the combined gate, and must be rejected before claiming ABI success.
         contract = AbiContract("ksu_nonexistent_handler", "int", ("int",))
-        empty_bundle = SourceBundle("xxksu", "main", ())
-        results = validate_abi(bundle=empty_bundle, contracts=(contract,))
-        # No signature found for contract
-        self.assertEqual(len(results), 0)
+        required = SymbolContract(contract.symbol, is_required=True, bundle_target="xxksu")
+        bundle = SourceBundle("xxksu", "main", ())
+        kwargs = dict(bundle=bundle, contracts_symbols=(required,), contracts_abi=(contract,))
+        report = validate_all(**kwargs)
+        self.assertEqual(report.status, ValidationStatus.FAIL)
+        self.assertTrue(any(r.metadata.get("error_type") == "MissingRequiredSymbol"
+                            and r.target == contract.symbol for r in report.results))
+        with self.assertRaises(MissingRequiredSymbol):
+            validate_all(**kwargs, raise_on_failure=True)
 
     def test_15_corrupted_source_bundle_integrity_fails(self):
         bad_digest = HashDigest("sha256", "0" * 64)

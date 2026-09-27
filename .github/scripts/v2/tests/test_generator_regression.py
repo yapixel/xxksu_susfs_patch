@@ -19,6 +19,20 @@ from v2.validation.exact_patch import (
 class GeneratorEscapeRegressionTests(unittest.TestCase):
     """Reproduce and guard against the seq_putc(m, '\\n') -> raw newline corruption bug."""
 
+    def test_generated_patch51_literals_both_targets(self):
+        from v2.pipeline import generate_candidate_patch
+        from test_lifecycle import postimages
+        root = Path(__file__).resolve().parents[4]
+        for gki, patch_id, folder in (
+            (False, "sultan-android14-6.1-patch51", "sultan"),
+            (True, "gki-android16-6.12-r38-patch51", "r38"),
+        ):
+            with self.subTest(target=patch_id):
+                candidate = generate_candidate_patch(patch_id, root / ".github/fixtures" / folder, root)
+                self.assertEqual(validate_patch_syntax(candidate), [])
+                for path, content in postimages(gki).items():
+                    self.assertEqual(verify_postimage_integrity(content, path), [])
+
     def test_reproduce_re_sub_template_corrupts_escaped_newline_literal(self) -> None:
         """Demonstrate that re.sub string replacement unescapes '\\n' into raw line breaks."""
         # A hunk containing C code with character literal '\n'

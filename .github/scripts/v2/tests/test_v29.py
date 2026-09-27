@@ -5,6 +5,8 @@ from __future__ import annotations
 import copy
 from pathlib import Path
 import unittest
+from test_lifecycle import target_sources
+from unittest.mock import patch
 
 from v2.adapters import get_adapter
 from v2.model.manifest import (
@@ -149,118 +151,9 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd, void __user
 }
 """
 
-_SAMPLE_SECURITY_6_1 = """/* security/security.c */
-#include <linux/security.h>
+_SAMPLE_SECURITY_6_1 = target_sources(False)["security/security.c"]
 
-static int lsm_superblock_alloc(struct super_block *sb)
-{
-	return 0;
-}
-
-#include <linux/lsm_hook_defs.h>
-#undef LSM_HOOK
-
-int security_bprm_check(struct linux_binprm *bprm)
-{
-	int ret;
-
-	ret = call_int_hook(bprm_check_security, 0, bprm);
-	if (ret)
-		return ret;
-	return 0;
-}
-
-int security_inode_rename(struct inode *old_dir, struct dentry *old_dentry,
-			   struct inode *new_dir, struct dentry *new_dentry,
-			   unsigned int flags)
-{
-	if (unlikely(IS_PRIVATE(d_backing_inode(old_dentry)) ||
-            (d_is_positive(new_dentry) && IS_PRIVATE(d_backing_inode(new_dentry)))))
-		return 0;
-	return 0;
-}
-
-int security_file_permission(struct file *file, int mask)
-{
-	int ret;
-
-	ret = call_int_hook(file_permission, 0, file, mask);
-	if (ret)
-		return ret;
-	return 0;
-}
-
-int security_task_fix_setuid(struct cred *new, const struct cred *old, int flags)
-{
-	return call_int_hook(task_fix_setuid, 0, new, old, flags);
-}
-
-int security_setprocattr(const char *lsm, const char *name, void *value, size_t size)
-{
-	struct security_hook_list *hp;
-
-	hlist_for_each_entry(hp, &security_hook_heads.setprocattr, list) {
-		if (lsm != NULL && strcmp(lsm, hp->lsm))
-			continue;
-	}
-	return 0;
-}
-"""
-
-_SAMPLE_SECURITY_6_12 = """/* security/security.c 6.12 */
-#include <linux/security.h>
-
-static int lsm_superblock_alloc(struct super_block *sb)
-{
-	return 0;
-}
-
-#include <linux/lsm_hook_defs.h>
-#undef LSM_HOOK
-
-int security_bprm_check(struct linux_binprm *bprm)
-{
-	int ret;
-
-	return 0;
-}
-
-int security_inode_rename(struct inode *old_dir, struct dentry *old_dentry,
-			   struct inode *new_dir, struct dentry *new_dentry,
-			   unsigned int flags)
-{
-	if (unlikely(IS_PRIVATE(d_backing_inode(old_dentry)) ||
-            (d_is_positive(new_dentry) && IS_PRIVATE(d_backing_inode(new_dentry)))))
-		return 0;
-	return 0;
-}
-
-int security_file_permission(struct file *file, int mask)
-{
-	int ret;
-
-	ret = call_int_hook(file_permission, 0, file, mask);
-	if (ret)
-		return ret;
-	return 0;
-}
-
-int security_task_fix_setuid(struct cred *new, const struct cred *old, int flags)
-{
-	return call_int_hook(task_fix_setuid, 0, new, old, flags);
-}
-
-int security_setprocattr(const char *lsm, const char *name, void *value, size_t size)
-{
-	struct security_hook_list *hp;
-
-	hlist_for_each_entry(hp, &security_hook_heads.setprocattr, list) {
-		if (lsm != NULL && strcmp(lsm, hp->lsm))
-			continue;
-	}
-	return 0;
-}
-"""
+_SAMPLE_SECURITY_6_12 = target_sources(True)["security/security.c"]
 
 
 def _make_clean_bundle(target_id: str = "sultan-android14-6.1", version: str = "6.1.25") -> SourceBundle:
@@ -303,7 +196,7 @@ def _make_clean_bundle(target_id: str = "sultan-android14-6.1", version: str = "
         )
         if path == "fs/stat.c":
             content += _SAMPLE_STAT
-        files[path] = content
+        files[path] = sec_content if path == "security/security.c" else content
     return create_source_bundle(target_id=target_id, kernel_version=version, files=files)
 
 
@@ -368,45 +261,40 @@ class V29PositiveProfileMatrixTests(unittest.TestCase):
         prof_def = get_profile_definition(pid)
         target_bundle = bundle or self.bundles[prof_def.target_id]
 
-        # 1. Genuinely incomplete transport sources without ownership claims fail closed in ownership validation
+        # Composition is not the publication authentication gate. Exercise its
+        # actual missing-owner rejection, including the returned report state.
+        kwargs = dict(target_bundle=target_bundle, patch_11=self.patch_11,
+                      patch_51=self.patches_51[prof_def.target_id], claims=())
+        from v2.validation import validate_symbols, validate_abi
+        with patch("v2.validation.validate_symbols", wraps=validate_symbols) as symbols, \
+             patch("v2.validation.validate_abi", wraps=validate_abi) as abi:
+            res = compose_profile(pid, **kwargs, raise_on_failure=False)
+        self.assertEqual(res.validation_report.status, ValidationStatus.FAIL)
+        failures = [r for r in res.validation_report.results if r.status == ValidationStatus.FAIL]
+        self.assertTrue(failures)
+        self.assertTrue(all(r.validator_id.startswith("validation.ownership") for r in failures))
+        self.assertTrue(any(r.metadata.get("error_type") == "NoOwner" for r in failures))
+        self.assertTrue(symbols.called)
+        self.assertTrue(abi.called)
         with self.assertRaises(NoOwner):
-            compose_profile(
-                pid,
-                target_bundle=target_bundle,
-                patch_11=self.patch_11,
-                patch_51=self.patches_51[prof_def.target_id],
-                claims=(),
-            )
-
-        # 2. Incomplete / non-authoritative synthetic inputs must never produce production PASS
-        res = compose_profile(
-            pid,
-            target_bundle=target_bundle,
-            patch_11=self.patch_11,
-            patch_51=self.patches_51[prof_def.target_id],
-        )
-        self.assertIsInstance(res, ProfileCompositionResult)
-        auth_bundle = load_authoritative_bundle(prof_def.target_id, REPO_ROOT)
-        auth_xxksu = load_authoritative_bundle("xxksu", REPO_ROOT)
-        self.assertNotEqual(res.composed_bundle.identity, auth_bundle.identity)
-        self.assertNotEqual(res.xxksu_bundle.identity, auth_xxksu.identity)
+            compose_profile(pid, **kwargs, raise_on_failure=True)
         return str(res.digest)
 
     def test_2_incomplete_synthetic_sources_are_blocked(self) -> None:
         for pid in KNOWN_PROFILES:
             self._assert_incomplete_source_blocked(pid)
 
-    def test_3_manual_positive_composition_is_blocked_without_authority(self) -> None:
+    def test_3_manual_composition_rejects_missing_owners(self) -> None:
         for pid in KNOWN_PROFILES:
             if pid.endswith("-manual"):
                 self._assert_incomplete_source_blocked(pid)
 
-    def test_4_lsm_positive_composition_is_blocked_without_authority(self) -> None:
+    def test_4_lsm_composition_rejects_missing_owners(self) -> None:
         for pid in KNOWN_PROFILES:
             if pid.endswith("-lsm_bl"):
                 self._assert_incomplete_source_blocked(pid)
 
-    def test_5_patch_order_cannot_be_asserted_without_authority(self) -> None:
+    def test_5_failed_composition_has_no_successful_report(self) -> None:
         for pid in KNOWN_PROFILES:
             self._assert_incomplete_source_blocked(pid)
 
@@ -448,11 +336,11 @@ class V29PositiveProfileMatrixTests(unittest.TestCase):
         for pid in KNOWN_PROFILES:
             self._assert_incomplete_source_blocked(pid)
 
-    def test_11_incomplete_sources_do_not_reach_symbol_validation(self) -> None:
+    def test_11_symbol_validation_precedes_missing_owner_rejection(self) -> None:
         for pid in KNOWN_PROFILES:
             self._assert_incomplete_source_blocked(pid)
 
-    def test_12_incomplete_sources_do_not_reach_abi_validation(self) -> None:
+    def test_12_abi_validation_precedes_missing_owner_rejection(self) -> None:
         for pid in KNOWN_PROFILES:
             self._assert_incomplete_source_blocked(pid)
 

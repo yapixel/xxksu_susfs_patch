@@ -3,6 +3,8 @@
 import hashlib
 from pathlib import Path
 import unittest
+from unittest.mock import patch
+from dataclasses import replace
 
 from v2.adapters import (
     AnchorConflict,
@@ -412,23 +414,18 @@ class XxksuAdapterTests(unittest.TestCase):
                 operations=duplicate_ops,
             )
 
-    def test_overlapping_adaptation_operations_fail_closed(self):
-        # Manually create two operations on the same file with overlapping spans
-        loc1 = AnchorLocation("kernel/Kconfig", 10, 1, "test", start_offset=100, end_offset=150)
-        loc2 = AnchorLocation("kernel/Kconfig", 11, 1, "test", start_offset=120, end_offset=180)
-        op1 = AdaptationOperation("op1", "test.patch", "kernel/Kconfig", loc1, Placement.BEFORE, "a", "xxksu")
-        op2 = AdaptationOperation("op2", "test.patch", "kernel/Kconfig", loc2, Placement.BEFORE, "b", "xxksu")
 
-        # Building a plan with overlapping operations should raise AnchorConflict
-        # Let's test the overlap detection logic
-        file_ops = [op1, op2]
-        sorted_ops = sorted(file_ops, key=lambda o: (o.anchor_location.start_offset, o.anchor_location.end_offset))
-        with self.assertRaises(AnchorConflict):
-            for i in range(len(sorted_ops) - 1):
-                cur = sorted_ops[i]
-                nxt = sorted_ops[i + 1]
-                if cur.anchor_location.end_offset > nxt.anchor_location.start_offset:
-                    raise AnchorConflict(f"overlapping mutation spans in kernel/Kconfig")
+    def test_overlapping_adaptation_operations_fail_closed(self):
+        specs = get_patch11_operation_specs()
+        first = specs[0]
+        second = replace(first, operation_id="test.overlapping")
+        locations = [
+            AnchorLocation(first.file_path, 10, 1, "first", start_offset=100, end_offset=150),
+            AnchorLocation(first.file_path, 11, 1, "second", start_offset=120, end_offset=180),
+        ]
+        with patch("v2.adapters.xxksu.get_patch11_operation_specs", return_value=(first, second)),              patch.object(self.adapter, "locate_anchor", side_effect=locations):
+            with self.assertRaisesRegex(AnchorConflict, "overlapping mutation spans"):
+                self.adapter.build_adaptation_plan(self.clean_bundle)
 
     def test_generate_patch11_does_not_read_golden_file(self):
         """Trap any attempt by production code to open or read the golden patch file."""
@@ -455,11 +452,24 @@ class XxksuAdapterTests(unittest.TestCase):
             Path.read_text = real_read_text
             Path.read_bytes = real_read_bytes
 
+
     def test_generate_patch11_succeeds_when_golden_patch_unavailable(self):
-        """Generation succeeds independently of golden patch presence on disk."""
-        generated = generate_patch11(self.clean_bundle)
-        self.assertTrue(generated.startswith("From 37eee69d83424bba4b2ae3d3dd38cbbbb1ef9824"))
-        self.assertTrue(generated.endswith("-- \n2.55.0\n\n"))
+        import tempfile
+        from v2.source.baseline import load_authoritative_bundle
+        # Start from the authenticated source fixture, not reconstructed patch context.
+        bundle = load_authoritative_bundle("xxksu", _PATCH11_PATH.parents[2])
+        with tempfile.TemporaryDirectory() as td:
+            # Generation runs with a physically absent golden in its working directory.
+            import os
+            previous = Path.cwd()
+            try:
+                os.chdir(td)
+                self.assertFalse(Path("patches/xxksu/11_enable_susfs_for_ksu.patch").exists())
+                with patch.object(Path, "read_text", side_effect=FileNotFoundError("golden unavailable")),                      patch.object(Path, "read_bytes", side_effect=FileNotFoundError("golden unavailable")),                      patch("builtins.open", side_effect=FileNotFoundError("golden unavailable")):
+                    generated = generate_patch11(bundle)
+            finally:
+                os.chdir(previous)
+        self.assertIn("diff --git a/kernel/ksu.c", generated)
 
     def test_changing_mutation_payload_changes_patch(self):
         """Modifying an operation payload produces a correspondingly changed patch."""

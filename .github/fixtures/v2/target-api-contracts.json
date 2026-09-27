@@ -1,0 +1,33 @@
+{
+  "gki": {
+    "archive_sha256": "accf8f9348280116792c9608f420f8d4554da52499119a8536883c5eefd429ff",
+    "excerpts": {
+      "find_vma": "extern struct vm_area_struct * find_vma(struct mm_struct * mm, unsigned long addr);",
+      "vma_iter_invalidate": "static inline void vma_iter_invalidate(struct vma_iterator *vmi)\n{\n\tmas_pause(&vmi->mas);\n}\n",
+      "vma_iterator": "struct vma_iterator {\n\tstruct ma_state mas;\n};\n",
+      "vma_next": "static inline struct vm_area_struct *vma_next(struct vma_iterator *vmi)\n{\n\t/*\n\t * Uses mas_find() to get the first VMA when the iterator starts.\n\t * Calling mas_next() could skip the first entry.\n\t */\n\treturn mas_find(&vmi->mas, ULONG_MAX);\n}\n",
+      "walk_page_range": "int walk_page_range(struct mm_struct *mm, unsigned long start,\n\t\tunsigned long end, const struct mm_walk_ops *ops,\n\t\tvoid *private);"
+    },
+    "source": "https://github.com/yapixel/gki-build-assets/releases/download/android16-6.12-2025-09_r38/common-android16-6.12-2025-09_r38.tar.gz",
+    "source_sha256": {
+      "include/linux/mm.h": "037cbec817021b2d280e0d9efe60ad1d5704861f317855c6c410d8dee867ccd4",
+      "include/linux/mm_types.h": "a9969815fa402727987d64dc258d2e26664fbd8197621aba9a7b8e153aadf026",
+      "include/linux/pagewalk.h": "52fb56c1e6dd9abdef16b625b895c8372d0a43dd067acf074b5824c08be2bf25"
+    }
+  },
+  "sultan": {
+    "archive_sha256": null,
+    "excerpts": {
+      "find_vma": "extern struct vm_area_struct * find_vma(struct mm_struct * mm, unsigned long addr);",
+      "vma_iterator": "struct vma_iterator {\n\tstruct ma_state mas;\n};\n",
+      "vma_next": "static inline struct vm_area_struct *vma_next(struct vma_iterator *vmi)\n{\n\t/*\n\t * Uses vma_find() to get the first VMA when the iterator starts.\n\t * Calling mas_next() could skip the first entry.\n\t */\n\treturn vma_find(vmi, ULONG_MAX);\n}\n",
+      "walk_page_range": "int walk_page_range(struct mm_struct *mm, unsigned long start,\n\t\tunsigned long end, const struct mm_walk_ops *ops,\n\t\tvoid *private);"
+    },
+    "source": "https://github.com/kerneltoast/android_kernel_google_tensynos/tree/af5c65b9547a9f33c5f566430d0434aecab5a8b5",
+    "source_sha256": {
+      "include/linux/mm.h": "f3222507fc77545f1da5d0ff493224679dba0399fd012dcb33e721a9d05c8a8c",
+      "include/linux/mm_types.h": "662f68bf1e248aea9d6860c047e0ea3086bb262bb39358552538b49e669060b7",
+      "include/linux/pagewalk.h": "8d07c8501b6f9be511506932ad66ee36a1ac8cb471d0730005b98af9a7d8ce75"
+    }
+  }
+}

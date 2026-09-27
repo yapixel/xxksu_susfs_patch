@@ -1,5 +1,6 @@
 """Execute corrected production C control flow with bounded kernel API mocks."""
 from pathlib import Path
+import json
 import subprocess
 import tempfile
 import unittest
@@ -14,17 +15,31 @@ from v2.source.patch_apply import apply_patch_to_bundle
 ROOT = Path(__file__).resolve().parents[4]
 
 
+def target_headers(gki):
+    return json.loads((ROOT / ".github/fixtures/v2/target-api-contracts.json").read_text())[
+        "gki" if gki else "sultan"]["excerpts"]
+
+
+def rollup_harness():
+    headers = target_headers(True)
+    return ROLLUP_MOCKS.replace("NATIVE_ITERATOR", headers["vma_iterator"]).replace(
+        "NATIVE_VMA_HELPERS", headers["vma_next"] + headers["vma_iter_invalidate"])
+
+
+def target_sources(gki):
+    if gki:
+        return r38_sources(ROOT)
+    bundle = load_source_bundle(ROOT / ".github/fixtures/v2/v29-baselines/sultan-android14-6.1.json")
+    return {entry.path: entry.content for entry in bundle.files}
+
+
 def postimages(gki, corrected=True):
     target = "gki-android16-6.12" if gki else "sultan-android14-6.1"
     directory = ROOT / ".github/fixtures" / ("r38" if gki else "sultan")
     text = next(directory.glob("51_*.patch")).read_text()
     if corrected:
         text = correct_patch51(text, ROOT, gki=gki)
-    if gki:
-        sources = r38_sources(ROOT)
-    else:
-        bundle = load_source_bundle(ROOT / ".github/fixtures/v2/v29-baselines/sultan-android14-6.1.json")
-        sources = {entry.path: entry.content for entry in bundle.files}
+    sources = target_sources(gki)
     patch = parse_patch(text)
     patch.files = [file for file in patch.files if file.old_path.removeprefix("a/") in sources]
     bundle = create_source_bundle(target, "6.12" if gki else "6.1", sources)
@@ -42,16 +57,18 @@ def function(source, signature):
     return source[start:end] + "\n"
 
 
-def run_c(source):
+def run_c(source, *, syntax_only=False):
     with tempfile.TemporaryDirectory(prefix="patch51-c-") as tmp:
         path = Path(tmp) / "test.c"
         path.write_text("#include <stddef.h>\n" + source)
         compiled = subprocess.run(["gcc", "-std=gnu11", "-Wall", "-Werror=implicit-function-declaration",
-                        "-Werror=return-type", str(path), "-o", str(Path(tmp) / "test")],
+                        "-Werror=return-type", str(path), *(["-fsyntax-only"] if syntax_only else ["-o", str(Path(tmp) / "test")])],
                        capture_output=True, text=True)
         if compiled.returncode:
             raise AssertionError(compiled.stderr)
-        return subprocess.run([str(Path(tmp) / "test")], capture_output=True).returncode
+        if syntax_only:
+            return 0
+        return subprocess.run([str(Path(tmp) / "test")], capture_output=True, timeout=15).returncode
 
 
 def pagemap_harness(source, *, gki):
@@ -63,6 +80,32 @@ def pagemap_harness(source, *, gki):
     walk = PAGEMAP_WALK_MOCK.replace(
         "APPEND_ENTRY", "add_to_pagemap(&p, pm)" if gki else "add_to_pagemap(s, &p, pm)")
     return PAGEMAP_MOCKS + native + walk
+
+
+def namei_harness(source):
+    """Execute target nested lookup setup/restore instead of a substitute owner."""
+    mocks = NAMEI_MOCKS
+    start = source.index("struct nameidata {")
+    end = source.index("} __randomize_layout;", start) + len("} __randomize_layout;")
+    native_struct = source[start:end]
+    mocks = mocks.replace(
+        "NATIVE_NAMEIDATA_STRUCT",
+        "#define EMBEDDED_LEVELS 2\n#define __randomize_layout\n"
+        "struct qstr { int unused; }; struct delayed_call { int unused; };\n"
+        "typedef unsigned short umode_t; typedef int vfsuid_t;\n" + native_struct)
+    mocks = mocks.replace("static struct nameidata *active;",
+        "static struct { struct nameidata *nameidata; } task;\n"
+        "#define current (&task)\n#define active (current->nameidata)\n"
+        "#include <stdlib.h>\n#define kfree free\n"
+        "#define LOOKUP_MOUNTPOINT 128\n#define AUDIT_INODE_NOEVAL 1\n")
+    native = "".join(function(source, sig) for sig in (
+        "static void __set_nameidata(", "static inline void set_nameidata(",
+        "static void restore_nameidata("))
+    mocks = mocks.replace("NATIVE_NAMEIDATA_LIFETIME", native)
+    mocks = mocks.replace("NATIVE_FILENAME_LOOKUP",
+        "static void audit_inode(struct filename *,struct dentry *,int);\n" +
+        function(source, "int filename_lookup("))
+    return mocks
 
 
 class LifecycleTests(unittest.TestCase):
@@ -97,15 +140,23 @@ class LifecycleTests(unittest.TestCase):
             functions += function(source, "static ssize_t pagemap_read(")
             self.assertEqual(run_c(pagemap_harness(source, gki=gki) +
                                    PAGEMAP_READ_MOCKS + functions + PAGEMAP_READ_CASES), 0)
+            if gki:
+                emulated = pagemap_harness(source, gki=True).replace(
+                    "#define __PAGE_SIZE PAGE_SIZE", "#define __PAGE_SIZE (4 * PAGE_SIZE)")
+                emulated = emulated.replace(
+                    "? 123+s/PAGE_SIZE:0,0)", "? 123+s/PAGE_SIZE:0,v && s>=v->vm_start ? PM_PRESENT|PM_FILE:0)")
+                self.assertEqual(run_c(emulated + PAGEMAP_READ_MOCKS +
+                                       functions + PAGEMAP_EMULATED_CASES), 0)
+
 
     def test_nameidata_retries_and_local_lookup_ownership(self):
         names = ("static int do_tmpfile(", "static int do_o_path(",
                  "static struct file *path_openat(", "struct file *do_filp_open(")
         functions = "".join(function(self.gki["fs/namei.c"], name) for name in names)
-        self.assertEqual(run_c(NAMEI_MOCKS + functions + NAMEI_CASES), 0)
+        self.assertEqual(run_c(namei_harness(self.gki['fs/namei.c']) + functions + NAMEI_CASES), 0)
         original = postimages(True, False)["fs/namei.c"]
         functions = "".join(function(original, name) for name in names)
-        self.assertNotEqual(run_c(NAMEI_MOCKS + functions + NAMEI_CASES), 0,
+        self.assertNotEqual(run_c(namei_harness(original) + functions + NAMEI_CASES), 0,
                             "regression must reproduce the original lifetime failure")
 
     def test_mount_provenance_transition_inheritance_and_early_failure(self):
@@ -116,7 +167,8 @@ class LifecycleTests(unittest.TestCase):
             middle = clone.index("\tatomic_inc(&sb->s_active);")
             tail = clone.index(" out_free:")
             clone = clone[:middle] + "\treturn mnt;\n\n" + clone[tail:]
-            self.assertEqual(run_c(MOUNT_MOCKS + clone + MOUNT_CASES), 0)
+            free_id = function(sources["fs/namespace.c"], "static void mnt_free_id(")
+            self.assertEqual(run_c(MOUNT_MOCKS + free_id + clone + MOUNT_CASES), 0)
 
     def test_smaps_normal_and_reacquired_partial_gather(self):
         source = self.gki["fs/proc/task_mmu.c"]
@@ -136,14 +188,54 @@ class LifecycleTests(unittest.TestCase):
         loop = rollup[rollup.index("\tdo {"):rollup.index("\nempty_set:")]
         wrapper = ("static unsigned long run_rollup(void) {\n"
                    "struct mem_size_stats mss={0}; struct mm_struct *mm=NULL;\n"
-                   "void *priv=NULL; int ret=0,vmi=0; unsigned long last_vma_end=0;\n"
+                   "void *priv=NULL; int ret=0; struct vma_iterator vmi={0}; unsigned long last_vma_end=0;\n"
                    "struct vm_area_struct *vma=vma_next(&vmi);\n" + loop +
                    "\nout_put_mm: return mss.swap;\n}\n")
         gather = function(source, "static void smap_gather_stats(")
-        harness = SMAPS_MOCKS + ROLLUP_MOCKS + gather + wrapper + ROLLUP_CASES
+        harness = SMAPS_MOCKS + rollup_harness() + gather + wrapper + ROLLUP_CASES
         self.assertEqual(run_c(harness), 0)
         old = function(postimages(True, False)["fs/proc/task_mmu.c"], "static void smap_gather_stats(")
-        self.assertNotEqual(run_c(SMAPS_MOCKS + ROLLUP_MOCKS + old + wrapper + ROLLUP_CASES), 0)
+        self.assertNotEqual(run_c(SMAPS_MOCKS + rollup_harness() + old + wrapper + ROLLUP_CASES), 0)
+
+    def test_native_target_contracts(self):
+        for gki in (False, True):
+            sources = target_sources(gki)
+            specs = [
+                ("fs/namei.c", "static inline void set_nameidata(", "void (*)(struct nameidata *, int, struct filename *, const struct path *)"),
+                ("fs/namei.c", "static void restore_nameidata(", "void (*)(void)"),
+                ("fs/namei.c", "int filename_lookup(", "int (*)(int, struct filename *, unsigned, struct path *, struct path *)"),
+                ("fs/namei.c", "int vfs_tmpfile(" if gki else "static int vfs_tmpfile(",
+                 "int (*)(struct " + ("mnt_idmap" if gki else "user_namespace") + " *, const struct path *, struct file *, umode_t)"),
+                ("security/security.c", "int security_setprocattr(",
+                 "int (*)(" + ("int" if gki else "const char *") + ", const char *, void *, size_t)"),
+                ("fs/proc/task_mmu.c", "static void smap_gather_stats(",
+                 "void (*)(struct vm_area_struct *, struct mem_size_stats *, unsigned long)"),
+                ("fs/namespace.c", "static struct mount *clone_mnt(",
+                 "struct mount *(*)(struct mount *, struct dentry *, int)"),
+                ("fs/namespace.c", "static struct mount *alloc_vfsmnt(",
+                 "struct mount *(*)(const char *)"),
+                ("fs/namespace.c", "static void mnt_free_id(", "void (*)(struct mount *)"),
+            ]
+            code = ("typedef unsigned short umode_t;\n"
+                    "struct nameidata; struct filename; struct path; struct file;\n"
+                    "struct mnt_idmap; struct user_namespace; struct vm_area_struct;\n"
+                    "struct mem_size_stats; struct mount; struct dentry;\n")
+            for path, signature, expected in specs:
+                declaration = function(sources[path], signature).split("{", 1)[0].strip()
+                symbol = signature.split("(")[0].split()[-1].lstrip("*")
+                code += declaration + ";\n"
+                code += '_Static_assert(__builtin_types_compatible_p(typeof(&' + symbol + '), ' + expected + '), "' + symbol + '");\n'
+            headers = target_headers(gki)
+            code += "struct mm_struct; struct mm_walk_ops; struct ma_state {int unused;};\n"
+            code += headers["vma_iterator"]
+            for name, expected in (
+                ("find_vma", "struct vm_area_struct *(*)(struct mm_struct *, unsigned long)"),
+                ("walk_page_range", "int (*)(struct mm_struct *, unsigned long, unsigned long, const struct mm_walk_ops *, void *)"),
+                ("vma_next", "struct vm_area_struct *(*)(struct vma_iterator *)"),
+            ):
+                code += headers[name].split("{", 1)[0].rstrip(";\n") + ";\n"
+                code += '_Static_assert(__builtin_types_compatible_p(typeof(&' + name + '), ' + expected + '), "' + name + '");\n'
+            self.assertEqual(run_c(code, syntax_only=True), 0)
 
     def test_generation_deterministic_and_changed_preimage_fails(self):
         for gki in (True, False):
@@ -173,13 +265,14 @@ typedef uint64_t u64;
 #include <stdbool.h>
 struct vm_area_struct { unsigned long vm_start,vm_end; int *vm_file; };
 struct mm_struct { struct vm_area_struct *v; int n; unsigned long task_size; };
-static int pagemap_ops;
+struct mm_walk_ops {int unused;}; static struct mm_walk_ops pagemap_ops;
 static struct vm_area_struct *find_vma(struct mm_struct *mm,unsigned long s) {
  for(int i=0;i<mm->n;i++) if(mm->v[i].vm_end>s) return &mm->v[i]; return NULL;
 }
 '''
 PAGEMAP_WALK_MOCK = r'''
-static int walk_page_range(struct mm_struct *mm,unsigned long s,unsigned long e,void *ops,struct pagemapread *pm) {
+static int walk_page_range(struct mm_struct *mm,unsigned long s,unsigned long e,const struct mm_walk_ops *ops,void *private) {
+ struct pagemapread *pm=private;
  for(;s<e;s+=PAGE_SIZE) { struct vm_area_struct *v=find_vma(mm,s);
   pagemap_entry_t p=make_pme(v && s>=v->vm_start ? 123+s/PAGE_SIZE:0,0);
   assert(pm->pos<pm->len);
@@ -277,6 +370,7 @@ NAMEI_MOCKS = r'''
 #define likely(x) (x)
 #define IS_ERR(p) ((intptr_t)(p)<0)
 #define ERR_PTR(e) ((void *)(intptr_t)(e))
+#define PTR_ERR(p) ((intptr_t)(p))
 #define ND_ROOT_PRESET 1
 #define LOOKUP_RCU 2
 #define LOOKUP_REVAL 4
@@ -289,8 +383,9 @@ NAMEI_MOCKS = r'''
 #define SUSFS_IS_INODE_OPEN_REDIRECT_WITHOUT_UID_CHECK(i) (redirect)
 struct filename { int alive; };
 struct dentry { int *d_inode; };
-struct path { struct dentry *dentry; int mnt; };
-struct nameidata { int dfd,state; struct filename *name; struct path path; };
+struct vfsmount {int unused;}; static struct vfsmount mount;
+struct path { struct dentry *dentry; struct vfsmount *mnt; };
+NATIVE_NAMEIDATA_STRUCT
 struct open_flags { int open_flag,lookup_flags,mode; };
 struct file { int f_flags,f_mode; struct path f_path; };
 static struct filename original={1},fake;
@@ -299,31 +394,31 @@ static struct file result;
 static struct nameidata *active;
 static int redirect=1,root_preset,attempt,allocated,freed,refs,lookup_error,open_error,lookup_calls;
 static unsigned expected_flags;
-static void set_nameidata(struct nameidata *nd,int dfd,struct filename *name,void *root) {
- assert(name->alive); nd->name=name; nd->dfd=dfd; nd->state=root_preset; nd->path=(struct path){&dent,1}; active=nd;
-}
-static void restore_nameidata(void) { active=NULL; }
+NATIVE_NAMEIDATA_LIFETIME
 static int current_cred(void) {return 0;}
-static struct file *alloc_empty_file(int flags,int cred) {result=(struct file){flags,FMODE_OPENED,{&dent,1}};return &result;}
+static struct file *alloc_empty_file(int flags,int cred) {result=(struct file){flags,FMODE_OPENED,{&dent,&mount}};return &result;}
 static int path_lookupat(struct nameidata *nd,unsigned flags,struct path *p) {
- assert(nd->name->alive); refs++; *p=(struct path){&dent,1}; return 0;
+ assert(nd->name->alive);
+ if(nd->name==&fake) {
+  assert(nd->dfd==73 && nd->saved && nd->saved->name==&original);
+  assert((flags & ~LOOKUP_RCU)==expected_flags); lookup_calls++;
+  if(lookup_error) return lookup_error;
+ }
+ refs++; *p=(struct path){&dent,&mount}; return 0;
 }
 static struct filename *susfs_open_redirect_spoof_do_sys_openat(int *inode) { assert(!fake.alive); fake.alive=1;allocated++;return &fake;}
 static void putname(struct filename *name) { assert(name->alive); assert(!active || active->name!=name); name->alive=0;freed++; }
 static void path_put(struct path *p) { assert(refs>0);refs--; }
-static int filename_lookup(int dfd,struct filename *name,unsigned flags,struct path *p,void *root) {
- assert(dfd==73 && name==&fake && name->alive && root==NULL);
- assert(active->name==&original && flags==expected_flags); lookup_calls++;
- if(lookup_error) return lookup_error;
- refs++; *p=(struct path){&dent,1}; return 0;
-}
-static int mnt_want_write(int mnt) {return 0;}
-static void mnt_drop_write(int mnt) {}
-static int mnt_idmap(int mnt) {return 0;}
-static int vfs_tmpfile(int id,struct path *p,struct file *f,int mode) {return open_error;}
+NATIVE_FILENAME_LOOKUP
+static int mnt_want_write(struct vfsmount *mnt) {return 0;}
+static void mnt_drop_write(struct vfsmount *mnt) {}
+struct mnt_idmap {int unused;};
+static struct mnt_idmap idmap;
+static struct mnt_idmap *mnt_idmap(struct vfsmount *mnt) {return &idmap;}
+static int vfs_tmpfile(struct mnt_idmap *id,const struct path *p,struct file *f,umode_t mode) {return open_error;}
 static void audit_inode(struct filename *name,struct dentry *d,int flag) {assert(name->alive);}
 static int vfs_open(struct path *p,struct file *f) {return open_error;}
-static const char *path_init(struct nameidata *nd,unsigned flags) {assert(nd->name->alive);return "name";}
+static const char *path_init(struct nameidata *nd,unsigned flags) {assert(nd->name->alive);nd->path=(struct path){&dent,&mount};return "name";}
 static int link_path_walk(const char *s,struct nameidata *nd) {assert(nd->name->alive);return 0;}
 static const char *open_last_lookups(struct nameidata *nd,struct file *f,const struct open_flags *op) {return NULL;}
 static void terminate_walk(struct nameidata *nd) {}
@@ -339,7 +434,8 @@ int main(void) {
  for(int redir=0;redir<2;redir++) for(int err=0;err<3;err++) {
   struct nameidata nd; root_preset=preset; redirect=redir; allocated=freed=refs=lookup_calls=0;
   lookup_error=err==1?-ENOENT:0; open_error=err==2?-EACCES:0;
-  set_nameidata(&nd,73,&original,NULL); expected_flags=64|(mode?LOOKUP_DIRECTORY:0);
+  struct path root={&dent,&mount};
+  set_nameidata(&nd,73,&original,preset?&root:NULL); expected_flags=64|(mode?LOOKUP_DIRECTORY:0);
   if(mode) do_tmpfile(&nd,64,&op,&result); else do_o_path(&nd,64,&result);
   assert(nd.name==&original && original.alive && refs==0 && allocated==freed);
   assert(lookup_calls==(!preset && redir)); restore_nameidata();
@@ -372,12 +468,13 @@ static struct mount allocated;
 static int susfs_is_sdcard_android_data_not_decrypted,key,domain,flip,ida_owned,free_count,group_error;
 static int static_branch_unlikely(int *p) {return key;}
 static int susfs_is_current_ksu_domain(void) {return domain;}
-static struct mount *alloc_common(int ida) {allocated=(struct mount){0};ida_owned=ida;if(flip)key=!key;return &allocated;}
-static struct mount *alloc_vfsmnt(char *name) {return alloc_common(1);}
-static struct mount *susfs_alloc_non_unshare_ksu_vfsmnt(char *name) {return alloc_common(1);}
-static struct mount *susfs_alloc_unshare_ksu_vfsmnt(char *name,int id) {return alloc_common(0);}
+static struct mount *alloc_common(int ida) {allocated=(struct mount){.mnt_id=ida?701:99};ida_owned=ida;if(flip)key=!key;return &allocated;}
+static struct mount *alloc_vfsmnt(const char *name) {return alloc_common(1);}
+static struct mount *susfs_alloc_non_unshare_ksu_vfsmnt(const char *name) {return alloc_common(1);}
+static struct mount *susfs_alloc_unshare_ksu_vfsmnt(const char *name,int id) {return alloc_common(0);}
 static int mnt_alloc_group_id(struct mount *m) {return group_error;}
-static void mnt_free_id(struct mount *m) {if(!(m->mnt.mnt_flags&VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT)){assert(ida_owned);free_count++;}}
+static int mnt_id_ida;
+static void ida_free(int *ida,int id) {assert(ida == &mnt_id_ida);assert(ida_owned);assert(id==allocated.mnt_id);free_count++;}
 static void free_vfsmnt(struct mount *m) {}
 '''
 MOUNT_CASES = r'''
@@ -402,6 +499,7 @@ SMAPS_MOCKS = r'''
 #define VMA_PAD_START(v) ((v)->vm_end)
 #define file_inode(f) (f)
 #define SUSFS_IS_INODE_SUS_MAP(f) ((f)->hidden)
+struct mm_struct;
 struct file {int hidden,f_mapping;};
 struct vm_area_struct {unsigned long vm_start,vm_end,vm_flags;struct file *vm_file;void *vm_mm;};
 struct mem_size_stats {unsigned long swap;};
@@ -410,7 +508,7 @@ static struct mm_walk_ops smaps_walk_ops,smaps_shmem_walk_ops;
 static int calls;
 static int shmem_mapping(int x) {return x;}
 static unsigned long shmem_swap_usage(struct vm_area_struct *v) {return 42;}
-static int walk_page_range(void *mm,unsigned long s,unsigned long e,const struct mm_walk_ops *ops,struct mem_size_stats *m) {calls++;m->swap+=e-s;return 0;}
+static int walk_page_range(struct mm_struct *mm,unsigned long s,unsigned long e,const struct mm_walk_ops *ops,void *private) {struct mem_size_stats *m=private;calls++;m->swap+=e-s;return 0;}
 '''
 SMAPS_CASES = r'''
 int main(void) {
@@ -431,11 +529,18 @@ ROLLUP_MOCKS = r'''
 #define for_each_vma(iter,vma) while (((vma)=vma_next(&(iter))) != NULL)
 struct mm_struct {int unused;};
 static struct vm_area_struct sequence[2];
-static int total,contended,lock_held;
-static struct vm_area_struct *vma_next(int *i) {return *i<total?&sequence[(*i)++]:NULL;}
+static int total,contended,lock_held,iterator_paused;
+#include <limits.h>
+struct ma_state {int index,paused;};
+NATIVE_ITERATOR
+static struct vm_area_struct *mas_find(struct ma_state *s,unsigned long max) {
+ assert(lock_held); s->paused=0; iterator_paused=0;
+ return s->index<total?&sequence[s->index++]:NULL;
+}
+static void mas_pause(struct ma_state *s) {assert(lock_held);s->paused=1;iterator_paused=1;}
+NATIVE_VMA_HELPERS
 static int mmap_lock_is_contended(struct mm_struct *mm) {int ret=contended;contended=0;return ret;}
-static void vma_iter_invalidate(int *i) {}
-static void mmap_read_unlock(struct mm_struct *mm) {assert(lock_held);lock_held=0;}
+static void mmap_read_unlock(struct mm_struct *mm) {assert(lock_held && iterator_paused);lock_held=0;}
 static int mmap_read_lock_killable(struct mm_struct *mm) {assert(!lock_held);lock_held=1;return 0;}
 static void release_task_mempolicy(void *p) {}
 '''
@@ -452,5 +557,31 @@ int main(void) {
   assert(run_rollup()==expected);
   assert(lock_held);
  } return 0;
+}
+'''
+
+
+PAGEMAP_EMULATED_CASES = r'''
+int main(void) {
+ int hidden=1,visible=0;
+ struct vm_area_struct v[]={{4*PAGE_SIZE,12*PAGE_SIZE,&visible},
+  {12*PAGE_SIZE,20*PAGE_SIZE,&hidden},{20*PAGE_SIZE,28*PAGE_SIZE,&visible},
+  {28*PAGE_SIZE,36*PAGE_SIZE,&hidden}};
+ struct mm_struct mm={v,4,64*PAGE_SIZE}; struct file f={&mm};
+ for(int first=0;first<=64;first+=4) for(int n=1;n<=17;n++) {
+  u64 out[20]; for(int j=0;j<20;j++)out[j]=~0ULL;
+  loff_t pos=first*PM_ENTRY_BYTES;
+  int entries=min(n,(64-first)/4);
+  assert(pagemap_read(&f,(char*)out,n*PM_ENTRY_BYTES,&pos)==entries*PM_ENTRY_BYTES);
+  /* This kernel's read function advances the internal offset in base pages;
+   * its outer emulation interface translates the public page-size units. */
+  assert(pos==(first+4*entries)*PM_ENTRY_BYTES && !lock_held);
+  for(int j=0;j<entries;j++) {
+   int a=first+4*j,vis=(a>=4&&a<12)||(a>=20&&a<28);
+   assert(out[j]==(vis?(PM_PRESENT|PM_FILE):0));
+  }
+  assert(out[entries]==~0ULL);
+ }
+ return 0;
 }
 '''

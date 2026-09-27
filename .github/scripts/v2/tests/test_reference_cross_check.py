@@ -241,17 +241,12 @@ exit 0
         bundle = load_authoritative_bundle("xxksu", repo_root)
         our_text = generate_patch11(bundle)
 
-        ref_path = Path("/tmp/midori_xx.patch")
-        if ref_path.is_file():
-            ref_text = ref_path.read_text(encoding="utf-8")
-        else:
-            # Fallback to realistic synthetic diff containing all matched and divergent units
-            ref_text = (
-                our_text.replace("config KSU_SUSFS_TRY_UMOUNT\n", "")
-                .replace("CMD_SUSFS_ADD_TRY_UMOUNT", "/* omitted */")
-                .replace("susfs_is_current_proc_umounted()", "false")
-                .replace("handle_zygote_setresuid", "handle_susfs_setresuid")
-            )
+        ref_path = repo_root / ".github/fixtures/midori/xx-reference.patch"
+        identity = json.loads(ref_path.with_suffix(".json").read_text())
+        ref_bytes = ref_path.read_bytes()
+        self.assertEqual(hashlib.sha256(ref_bytes).hexdigest(), identity["sha256"])
+        self.assertIn("/commit/d09d7a875dce2a97c64c7e6bf336a76e03ce883b.patch", identity["url"])
+        ref_text = ref_bytes.decode()
 
         matrix = evaluate_patch11_features(our_text, ref_text)
         self.assertEqual(len(matrix), 26)

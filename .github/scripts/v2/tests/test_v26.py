@@ -1,6 +1,7 @@
 """Unit tests for V2.6 fixture adaptation mechanics."""
 
 import unittest
+from test_lifecycle import target_sources
 
 from v2.adapters import (
     FIXED_FIXTURES,
@@ -118,118 +119,9 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd, void __user
 }
 """
 
-_SAMPLE_SECURITY_6_1 = """/* security/security.c */
-#include <linux/security.h>
+_SAMPLE_SECURITY_6_1 = target_sources(False)["security/security.c"]
 
-static int lsm_superblock_alloc(struct super_block *sb)
-{
-	return 0;
-}
-
-#include <linux/lsm_hook_defs.h>
-#undef LSM_HOOK
-
-int security_bprm_check(struct linux_binprm *bprm)
-{
-	int ret;
-
-	ret = call_int_hook(bprm_check_security, 0, bprm);
-	if (ret)
-		return ret;
-	return 0;
-}
-
-int security_inode_rename(struct inode *old_dir, struct dentry *old_dentry,
-			   struct inode *new_dir, struct dentry *new_dentry,
-			   unsigned int flags)
-{
-	if (unlikely(IS_PRIVATE(d_backing_inode(old_dentry)) ||
-            (d_is_positive(new_dentry) && IS_PRIVATE(d_backing_inode(new_dentry)))))
-		return 0;
-	return 0;
-}
-
-int security_file_permission(struct file *file, int mask)
-{
-	int ret;
-
-	ret = call_int_hook(file_permission, 0, file, mask);
-	if (ret)
-		return ret;
-	return 0;
-}
-
-int security_task_fix_setuid(struct cred *new, const struct cred *old, int flags)
-{
-	return call_int_hook(task_fix_setuid, 0, new, old, flags);
-}
-
-int security_setprocattr(const char *lsm, const char *name, void *value, size_t size)
-{
-	struct security_hook_list *hp;
-
-	hlist_for_each_entry(hp, &security_hook_heads.setprocattr, list) {
-		if (lsm != NULL && strcmp(lsm, hp->lsm))
-			continue;
-	}
-	return 0;
-}
-"""
-
-_SAMPLE_SECURITY_6_12 = """/* security/security.c 6.12 */
-#include <linux/security.h>
-
-static int lsm_superblock_alloc(struct super_block *sb)
-{
-	return 0;
-}
-
-#include <linux/lsm_hook_defs.h>
-#undef LSM_HOOK
-
-int security_bprm_check(struct linux_binprm *bprm)
-{
-	int ret;
-
-	return 0;
-}
-
-int security_inode_rename(struct inode *old_dir, struct dentry *old_dentry,
-			   struct inode *new_dir, struct dentry *new_dentry,
-			   unsigned int flags)
-{
-	if (unlikely(IS_PRIVATE(d_backing_inode(old_dentry)) ||
-            (d_is_positive(new_dentry) && IS_PRIVATE(d_backing_inode(new_dentry)))))
-		return 0;
-	return 0;
-}
-
-int security_file_permission(struct file *file, int mask)
-{
-	int ret;
-
-	ret = call_int_hook(file_permission, 0, file, mask);
-	if (ret)
-		return ret;
-	return 0;
-}
-
-int security_task_fix_setuid(struct cred *new, const struct cred *old, int flags)
-{
-	return call_int_hook(task_fix_setuid, 0, new, old, flags);
-}
-
-int security_setprocattr(const char *lsm, const char *name, void *value, size_t size)
-{
-	struct security_hook_list *hp;
-
-	hlist_for_each_entry(hp, &security_hook_heads.setprocattr, list) {
-		if (lsm != NULL && strcmp(lsm, hp->lsm))
-			continue;
-	}
-	return 0;
-}
-"""
+_SAMPLE_SECURITY_6_12 = target_sources(True)["security/security.c"]
 
 
 def _make_clean_bundle(target_id="sultan-android14-6.1", version="6.1.25"):
