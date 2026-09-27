@@ -159,34 +159,11 @@ def generate_patch11_from_tree(ksu_tree: Path, repo_root: Optional[Path] = None)
 
 def generate_sultan_patch51_from_input(upstream_input: Path, repo_root: Path) -> str:
     """Generate candidate Sultan Patch 51 from upstream SuSFS patch 50."""
+    from .policy.patch51_source import generate
     try:
-        from deinline_50_to_51 import deinline_patch_content
-    except ImportError:
-        sys.path.insert(0, str(repo_root / ".github" / "scripts"))
-        from deinline_50_to_51 import deinline_patch_content
-
-    patch_50_file = upstream_input
-    if upstream_input.is_dir():
-        candidates = [
-            upstream_input / "kernel_patches" / "50_add_susfs_in_gki-android14-6.1.patch",
-            upstream_input / "kernel_patches" / "50_add_susfs_in_sultan-kernel-6.1.patch",
-            upstream_input / "50_add_susfs_in_gki-android14-6.1.patch",
-            upstream_input / "50_add_susfs_in_sultan-kernel-6.1.patch",
-        ]
-        for c in candidates:
-            if c.is_file():
-                patch_50_file = c
-                break
-
-    if not patch_50_file.is_file():
-        raise CandidateGenerationError(f"Upstream SuSFS 50 patch for Sultan not found at {upstream_input}")
-
-    content = patch_50_file.read_text(encoding="utf-8", errors="ignore")
-    if "diff --git " not in content:
-        raise CandidateGenerationError(f"Input file {patch_50_file} does not contain unified diff content")
-
-    return deinline_patch_content(
-        content, target="sultan-android14-6.1", date_str=_sultan_source_date(repo_root))
+        return generate("sultan-android14-6.1-patch51", upstream_input, repo_root)[0]
+    except (ValueError, KeyError, OSError) as exc:
+        raise CandidateGenerationError(str(exc)) from exc
 
 
 def generate_gki_r38_patch51_from_input(upstream_input: Path, repo_root: Path) -> str:
@@ -203,8 +180,7 @@ def generate_candidate_patch(patch_id: str, upstream_input: Path, repo_root: Pat
     if patch_id == "xxksu-patch11":
         return generate_patch11_from_tree(upstream_input, repo_root)
     elif patch_id == "sultan-android14-6.1-patch51":
-        from .policy.lifecycle import correct_patch51
-        return correct_patch51(generate_sultan_patch51_from_input(upstream_input, repo_root), repo_root, gki=False)
+        return generate_sultan_patch51_from_input(upstream_input, repo_root)
     elif patch_id == "gki-android16-6.12-r38-patch51":
         return generate_gki_r38_patch51_from_input(upstream_input, repo_root)
     else:
@@ -784,11 +760,21 @@ def run_pipeline(
         )
 
     # Step 1: Deterministic candidate generation (writes ONLY to candidate path)
-    candidate_text_1 = generate_candidate_patch(patch_id, upstream_input, repo_root)
+    postimages = None
+    if patch_id.endswith("patch51") and target_tree is not None:
+        from .policy.patch51_source import generate
+        candidate_text_1, postimages = generate(patch_id, upstream_input, repo_root, target_tree)
+    else:
+        candidate_text_1 = generate_candidate_patch(patch_id, upstream_input, repo_root)
     candidate_path.write_text(candidate_text_1, encoding="utf-8")
 
     # Step 2: Deterministic regeneration equality verification
-    candidate_text_2 = generate_candidate_patch(patch_id, upstream_input, repo_root)
+    if postimages is not None:
+        candidate_text_2, reproduced = generate(patch_id, upstream_input, repo_root, target_tree)
+        if reproduced != postimages:
+            raise RegenerationMismatchError("independent source reconstruction differs")
+    else:
+        candidate_text_2 = generate_candidate_patch(patch_id, upstream_input, repo_root)
     if candidate_text_1 != candidate_text_2:
         # Revert candidate file on failure
         if candidate_path.is_file():
@@ -809,6 +795,8 @@ def run_pipeline(
 
     if target_tree is not None:
         target_tree = Path(target_tree).resolve()
+        if postimages is not None:
+            subprocess.run(["git", "apply", "--check", str(candidate_path)], cwd=target_tree, check=True)
         # Single-pass validation against target tree
         valid, errors = validate_exact_patch_on_tree(target_tree, candidate_path, dry_run=check_only)
         if not valid:
@@ -818,6 +806,13 @@ def run_pipeline(
             raise CandidateValidationError(
                 f"Candidate exact validation failed for {patch_id} on {target_tree}:\n" + "\n".join(f"  - {e}" for e in errors)
             )
+
+        if postimages is not None and not check_only:
+            for path, hashes in postimages.items():
+                hashes["applied"] = hashlib.sha256((target_tree / path).read_bytes()).hexdigest()
+                if hashes["applied"] != hashes["postimage"]:
+                    raise CandidateValidationError(f"postimage round-trip mismatch: {path}")
+            (candidate_dir / "postimages.json").write_text(json.dumps(postimages, indent=2))
 
         # For Patch 11 on real KernelSU tree: verify exactly 8 modified files if applied
         if patch_id == "xxksu-patch11" and not check_only:

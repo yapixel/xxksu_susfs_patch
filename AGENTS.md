@@ -81,6 +81,21 @@ Patch 11 modifies exactly: `kernel/Kconfig`, `kernel/hook/setuid_hook.c`,
 `kernel/supercall/supercall.c`. Do not modify `kernel/feature/kernel_umount.c` or
 `kernel/downstream/ksu_hostsredirect.h`; native try-umount/task-mark ownership remains.
 
+## Production Patch 51 invariant
+
+- Python reconstructs complete reviewed source postimages; native Git in the
+  authenticated target tree generates final kernel hunks, indexes and diffstat.
+- Mixed SuSFS/KSU ownership is explicitly decomposed in source or fails closed.
+- Independent generation/reproduction trees must agree. A separate clean target
+  applies the candidate and must reproduce every source postimage byte.
+- Actions alone publishes, after real target Kbuild of affected objects (selected
+  from the final Git diff through Kbuild), real-object SuSFS symbol closure, and
+  semantic/lifecycle checks. Clean-room exercises the same gates without writing.
+- Report `PATCH51_OBJECT_COMPILE_PASS` and `PATCH51_SYMBOL_CLOSURE_PASS`;
+  neither is a final vmlinux link or device claim. Python test count is not build evidence.
+- Full kernel/link/device acceptance is separate. Escalate for broad semantic or
+  target changes, linker/layout changes, unknown providers or bounded-gate failure.
+
 ## Watch, acceptance, and publication
 
 **Tracking ref** is the mutable remote branch used for discovery. **Discovered
@@ -144,8 +159,9 @@ outages, while complete clean-room acceptance requires available reference evide
 Tests cover generator/pipeline invariants, native APIs, historical regressions,
 ownership, and publication integrity. They do not prove arbitrary kernel lifetime,
 concurrency, or complete semantics; meaningful drift requires targeted source review.
-Kernel compilation, toolchain/defconfig management, packaging, and device testing
-remain downstream responsibilities.
+The bounded production Kbuild gate uses the accepted target ARM64 gki_defconfig
+and LLVM 14 with required SuSFS options checked. Full kernel builds, packaging
+and device testing remain separate downstream acceptance responsibilities.
 
 GitHub Actions `clean-room.yml` is the authoritative fresh-environment reproducibility
 check: fresh Ubuntu, `contents: read`, independent input authentication, outputs

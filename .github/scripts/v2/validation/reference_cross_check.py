@@ -47,25 +47,26 @@ REFERENCE_HASHES = {
 }
 
 # Exact file-diff pairs reviewed against the authenticated r38 postimages.
+# Ours fingerprints use native Git formatting; migration verified identical source bytes.
 # No filename/symbol wildcard: even a one-line lifecycle change requires review.
 # Evidence and behavioral regression coverage: PATCH51_CORRECTIONS.md.
 REVIEWED_LIFECYCLE_DIFFERENCES = {
     "mm/memory.c": (
-        "d7bfa1bddc3b7d93b37feebcf4921a60a2f99bb25e9f1ad86165155a77132db4",
+        "a17a934e6816bd5c6e290b242c020bb3cf556d3bf39ed5acdb847fc588efe63f",
         "b152ef003898da9a639124e7fbd1a2d57655b8a2afb823869460e9d9609c7dd0",
         "OURS refreshes the current-address VMA under mmap_lock before GUP; "
         "REFERENCE retains the inherited NULL-VMA guard, exposing SUS_MAP remote memory. "
         "Stop-before-GUP preserves page ownership and native partial-access semantics."),
     "fs/namei.c": (
-        "ee94ae51552dce2352dac178a2b0e75f7ae8ddb79504d623f628dfeebb835a3c",
+        "2bab6f55a8ba79e7bef1b78587741296aa9d5190d6b8242072ba459531a14359",
         "17a68048d5ee940ed0e62ea7079aeeef57de6c13565ef21831737043f6c18c67",
         "Local filename_lookup and old_name restoration agree; declaration order only."),
     "fs/namespace.c": (
-        "ed9af3d926f9072cc75387728b0d004f89bd433cf6359933c9393f6b14c70a42",
+        "602d53bebbd8488a64d2587724679ae3c680bd38ecbb44a4064b470b1b3037c4",
         "4a6bff8267d35326dfed3ef23cef9e1a1cdb6ca6971c368bbbdb8e9c7fa6527e",
         "Allocation provenance plus inherited-flag clearing and early-error accounting; retain locked non-sus lookup instead of reference early returns."),
     "fs/proc/task_mmu.c": (
-        "2d468a038a169a916b514140f35bf5d54e0f5edc40c09950bdc607a8849a83b8",
+        "1b0b7ff4c8483380f607e7c21da4eb531d62bfec33e005e33b182dc65d91c359",
         "91d7d11a43f12105e5797189e135a5e09a0c95aa5f2bd903a6cee2282a8437be",
         "Intentional correction: VMA-bounded zero pagemap entries and shared gather guard; reference retains both defects."),
 }

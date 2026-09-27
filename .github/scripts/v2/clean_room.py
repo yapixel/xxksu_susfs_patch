@@ -71,7 +71,7 @@ def generation_environment(root, dest, baselines):
         shutil.copyfile(root / rel, out)
 
 
-def generate_child(patch_id, source, forbidden_root):
+def generate_child(patch_id, source, forbidden_root, target_tree="", evidence=""):
     # The checkout remains available to the comparison/test process, never this
     # generator. Catch accidental Python fallbacks to its outputs as well.
     forbidden = Path(forbidden_root).resolve()
@@ -82,14 +82,20 @@ def generate_child(patch_id, source, forbidden_root):
                 raise RuntimeError(f"generator attempted final-output/checkout read: {path}")
     sys.addaudithook(audit)
     from .pipeline import generate_candidate_patch
-    sys.stdout.write(generate_candidate_patch(patch_id, Path(source), ROOT))
+    if target_tree:
+        from .policy.patch51_source import generate
+        text, images = generate(patch_id, Path(source), ROOT, Path(target_tree))
+        Path(evidence).write_text(json.dumps(images))
+        sys.stdout.write(text)
+    else:
+        sys.stdout.write(generate_candidate_patch(patch_id, Path(source), ROOT))
 
 
-def generate_process(env_root, patch_id, source, *, missing=None):
+def generate_process(env_root, patch_id, source, *, missing=None, target_tree="", evidence=""):
     env = {**os.environ, "PYTHONPATH": str(env_root / ".github/scripts"),
            "GITHUB_WORKSPACE": str(env_root), "PYTHONDONTWRITEBYTECODE": "1"}
     result = subprocess.run([sys.executable, "-m", "v2.clean_room", "generate",
-                             patch_id, str(source), str(ROOT)],
+                             patch_id, str(source), str(ROOT), str(target_tree), str(evidence)],
                             cwd=env_root, env=env, capture_output=True)
     if missing:
         require(result.returncode != 0 and missing in result.stderr.decode(),
@@ -238,8 +244,12 @@ def verify(work, report):
         row = report["patches"][patch_id]
         gate = verify_semantic_gate_for_pipeline(patch_id, source, repo_root=env_root)
         require(gate.passed, gate.details)
-        first = generate_process(env_root, patch_id, source)
-        second = generate_process(env_root, patch_id, source)
+        kwargs = {} if target == "xxksu" else {"target_tree": targets[target]}
+        first_evidence, second_evidence = work / (target + "-A.json"), work / (target + "-C.json")
+        first = generate_process(env_root, patch_id, source, evidence=first_evidence, **kwargs)
+        second = generate_process(env_root, patch_id, source, evidence=second_evidence, **kwargs)
+        if kwargs:
+            require(first_evidence.read_bytes() == second_evidence.read_bytes(), "postimage nondeterminism")
         require(first == second, f"nondeterministic generation: {patch_id}")
         row["generated SHA"] = sha(first)
         require(first == (ROOT / entry["relative_path"]).read_bytes() and
@@ -269,11 +279,25 @@ def verify(work, report):
         candidate.write_bytes(first)
         protected = {p: (targets[target] / p).read_bytes() for p in (
             "kernel/feature/kernel_umount.c", "kernel/downstream/ksu_hostsredirect.h")} if target == "xxksu" else {}
+        if target != "xxksu":
+            command("git", "apply", "--check", str(candidate), cwd=targets[target])
         ok, errors = validate_exact_patch_on_tree(targets[target], candidate, dry_run=False)
         require(ok, str(errors))
         for path, data in protected.items():
             require((targets[target] / path).read_bytes() == data, f"protected file changed: {path}")
         row["exact apply"] = "PASS (0 offsets / fuzz / rejects)"
+        if target != "xxksu":
+            from .validation.patch51_kbuild import verify as verify_kbuild
+            images = json.loads(first_evidence.read_text())
+            for path, hashes in images.items():
+                require(sha((targets[target] / path).read_bytes()) == hashes["postimage"],
+                        f"round-trip postimage mismatch: {path}")
+            row.update({key: "PASS" for key in ("SOURCE_AUTHENTICATED", "RECONSTRUCTION",
+                        "GIT_DIFF", "DETERMINISM", "ROUND_TRIP", "EXACT_APPLY", "PRODUCTION_EQUALITY")})
+            build = verify_kbuild(targets[target], candidate, ROOT, work / (target + "-kbuild"))
+            row["PATCH51_OBJECT_COMPILE"] = "PASS" if build["PATCH51_OBJECT_COMPILE_PASS"] else "FAIL"
+            row["PATCH51_SYMBOL_CLOSURE"] = "PASS" if build["PATCH51_SYMBOL_CLOSURE_PASS"] else "FAIL"
+            row["full vmlinux link"] = "NOT_RUN"
         reference = run_reference_cross_check(patch_id, first.decode(), sha(first), repo_root=ROOT)
         if reference is not None:
             report["midori"][patch_id] = reference.classification.value
@@ -297,6 +321,8 @@ def verify(work, report):
         if focused:
             for row in report["patches"].values():
                 row["target contracts"] = "PASS"
+                if "GIT_DIFF" in row:
+                    row["SEMANTIC_LIFECYCLE"] = "PASS"
             report["patches"]["gki-android16-6.12-r38-patch51"]["lifecycle checks"] = "PASS"
 
 

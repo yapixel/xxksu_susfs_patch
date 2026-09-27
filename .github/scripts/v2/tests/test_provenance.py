@@ -48,6 +48,21 @@ class ProvenanceTests(unittest.TestCase):
         return subprocess.run([sys.executable, "-c", code, patch_id, str(source)],
                               cwd=self.root, env=env, capture_output=True, check=True).stdout
 
+    def assert_production_postimages(self, patch_id, candidate):
+        expected = (ROOT / TARGET_REL_PATHS[patch_id]).read_bytes()
+        if patch_id == "xxksu-patch11":
+            self.assertEqual(candidate, expected)
+            return
+        from v2.source.patch_apply import apply_patch_to_bundle
+        from v2.source.bundle import create_source_bundle
+        from v2.policy.lifecycle import r38_sources
+        bundle = (create_source_bundle("gki-android16-6.12", "6.12", r38_sources(ROOT))
+                  if patch_id.startswith("gki") else load_authoritative_bundle("sultan-android14-6.1", ROOT))
+        def images(text):
+            return {f.path: f.content for f in apply_patch_to_bundle(bundle, text.decode()).files}
+        self.assertEqual(images(candidate), images(expected))
+        self.assertEqual(candidate.split(b"---\n", 1)[0], expected.split(b"---\n", 1)[0])
+
     def test_patch11_reconstructs_without_outputs_or_patch10_and_requires_xxksu(self):
         expected = (ROOT / TARGET_REL_PATHS["xxksu-patch11"]).read_bytes()
         self.assertFalse(list(self.root.rglob("*10_enable_susfs*")))
@@ -128,8 +143,9 @@ class ProvenanceTests(unittest.TestCase):
     def test_sultan_without_outputs_is_deterministic_and_inputs_are_required(self):
         # Production is a final assertion only, never a generation input.
         expected = (ROOT / TARGET_REL_PATHS[SULTAN]).read_bytes()
-        self.assertEqual(self.fresh(SULTAN, self.sultan), expected)
-        self.assertEqual(self.fresh(SULTAN, self.sultan), expected)
+        first = self.fresh(SULTAN, self.sultan)
+        self.assertEqual(first, self.fresh(SULTAN, self.sultan))
+        self.assert_production_postimages(SULTAN, first)
         source = self.sultan / "50_add_susfs_in_gki-android14-6.1.patch"
         # The standalone converter must not reuse an existing output Date either.
         output = self.root / "legacy.patch"
@@ -148,12 +164,13 @@ class ProvenanceTests(unittest.TestCase):
                                    "obj-$(CONFIG_KSU_SUSFS) += provenance_probe.o", 1)
         self.assertNotEqual(changed, original)
         source.write_text(changed)
-        self.assertNotEqual(generate_candidate_patch(SULTAN, self.sultan, self.root).encode(), expected)
+        with self.assertRaisesRegex(CandidateGenerationError, "unreviewed Sultan Patch 50"):
+            generate_candidate_patch(SULTAN, self.sultan, self.root)
         source.write_text(original)
         context = self.root / ".github/fixtures/v2/v29-baselines/sultan-android14-6.1.json"
         saved = context.read_bytes()
         context.unlink()
-        with self.assertRaises(FileNotFoundError):
+        with self.assertRaises(CandidateGenerationError):
             generate_candidate_patch(SULTAN, self.sultan, self.root)
         data = json.loads(saved)
         for entry in data["files"]:
@@ -161,13 +178,33 @@ class ProvenanceTests(unittest.TestCase):
                 entry["content"] = entry["content"].replace("static struct mount *clone_mnt(",
                                                           "static struct mount *changed_clone(", 1)
         context.write_text(json.dumps(data))
-        with self.assertRaises(ValueError):
+        with self.assertRaises(CandidateGenerationError):
             generate_candidate_patch(SULTAN, self.sultan, self.root)
         context.write_bytes(saved)
         metadata = self.sultan / "susfs-source-commit.txt"
         metadata.write_bytes(metadata.read_bytes() + b"tampered")
         with self.assertRaisesRegex(CandidateGenerationError, "metadata identity mismatch"):
             generate_candidate_patch(SULTAN, self.sultan, self.root)
+
+    def test_patch51_bytes_do_not_depend_on_midori_removal_or_poison(self):
+        references = [p for p in (self.root / ".github/fixtures").rglob("*")
+                      if p.is_file() and any(word in str(p).lower() for word in ("midori", "reference"))]
+        for p in references:
+            p.unlink()
+        state_path = self.root / ".github/upstream-state.json"
+        state = json.loads(state_path.read_text())
+        state["sources"].pop("reference", None)
+        state_path.write_text(json.dumps(state))
+        inputs = ((SULTAN, self.sultan),
+                  ("gki-android16-6.12-r38-patch51", self.root / ".github/fixtures/r38"))
+        removed = {pid: self.fresh(pid, source) for pid, source in inputs}
+        for p in references:
+            p.write_text("MIDORI_POISON_MUST_NOT_ENTER_GENERATION\n")
+        state["sources"]["reference"] = {"poison": "NOT_AN_INPUT"}
+        state_path.write_text(json.dumps(state))
+        for pid, source in inputs:
+            self.assertEqual(self.fresh(pid, source), removed[pid])
+            self.assert_production_postimages(pid, removed[pid])
 
     def test_patch10_lineage_drift_reaches_real_watch_semantic_review(self):
         info = json.loads((ROOT / ".github/upstream-state.json").read_text())[
@@ -208,7 +245,7 @@ class ProvenanceTests(unittest.TestCase):
         self.assertEqual({f.old_path[2:] for f in parse_patch(first.decode()).files}, set(FILES))
         # Golden is read only AFTER independent generation; it supplies no input.
         expected = (ROOT / TARGET_REL_PATHS[patch_id]).read_bytes()
-        self.assertEqual(first, expected)
+        self.assert_production_postimages(patch_id, first)
         empty = self.root / "empty"
         empty.mkdir()
         with self.assertRaisesRegex(CandidateGenerationError, "Patch 50 missing"):
@@ -302,8 +339,7 @@ class ProvenanceTests(unittest.TestCase):
                 if target != "xxksu":
                     metadata.write_bytes(raw)
                 self.assertEqual(accepted_sources(self.root)[key]["commit"], new)
-                self.assertEqual(self.fresh(patch_id, source),
-                                 (ROOT / TARGET_REL_PATHS[patch_id]).read_bytes())
+                self.assert_production_postimages(patch_id, self.fresh(patch_id, source))
 
         # Execute the actual workflow identity-freezing shell, not a test resolver.
         for name in ("generate-11-ksu-patch.yml", "generate-51-kernel-patches.yml"):

@@ -17,7 +17,8 @@ on:
     paths:
       - ".github/workflows/generate-51-kernel-patches.yml"
       - ".github/scripts/v2/pipeline.py"
-      - ".github/scripts/v2/policy/lifecycle.py"
+      - ".github/scripts/v2/policy/**"
+      - ".github/scripts/v2/validation/patch51_kbuild.py"
       - ".github/scripts/v2/validation/reference_cross_check.py"
       - ".github/fixtures/**"
       - "patches/**/51_*.patch"
@@ -40,6 +41,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      TMPDIR: ${{ runner.temp }}
+      PYTHONDONTWRITEBYTECODE: "1"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -52,13 +56,16 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install target Kbuild toolchain
+        run: sudo apt-get update && sudo apt-get install -y clang-14 llvm-14 lld-14 flex bison bc libelf-dev libdw-dev libssl-dev zlib1g-dev
+
       - name: Freeze accepted upstream identities
         env:
           KSU_OVERRIDE: ${{ github.event.inputs.ksu_branch || '' }}
         run: |
           set -euo pipefail
           PYTHONPATH=.github/scripts python3 - <<'PY' >> "$GITHUB_ENV"
-          import os, re
+          import os, re, json
           from v2.manifests.defaults import accepted_sources
           sources = accepted_sources()
           ksu = os.environ.get("KSU_OVERRIDE") or sources["backslashxx_kernelsu"]["commit"]
@@ -67,6 +74,9 @@ jobs:
           print("KSU_COMMIT=" + ksu)
           print("SULTAN_SUSFS_COMMIT=" + sources["susfs_sultan"]["commit"])
           print("GKI_SUSFS_COMMIT=" + sources["susfs_gki"]["commit"])
+          target = json.load(open("patches/sultan-android14-6.1/BASELINE.json"))["upstream"]
+          print("SULTAN_KERNEL_COMMIT=" + target["resolved_commit"])
+          print("SULTAN_KERNEL_REPO=" + target["repository"])
           PY
 
       - name: Verify Initial Patches Manifest Consistency
@@ -91,8 +101,8 @@ jobs:
           echo "📥 Cloning kernel tree from https://github.com/kerneltoast/android_kernel_google_tensynos.git (16.0.0-sultan)..."
           cd kernel_tree
           git init
-          git remote add origin "https://github.com/kerneltoast/android_kernel_google_tensynos.git"
-          git fetch --depth=1 origin "af5c65b9547a9f33c5f566430d0434aecab5a8b5"
+          git remote add origin "$SULTAN_KERNEL_REPO"
+          git fetch --depth=1 origin "$SULTAN_KERNEL_COMMIT"
           git checkout --detach FETCH_HEAD
 
       - name: Setup SuSFS Core Source Files (Sultan 6.1)
@@ -100,9 +110,9 @@ jobs:
           set -euo pipefail
           cd kernel_tree
           mkdir -p fs/ include/linux/
-          cp -r "${{ github.workspace }}/susfs_src/kernel_patches/fs/susfs.c" fs/ || true
-          cp -r "${{ github.workspace }}/susfs_src/kernel_patches/include/linux/susfs.h" include/linux/ || true
-          cp -r "${{ github.workspace }}/susfs_src/kernel_patches/include/linux/susfs_def.h" include/linux/ || true
+          cp -r "${{ github.workspace }}/susfs_src/kernel_patches/fs/susfs.c" fs/
+          cp -r "${{ github.workspace }}/susfs_src/kernel_patches/include/linux/susfs.h" include/linux/
+          cp -r "${{ github.workspace }}/susfs_src/kernel_patches/include/linux/susfs_def.h" include/linux/
 
       - name: Run Patch 51 Candidate Validation (Sultan 6.1)
         run: |
@@ -118,55 +128,27 @@ jobs:
             --target-tree kernel_tree \
             --candidate-dir candidate_patches
 
-          cd kernel_tree
-          find . -type f \( -name "*.orig" -o -name "*~" \) -delete
-          git add -A
-          git commit --no-gpg-sign -m "SUSFS de-inlined hooks for sultan-android14-6.1" || true
 
-      - name: Validate xxKSU + SuSFS Integration on Kernel Tree (Sultan 6.1)
+      - name: Real Kbuild objects and SuSFS symbol closure (sultan)
         run: |
           set -euo pipefail
-          cd kernel_tree
-          
-          echo "🧪 Setting up authoritative xxKSU (${{ env.KSU_COMMIT }})..."
-          if [ ! -d "KernelSU" ]; then
-            git init KernelSU
-            cd KernelSU
-            git config user.name "yapixel"
-            git config user.email "yapixel@users.noreply.github.com"
-            git remote add origin "https://github.com/${{ env.KSU_REPO }}.git"
-            git fetch --depth=1 origin "${{ env.KSU_COMMIT }}"
-            git checkout FETCH_HEAD
-            cd ..
-          fi
-
-          DRIVER_DIR="drivers"
-          if [ -d "common/drivers" ]; then
-            DRIVER_DIR="common/drivers"
-          fi
-
-          ln -sf "$(realpath --relative-to="$DRIVER_DIR" "KernelSU/kernel")" "$DRIVER_DIR/kernelsu"
-          grep -q "kernelsu" "$DRIVER_DIR/Makefile" || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> "$DRIVER_DIR/Makefile"
-          grep -q "drivers/kernelsu/Kconfig" "$DRIVER_DIR/Kconfig" || sed -i "/endmenu/i\source \"drivers/kernelsu/Kconfig\"" "$DRIVER_DIR/Kconfig"
-          
-          echo "🧪 Applying universal 11 patch to KernelSU..."
-          cd KernelSU
-          PYTHONPATH="${{ github.workspace }}/.github/scripts" python3 -m v2.validation.exact_patch \
-            --patch "${{ github.workspace }}/patches/xxksu/11_enable_susfs_for_ksu.patch" \
-            --target-tree .
-          find . -type f \( -name "*.orig" -o -name "*~" \) -delete
-          cd ..
-
-          patch -p1 -l < "${{ github.workspace }}/.github/fixtures/manual-security-hooks-v2.0.patch" || true
-          patch -p1 -l < "${{ github.workspace }}/.github/fixtures/scope-min-manual-hooks-v2.3.patch" || true
-
-          echo "✅ Full Sultan 6.1 kernel tree integration verified successfully!"
+          PYTHONPATH=.github/scripts python3 -m v2.validation.patch51_kbuild \
+            --tree kernel_tree \
+            --candidate candidate_patches/sultan-android14-6.1-patch51/51_deinlined_susfs_hooks_sultan-android14-6.1.patch \
+            --workspace "$RUNNER_TEMP/kbuild-sultan"
+          cp "$RUNNER_TEMP/kbuild-sultan/gates.json" candidate_patches/sultan-android14-6.1-patch51/gates.json
+          PYTHONPATH=.github/scripts:.github/scripts/v2/tests python3 -m unittest test_lifecycle test_remote_mem
+          echo "### sultan production validation" >> "$GITHUB_STEP_SUMMARY"
+          for gate in SOURCE_AUTHENTICATED RECONSTRUCTION_PASS GIT_DIFF_GENERATION_PASS DETERMINISM_PASS POSTIMAGE_ROUNDTRIP_PASS EXACT_APPLY_PASS PATCH51_OBJECT_COMPILE_PASS PATCH51_SYMBOL_CLOSURE_PASS SEMANTIC_LIFECYCLE_PASS; do
+            echo "- $gate" >> "$GITHUB_STEP_SUMMARY"
+          done
+          echo "Full vmlinux link: NOT_RUN (separate acceptance boundary)" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Validated Sultan Candidate (Intra-Workflow Transport)
         uses: actions/upload-artifact@v4
         with:
           name: candidate-sultan-51
-          path: candidate_patches/sultan-android14-6.1-patch51/51_deinlined_susfs_hooks_sultan-android14-6.1.patch
+          path: candidate_patches/sultan-android14-6.1-patch51/
           retention-days: 1
 
   validate_gki_r38:
@@ -174,6 +156,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      TMPDIR: ${{ runner.temp }}
+      PYTHONDONTWRITEBYTECODE: "1"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -186,13 +171,16 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install target Kbuild toolchain
+        run: sudo apt-get update && sudo apt-get install -y clang-14 llvm-14 lld-14 flex bison bc libelf-dev libdw-dev libssl-dev zlib1g-dev
+
       - name: Freeze accepted upstream identities
         env:
           KSU_OVERRIDE: ${{ github.event.inputs.ksu_branch || '' }}
         run: |
           set -euo pipefail
           PYTHONPATH=.github/scripts python3 - <<'PY' >> "$GITHUB_ENV"
-          import os, re
+          import os, re, json
           from v2.manifests.defaults import accepted_sources
           sources = accepted_sources()
           ksu = os.environ.get("KSU_OVERRIDE") or sources["backslashxx_kernelsu"]["commit"]
@@ -201,6 +189,9 @@ jobs:
           print("KSU_COMMIT=" + ksu)
           print("SULTAN_SUSFS_COMMIT=" + sources["susfs_sultan"]["commit"])
           print("GKI_SUSFS_COMMIT=" + sources["susfs_gki"]["commit"])
+          target = json.load(open("patches/sultan-android14-6.1/BASELINE.json"))["upstream"]
+          print("SULTAN_KERNEL_COMMIT=" + target["resolved_commit"])
+          print("SULTAN_KERNEL_REPO=" + target["repository"])
           PY
 
       - name: Verify Initial Patches Manifest Consistency
@@ -229,24 +220,15 @@ jobs:
           printf '%s  %s\n' "$archive_sha" r38-source.tar.gz | sha256sum --check --strict
           tar -xzf r38-source.tar.gz -C kernel_tree
 
-          cd kernel_tree
-          if [ ! -d ".git" ]; then
-            git init
-            git config user.name "yapixel"
-            git config user.email "yapixel@users.noreply.github.com"
-            git config commit.gpgsign false
-            git add -A
-            git commit --no-gpg-sign -m "base: initial clean kernel tree r38" || true
-          fi
 
       - name: Setup SuSFS Core Source Files (r38)
         run: |
           set -euo pipefail
           cd kernel_tree
           mkdir -p fs/ include/linux/
-          cp -r "${{ github.workspace }}/susfs_src/kernel_patches/fs/susfs.c" fs/ || true
-          cp -r "${{ github.workspace }}/susfs_src/kernel_patches/include/linux/susfs.h" include/linux/ || true
-          cp -r "${{ github.workspace }}/susfs_src/kernel_patches/include/linux/susfs_def.h" include/linux/ || true
+          cp -r "${{ github.workspace }}/susfs_src/kernel_patches/fs/susfs.c" fs/
+          cp -r "${{ github.workspace }}/susfs_src/kernel_patches/include/linux/susfs.h" include/linux/
+          cp -r "${{ github.workspace }}/susfs_src/kernel_patches/include/linux/susfs_def.h" include/linux/
 
       - name: Run Patch 51 Candidate Validation (r38 Compatibility)
         run: |
@@ -262,47 +244,21 @@ jobs:
             --target-tree kernel_tree \
             --candidate-dir candidate_patches
 
-          cd kernel_tree
-          find . -type f \( -name "*.orig" -o -name "*~" \) -delete
-          git add -A
-          git commit --no-gpg-sign -m "SUSFS de-inlined hooks for android16-6.12-2025-09_r38" || true
-          echo "✅ r38 Compatibility Patch 51 validated cleanly with 0 rejects, 0 fuzz, and 0 offsets!"
 
-      - name: Validate xxKSU + SuSFS Integration on r38 Kernel Tree
+      - name: Real Kbuild objects and SuSFS symbol closure (gki)
         run: |
           set -euo pipefail
-          cd kernel_tree
-
-          echo "🧪 Setting up authoritative xxKSU (${{ env.KSU_COMMIT }})..."
-          if [ ! -d "KernelSU" ]; then
-            git init KernelSU
-            cd KernelSU
-            git config user.name "yapixel"
-            git config user.email "yapixel@users.noreply.github.com"
-            git remote add origin "https://github.com/${{ env.KSU_REPO }}.git"
-            git fetch --depth=1 origin "${{ env.KSU_COMMIT }}"
-            git checkout FETCH_HEAD
-            cd ..
-          fi
-
-          DRIVER_DIR="drivers"
-          if [ -d "common/drivers" ]; then
-            DRIVER_DIR="common/drivers"
-          fi
-
-          ln -sf "$(realpath --relative-to="$DRIVER_DIR" "KernelSU/kernel")" "$DRIVER_DIR/kernelsu"
-          grep -q "kernelsu" "$DRIVER_DIR/Makefile" || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> "$DRIVER_DIR/Makefile"
-          grep -q "drivers/kernelsu/Kconfig" "$DRIVER_DIR/Kconfig" || sed -i "/endmenu/i\source \"drivers/kernelsu/Kconfig\"" "$DRIVER_DIR/Kconfig"
-
-          echo "🧪 Applying universal 11 patch to KernelSU..."
-          cd KernelSU
-          PYTHONPATH="${{ github.workspace }}/.github/scripts" python3 -m v2.validation.exact_patch \
-            --patch "${{ github.workspace }}/patches/xxksu/11_enable_susfs_for_ksu.patch" \
-            --target-tree .
-          find . -type f \( -name "*.orig" -o -name "*~" \) -delete
-          cd ..
-
-          echo "✅ Full r38 kernel tree integration (Patch 51 + xxKSU Patch 11) verified successfully!"
+          PYTHONPATH=.github/scripts python3 -m v2.validation.patch51_kbuild \
+            --tree kernel_tree \
+            --candidate candidate_patches/gki-android16-6.12-r38-patch51/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch \
+            --workspace "$RUNNER_TEMP/kbuild-gki"
+          cp "$RUNNER_TEMP/kbuild-gki/gates.json" candidate_patches/gki-android16-6.12-r38-patch51/gates.json
+          PYTHONPATH=.github/scripts:.github/scripts/v2/tests python3 -m unittest test_lifecycle test_remote_mem
+          echo "### gki production validation" >> "$GITHUB_STEP_SUMMARY"
+          for gate in SOURCE_AUTHENTICATED RECONSTRUCTION_PASS GIT_DIFF_GENERATION_PASS DETERMINISM_PASS POSTIMAGE_ROUNDTRIP_PASS EXACT_APPLY_PASS PATCH51_OBJECT_COMPILE_PASS PATCH51_SYMBOL_CLOSURE_PASS SEMANTIC_LIFECYCLE_PASS; do
+            echo "- $gate" >> "$GITHUB_STEP_SUMMARY"
+          done
+          echo "Full vmlinux link: NOT_RUN (separate acceptance boundary)" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Report Independent Midori Reference Cross-Check
         if: always()
@@ -355,7 +311,18 @@ jobs:
       - name: Atomic Promotion & Delivery
         run: |
           set -euo pipefail
-          echo "🚀 Executing Single Atomic Promotion & Delivery for Patch 51..."
+          python3 - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          for directory in Path("candidate_patches").iterdir():
+              patch = next(directory.glob("51_*.patch"))
+              gates = json.loads((directory / "gates.json").read_text())
+              assert gates["candidate_sha256"] == hashlib.sha256(patch.read_bytes()).hexdigest()
+              assert gates["PATCH51_OBJECT_COMPILE_PASS"] and gates["PATCH51_SYMBOL_CLOSURE_PASS"]
+              images = json.loads((directory / "postimages.json").read_text())
+              assert images and all(x["applied"] == x["postimage"] for x in images.values())
+          PY
+          echo "Executing Single Atomic Promotion & Delivery for Patch 51..."
           PYTHONPATH="${{ github.workspace }}/.github/scripts" python3 -m v2.pipeline \
             --deliver-candidates \
             --candidate-target sultan-android14-6.1-patch51:candidate_patches/sultan-android14-6.1-patch51/51_deinlined_susfs_hooks_sultan-android14-6.1.patch \

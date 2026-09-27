@@ -36,14 +36,13 @@ def target_sources(gki):
 def postimages(gki, corrected=True):
     target = "gki-android16-6.12" if gki else "sultan-android14-6.1"
     directory = ROOT / ".github/fixtures" / ("r38" if gki else "sultan")
-    if gki and corrected:
-        from v2.pipeline import generate_gki_r38_patch51_from_input
-        text = generate_gki_r38_patch51_from_input(directory, ROOT)
+    if corrected:
+        from v2.pipeline import generate_candidate_patch
+        pid = "gki-android16-6.12-r38-patch51" if gki else "sultan-android14-6.1-patch51"
+        text = generate_candidate_patch(pid, directory, ROOT)
     else:
         # Historical defective outputs are negative-test goldens only.
         text = next(directory.glob("51_*.patch")).read_text()
-        if corrected:
-            text = correct_patch51(text, ROOT, gki=gki)
     sources = target_sources(gki)
     patch = parse_patch(text)
     patch.files = [file for file in patch.files if file.old_path.removeprefix("a/") in sources]

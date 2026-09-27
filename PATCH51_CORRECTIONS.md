@@ -188,3 +188,43 @@ but direct equality helpers lack that fallback; a pre-initialization or failed
 context conversion can yield a false negative. Classify as LOW robustness concern,
 not proof of a failure under normal successful policy initialization. No Patch 11
 change is part of this correction; no universal policy-reload correctness claim is made.
+
+
+## Source-postimage migration (2026-09-27)
+
+Migration freezes the production postimages at repository
+`b1e15279d00f2ec52795ccf1667a696d34c6e484`: Sultan 18 files and GKI 16 files.
+The user reports Sultan full kernel build PASS; GKI full build, ROM boot, xxKSU
+root and basic SuSFS runtime PASS. No new boot/runtime claim is inferred.
+
+`policy/patch51_source.py` applies complete authoritative Patch 50 changes to
+authenticated source, then removes exact reviewed KSU-only source blocks.
+Sultan core replacements come from the existing reviewed repository core policy,
+not Midori or a final Patch 51. Existing lifecycle corrections remain unchanged.
+GKI retains its source adapter; hunk-coordinate exclusions and Python final-hunk
+re-emission are retired from production. The old converter remains historical.
+
+Native Git commands use `git -c core.quotePath=false diff --no-ext-diff
+--no-textconv --no-color --no-renames --full-index` and the same command with
+`--stat=80`. Git owns hunk ranges/context/indexes/statistics. Mail Date/attribution
+policy is unchanged. Canonicalization updates reviewed reference **format**
+fingerprints only, after proving all kernel postimages identical; classifications
+and reference payloads/policy remain unchanged. Midori is not imported/read by
+source reconstruction: it is compared only after candidate generation.
+
+The normal build boundary is `validation/patch51_kbuild.py`: ARM64 target
+`gki_defconfig`, accepted xxKSU with unchanged Patch 11, LLVM 14, and actual Kbuild
+commands. Final-diff C paths seed object selection; Kbuild determines object names.
+Potential providers are discovered from configured source/unity builds, but only
+global definitions in real compiled objects satisfy closure. A native relocatable
+aggregate catches duplicate definitions; unresolved SuSFS symbols fail closed.
+This is **not** a vmlinux link. Missing header and both historical mount-helper
+mutations run against actual Kbuild objects and must be rejected before restoration.
+
+Test consolidation: the old manually invoked four-object/two-symbol linker check
+in `test_sultan_stat_compile` is replaced by this configured Kbuild/dynamic closure
+and historical mutations. The authenticated-header CONFIG-disabled checks remain:
+the enabled production configuration does not supersede those negative boundaries.
+Manual diffstat column-width equality is removed; native Git identity/round trip
+and independent file/count accounting retain its useful invariant. Unique parser,
+transformation, lifecycle, provenance and publication/no-op protections remain.

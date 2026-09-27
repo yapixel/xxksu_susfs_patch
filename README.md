@@ -76,7 +76,13 @@ exactly, runs target-native contracts/historical regressions and the consolidate
 suite, compares authenticated Midori references, and checks repository immutability.
 It never promotes, commits, pushes, or updates issues, and uses no developer scratch state.
 
-Successful evidence: [run 36296083518](https://github.com/yapixel/xxksu_susfs_patch/actions/runs/36296083518)
+Patch 51 production reconstructs complete target source files, lets native Git
+produce the diff, and checks an independent clean-tree postimage round trip.
+Actions publication and clean-room require real Kbuild compilation of affected
+objects and real-object SuSFS symbol closure. These bounded gates do not claim a
+full vmlinux link, complete kernel build, boot or arbitrary runtime correctness.
+
+Historical reproducibility evidence: [run 36296083518](https://github.com/yapixel/xxksu_susfs_patch/actions/runs/36296083518)
 at `d47e2269e86848711131123f3a9afb80b106fdd0` (2026-09-27).
 
 Tests cover generator/pipeline invariants, target-native APIs, historical defects,

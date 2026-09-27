@@ -4,18 +4,13 @@ Target excerpts are clean archive members, not reverse-applied Patch 51 hunks.
 An input change needs review before this bounded transformation will accept it.
 """
 from datetime import datetime, timezone
-from difflib import unified_diff
 from email.utils import format_datetime
 import hashlib
 import json
-import os
 from pathlib import Path
-import subprocess
-import tempfile
 
 from ..engine.diff_parser import parse_patch
-from ..engine.emitter import emit_patch
-from ..model.patch import AddedLine, RemovedLine, Patch
+from ..model.patch import AddedLine, RemovedLine
 from .lifecycle import r38_sources, replace_once, fix_namespace, fix_task_mmu, fix_remote_memory
 
 # KSU transport/credential hooks in the other Patch 50 files belong to xxKSU.
@@ -104,7 +99,7 @@ def _adapt(path, source):
     return source
 
 
-def reconstruct(upstream_input: Path, root: Path) -> str:
+def reconstruct_postimages(upstream_input: Path, root: Path):
     baseline = json.loads((root / "patches/gki-android16-6.12/BASELINE.json").read_text())
     state = json.loads((root / ".github/upstream-state.json").read_text())[
         "sources"]["authoritative"]["susfs_gki"]
@@ -139,41 +134,14 @@ def reconstruct(upstream_input: Path, root: Path) -> str:
     after = {}
     for path in FILES:
         file = upstream[path]
-        # Exact accepted hunks: KSU fstat/stat and setresuid integration are deinlined.
-        if path == "fs/stat.c":
-            file.hunks = [h for h in file.hunks if h.old_start not in (227, 304)]
-        elif path == "kernel/sys.c":
-            file.hunks = [h for h in file.hunks if h.old_start == 1326]
-        after[path] = _adapt(path, _apply_retained(before[path], file))
+        # Apply the complete authoritative change first. Ownership is a source
+        # decision, never a decision to discard an entire mixed diff hunk.
+        from .patch51_source import remove_transport
+        source = remove_transport(path, _apply_retained(before[path], file), gki=True)
+        after[path] = _adapt(path, source)
+    return {p: before[p] for p in after}, after, date, target['apply_target']
 
-    # Native diff derives index IDs and function context from real pre/postimages.
-    env = {**os.environ, "LC_ALL": "C", "GIT_CONFIG_GLOBAL": "/dev/null",
-           "GIT_CONFIG_NOSYSTEM": "1"}
-    with tempfile.TemporaryDirectory(prefix="gki-r38-diff-") as tmp:
-        tree = Path(tmp)
-        def git(*args):
-            return subprocess.check_output(["git", *args], cwd=tree, env=env, text=True)
-        git("init", "-q")
-        (tree / ".git/info/attributes").write_text("*.c diff=cpp\n")
-        for path in FILES:
-            dest = tree / path
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_text(before[path])
-        git("add", ".")
-        for path in FILES:
-            (tree / path).write_text(after[path])
-        patch = parse_patch(git("-c", "core.quotePath=false", "diff", "--no-ext-diff",
-                                "--no-textconv", "--no-color", "--abbrev=12"))
-    # Retain the established lifecycle diff format; its content is freshly derived.
-    for i, file in enumerate(patch.files):
-        path = file.old_path.removeprefix("a/")
-        if path in ("fs/namei.c", "fs/namespace.c", "fs/proc/task_mmu.c"):
-            patch.files[i] = parse_patch(f"diff --git a/{path} b/{path}\n" + "".join(
-                unified_diff(before[path].splitlines(True), after[path].splitlines(True),
-                             f"a/{path}", f"b/{path}"))).files[0]
-    body = emit_patch(Patch(files=patch.files))
-    stat = subprocess.check_output(["git", "apply", "--stat"], input=body, text=True, env=env)
-    return ("From: yapixel <yapixel@users.noreply.github.com>\n"
-            f"Date: {date}\n"
-            f"Subject: [PATCH] SUSFS de-inlined hooks for {target['apply_target']}\n\n"
-            "---\n" + stat + "\n" + body)
+
+def reconstruct(upstream_input: Path, root: Path) -> str:
+    from .patch51_source import generate
+    return generate("gki-android16-6.12-r38-patch51", upstream_input, root)[0]

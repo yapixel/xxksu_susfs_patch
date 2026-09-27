@@ -15,7 +15,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       PYTHONDONTWRITEBYTECODE: "1"
       PYTHONPATH: .github/scripts
@@ -30,7 +30,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install ARM64 link-regression dependency
-        run: sudo apt-get update && sudo apt-get install -y lld
+      - name: Install real target Kbuild toolchain
+        run: sudo apt-get update && sudo apt-get install -y clang-14 llvm-14 lld-14 lld flex bison bc libelf-dev libdw-dev libssl-dev zlib1g-dev
       - name: Verify fresh reconstruction, contracts, references and immutability
         run: python3 -m v2.clean_room
