@@ -33,9 +33,9 @@ Executable regression extracts the actual generated functions, drives both retri
 
 Old r38 `clone_mnt` selected `susfs_alloc_unshare_ksu_vfsmnt` (copies old ID without IDA allocation), then re-read the asynchronous sdcard static key before marking the no-IDA flag. A key transition could therefore send a copied ID to `ida_free`. Pinned Simonpunk and Midori retain allocation provenance in `is_mnt_ksu_unshared`; our old r38 fixture did not.
 
-`fix_namespace` records the decision once at allocation and never re-evaluates it for accounting. Two related control paths were also proven in both target postimages: `mnt_alloc_group_id` can jump to `out_free` before flags are assigned, and a normal IDA-allocated clone can inherit its parent's no-IDA bit. The correction guards early free with the same local provenance and clears the inherited bit before applying the new allocation's bit. No mount references or linking operations change.
+`fix_namespace` records the decision once at allocation and never re-evaluates it for accounting. A related accounting defect exists in both target postimages: a normal IDA-allocated clone can inherit its parent's no-IDA bit. The correction clears that inherited bit before applying the new allocation's bit. Early `out_free` is also guarded with the same provenance because it precedes flag initialization. This last guard is defensive allocator-contract coverage: current `copy_mnt_ns` does not request `CL_MAKE_SHARED`, so the artificial combined-flags failure test is not claimed as a separately reproduced production failure. No mount references or linking operations change.
 
-The compiled actual allocator/flag/error slices cover all combinations of static-key transition, caller domain, copy mode, inherited flag, and group-allocation failure. Non-IDA IDs are never freed; IDA IDs are freed once. Sultan already had the local boolean but required the inherited-bit and early-error corrections too. Midori retains those two related defects.
+The compiled actual allocator/flag/error slices cover combinations of static-key transition, caller domain, copy mode, inherited flag, and group-allocation failure. Non-IDA IDs are never freed; IDA IDs are freed once. Sultan already had the local boolean but required inherited-bit clearing too; both targets use the same defensive early-error guard. Midori retains the inherited-bit accounting defect.
 
 ### P1 pagemap VMA boundaries, both targets — CONFIRMED + FIXED
 
@@ -69,6 +69,14 @@ The hardcoded external scratch path and silent skip are removed. The authenticat
 
 The Sultan-only input declaration has no remaining consumer after input hook deinlining. Its extra generator chunk is removed, with a negative regression. No production patch was hand-edited. The retired `gki-android14-6.1` target stays retired; current handover documents two targets/four profiles. Current provenance separates actual r38 input from historical c8909f7 lineage. Historical implementation reports are not rewritten.
 
+## Follow-up: production mail diffstat — CONFIRMED + FIXED
+
+The first lifecycle publication's summary-only header refresh omitted the per-file list in both GKI and Sultan Patch 51. The generator now feeds the **final emitted diff body**, after every lifecycle transformation, to native `git apply --stat` in canonical `LC_ALL=C`, with color disabled and stable pathname quoting. It embeds all resulting per-file counts/bars and the aggregate summary. No filename/count list is hardcoded; renderer failure aborts generation. This command reports statistics only and does not apply the patch.
+
+`tests/test_mail_diffstat.py` independently compares final AST counts with Git `--numstat`, verifies the diffstat path set equals the actual file set, checks every per-file count and aggregate insertion/deletion count, checks the native bar rendering, and verifies identical repeated generation (including locale variation). A synthetic added file plus a changed existing hunk verifies automatic updates. Patch 11 was audited: all eight per-file counts and its 367-insertion/1-deletion summary match its diff, so it remains unchanged.
+
+The formatting follow-up changes only Patch 51 mail preambles; hunk bodies and corrected C postimages remain unchanged. It is republished through the same parallel validation/single-writer Actions path, not by editing production files.
+
 ## Midori reproduction and remaining differences
 
 Executed Midori's own pinned shell converter under WSL Debian, using only its own Patch 50:
@@ -90,4 +98,30 @@ Reference normalization was used only to compare postimages, not to authorize or
 
 Local semantic gate, double generation equality, syntax checks and exact target application passed for both candidates (zero offsets/fuzz/rejects). Repeated exact bundle application verified identical per-file postimage hashes (16 GKI files; Sultan bundle 23 retained files). Focused C regressions pass. No full kernel compilation was claimed.
 
-Final clean-checkout test result, real Actions run/delivery commit, four-way SHA evidence and Status Issue refresh will be recorded here after publication. Until then publication acceptance is pending.
+Initial correctness publication: [36283493548](https://github.com/yapixel/xxksu_susfs_patch/actions/runs/36283493548), SUCCESS, delivery `da8c2d00995cfcafb82a583b602e1e3949026744`. Final publication including complete diffstats: [36284535551](https://github.com/yapixel/xxksu_susfs_patch/actions/runs/36284535551), SUCCESS. Both independent read-only validation jobs passed before the one promotion/delivery job ran. GKI logs verify the authenticated archive before extraction. The final single-writer delivery commit is `bb72cfe5e197e8f3342d4bbc2902d26dbb949b4c` (`auto(pipeline): deliver verified 51 patch production outputs [skip ci]`), changing only both Patch 51 outputs, their two baseline records and the manifest. Patch 11 remained byte-identical. Independently comparing both deliveries confirmed identical diff bodies; only mail preambles changed.
+
+Downloaded Actions artifacts were compared byte-for-byte with local generated candidates, `git show origin/main:<path>`, independently fetched `raw.githubusercontent.com` responses, and the matching manifest entries:
+
+| Patch | SHA-256, identical in all four publication locations |
+|---|---|
+| Sultan Patch 51 | `be73180680fb545bc38939adc900a85c00cd7ec834323c3700dfe034ebb627d0` |
+| GKI r38 Patch 51 | `9422b190e17145ee13cab48311110de5d76b1dc4a1518c9314dff8b16002e326` |
+
+Pinned Midori reproduction in Actions has SHA `8fc7905d5c8d804191a4d3c29f75409ea69924fa18f0eda038f7b45f102d7fd6`; the exact reviewed-pair cross-check passed. No corrected code was reverted for parity.
+
+Final status refresh run [36284739196](https://github.com/yapixel/xxksu_susfs_patch/actions/runs/36284739196) succeeded. Permanent [Status Issue #5](https://github.com/yapixel/xxksu_susfs_patch/issues/5) was updated at `2026-09-27T01:11:03Z` and independently read back: production rows show `be73180680fb` and `9422b190e171`, plus the explicit reviewed lifecycle-difference explanation. Its overall status remains REVIEW REQUIRED because the separate moving-reference watcher reports informational Midori Patch-50 drift against an older watch baseline; that is not the pinned comparison or an authoritative-source failure. Escalation was disabled for this refresh; no new issue was requested or created.
+
+Final post-publication clean-checkout test result at `bb72cfe5e197e8f3342d4bbc2902d26dbb949b4c`: **Ran 331 tests in 363.333s — OK; zero skips**. Source/test revisions also passed full clean discovery (327 tests, then 328 tests, and 331 tests in 362.886s) and all focused regressions. The first run against published outputs exposed one test-setup failure in `test_13_multi_candidate_both_unchanged_noop`: historical generator fixtures were assumed to equal current production bytes. The related one-changed test had the same assumption. Both now use the actual initial delivery bytes; no-op still requires no commit/push, and added assertions verify unchanged GKI bytes and local/remote HEAD. Both focused tests pass. No production logic was weakened or changed for this failure.
+
+Signing: interactive GPG access blocked; commits used the user-authorized `--no-gpg-sign` fallback. No Git identity/signing configuration or history was rewritten. Unsigned local commit hashes are recorded in the intentionally ignored local `.codex/HANDOFF.md` ledger. Final evidence-only documentation follows the delivery commit and does not alter production bytes.
+
+Reproduction command (WSL Debian, clean detached checkout of the final delivery):
+
+```sh
+PYTHONPATH=.github/scripts \
+GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=commit.gpgsign GIT_CONFIG_VALUE_0=false \
+GIT_CONFIG_KEY_1=tag.gpgsign GIT_CONFIG_VALUE_1=false \
+python3 -m unittest discover -s .github/scripts/v2/tests -p 'test_*.py' -v
+```
+
+The environment-only Git settings allow disposable test repositories to commit without interactive signing; they do not modify repository/global configuration. Production diffstats were also independently checked directly on all three published patches, not merely generated fixtures.
