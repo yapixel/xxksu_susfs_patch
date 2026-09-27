@@ -251,6 +251,22 @@ def deinline_patch_content(content: str, target: str = "gki", date_str: str | No
                     raise ValueError(f"Corrupt character literal with unescaped newline in hunk for {file_path}: {line}")
 
 
+            # Sultan's stat header hunk mixes KSU transport declarations with
+            # retained SuSFS dependencies. Remove only the transport block:
+            # dropping the whole hunk makes SUS_KSTAT fail to compile.
+            if is_sultan_target(target) and file_path == 'fs/stat.c' and '+extern int ksu_handle_stat(' in hunk_body:
+                transport = (
+                    '+#ifdef CONFIG_KSU_SUSFS\n'
+                    '+extern struct static_key_true ksu_is_init_rc_hook_enabled;\n'
+                    '+extern void ksu_handle_vfs_fstat(int fd, loff_t *kstat_size_ptr);\n'
+                    '+extern struct static_key_true ksu_su_compat_enabled;\n'
+                    '+extern bool __ksu_is_allow_uid_for_current(uid_t uid);\n'
+                    '+extern int ksu_handle_stat(int *dfd, struct filename **filename, int *flags);\n'
+                    '+#endif // #ifdef CONFIG_KSU_SUSFS\n')
+                if hunk_body.count(transport) != 1:
+                    raise ValueError('Unreviewed Sultan stat transport declaration block')
+                hunk_body = hunk_body.replace(transport, '', 1)
+
             added_lines = [l[1:] for l in hunk_body.splitlines() if l.startswith('+') and not l.startswith('+++')]
             added_text = '\n'.join(added_lines)
 
