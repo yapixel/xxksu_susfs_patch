@@ -3,6 +3,7 @@ from pathlib import Path
 import re
 import subprocess
 import unittest
+from unittest.mock import patch as mock_patch
 
 from v2.engine.diff_parser import parse_patch
 from v2.engine.emitter import emit_patch
@@ -56,6 +57,8 @@ class MailDiffstatTests(unittest.TestCase):
             text = next((ROOT / ".github/fixtures" / folder).glob("51_*.patch")).read_text()
             first = correct_patch51(text, ROOT, gki=gki)
             second = correct_patch51(text, ROOT, gki=gki)
+            with mock_patch.dict("os.environ", {"LC_ALL": "C.UTF-8"}):
+                self.assertEqual(first, correct_patch51(text, ROOT, gki=gki))
             self.assertEqual(first, second)
             self.assertEqual(parse_patch(first).preamble, parse_patch(second).preamble)
             self.assert_diffstat(first, native=True)

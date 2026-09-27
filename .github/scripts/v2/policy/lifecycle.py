@@ -7,6 +7,7 @@ from helper names or successful application. Public patches are never inputs.
 from difflib import unified_diff
 import hashlib
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -186,6 +187,6 @@ def correct_patch51(text: str, root: Path, *, gki: bool) -> str:
         body = emit_patch(Patch(files=patch.files))
         stat = subprocess.check_output(
             ["git", "-c", "core.quotePath=false", "-c", "color.ui=false", "apply", "--stat"],
-            input=body, text=True)
+            input=body, text=True, env={**os.environ, "LC_ALL": "C"})
         patch.preamble = patch.preamble[:patch.preamble.index("---") + 1] + stat.splitlines() + [""]
     return emit_patch(patch)
