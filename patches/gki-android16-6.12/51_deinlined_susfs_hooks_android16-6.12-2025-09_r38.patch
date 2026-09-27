@@ -3,7 +3,23 @@ Date: Thu, 24 Sep 2026 10:00:00 +0800
 Subject: [PATCH] SUSFS de-inlined hooks for android16-6.12-2025-09_r38
 
 ---
- 16 files changed, 1347 insertions(+), 1 deletions(-)
+ fs/Makefile          |    2 
+ fs/namei.c           |  237 ++++++++++++++++++++++++++++++++++++++++
+ fs/namespace.c       |  293 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ fs/notify/fdinfo.c   |   78 +++++++++++++
+ fs/proc/base.c       |   24 ++++
+ fs/proc/bootconfig.c |   13 ++
+ fs/proc/fd.c         |   70 ++++++++++++
+ fs/proc/task_mmu.c   |  107 ++++++++++++++++++
+ fs/proc_namespace.c  |  174 ++++++++++++++++++++++++++++++
+ fs/readdir.c         |  126 ++++++++++++++++++++++
+ fs/stat.c            |   67 +++++++++++
+ fs/statfs.c          |   81 ++++++++++++++
+ fs/super.c           |   24 ++++
+ kernel/kallsyms.c    |   31 +++++
+ kernel/sys.c         |    8 +
+ mm/memory.c          |   13 ++
+ 16 files changed, 1347 insertions(+), 1 deletion(-)
 
 diff --git a/fs/Makefile b/fs/Makefile
 index 9f5d06f4a1a1..eeea6b70b47a 100644

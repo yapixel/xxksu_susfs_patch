@@ -3,6 +3,24 @@ Date: Fri, 25 Sep 2026 22:14:22 +0000
 Subject: [PATCH] SUSFS de-inlined hooks for sultan-android14-6.1
 
 ---
+ fs/Makefile           |    2 
+ fs/namei.c            |  238 +++++++++++++++++++++++++++++++++++++++++++++++++
+ fs/namespace.c        |  221 +++++++++++++++++++++++++++++++++++++++++++++-
+ fs/notify/fdinfo.c    |   78 ++++++++++++++++
+ fs/proc/base.c        |   24 +++++
+ fs/proc/bootconfig.c  |   43 +++++++++
+ fs/proc/fd.c          |   70 ++++++++++++++
+ fs/proc/task_mmu.c    |  103 +++++++++++++++++++++
+ fs/proc_namespace.c   |  178 +++++++++++++++++++++++++++++++++++++
+ fs/readdir.c          |  197 +++++++++++++++++++++++++++++++++++++++++
+ fs/stat.c             |   52 +++++++++++
+ fs/statfs.c           |   81 +++++++++++++++++
+ fs/super.c            |   24 +++++
+ fs/susfs.c            |   64 +++++++++++++
+ include/linux/susfs.h |   20 ++++
+ kernel/kallsyms.c     |   31 ++++++
+ kernel/sys.c          |   26 ++---
+ mm/memory.c           |    8 ++
  18 files changed, 1441 insertions(+), 19 deletions(-)
 
 diff --git a/fs/Makefile b/fs/Makefile

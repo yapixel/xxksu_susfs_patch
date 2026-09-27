@@ -28,7 +28,7 @@
       "name": "Sultan Android 14 / 6.1 Patch 51",
       "patch_apply_target": "16.0.0-sultan",
       "relative_path": "patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch",
-      "sha256": "0166fc3c1e522aaa511dd85ed5fff712f36290543de0bb4f5a9bf9c2fe36d01e",
+      "sha256": "be73180680fb545bc38939adc900a85c00cd7ec834323c3700dfe034ebb627d0",
       "susfs_lineage": {
         "commit": "a8324101bca5e5a2dd7d0dc82b1650e10923eec9",
         "ref": "sultan-shiba-susfs-minimal",
@@ -55,7 +55,7 @@
         "repository": "https://android.googlesource.com/kernel/common"
       },
       "relative_path": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
-      "sha256": "39982dc73ad2f6dc1cf0c3496e811324830a6b99f15a8c72201cb4ff6b21ad48",
+      "sha256": "9422b190e17145ee13cab48311110de5d76b1dc4a1518c9314dff8b16002e326",
       "susfs_lineage": {
         "commit": "b213c54126fb243595ce7876e91d84d6e0861fec",
         "ref": "gki-android16-6.12",
