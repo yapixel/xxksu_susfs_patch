@@ -190,20 +190,12 @@ def generate_sultan_patch51_from_input(upstream_input: Path, repo_root: Path) ->
 
 
 def generate_gki_r38_patch51_from_input(upstream_input: Path, repo_root: Path) -> str:
-    """Generate candidate GKI r38 Patch 51 from authoritative source."""
-    if upstream_input.is_file():
-        return upstream_input.read_text(encoding="utf-8")
-    cand = upstream_input / "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
-    if cand.is_file():
-        return cand.read_text(encoding="utf-8")
-    cand = upstream_input / "kernel_patches" / "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
-    if cand.is_file():
-        return cand.read_text(encoding="utf-8")
-    fixture_patch = repo_root / ".github" / "fixtures" / "r38" / "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
-    if fixture_patch.is_file():
-        return fixture_patch.read_text(encoding="utf-8")
-
-    raise CandidateGenerationError("Authoritative GKI r38 source patch not found")
+    """Reconstruct from accepted Patch 50 and authenticated r38 preimages."""
+    from .policy.gki_r38 import reconstruct
+    try:
+        return reconstruct(upstream_input, repo_root)
+    except (ValueError, KeyError, OSError) as exc:
+        raise CandidateGenerationError(str(exc)) from exc
 
 
 def generate_candidate_patch(patch_id: str, upstream_input: Path, repo_root: Path) -> str:
@@ -214,8 +206,7 @@ def generate_candidate_patch(patch_id: str, upstream_input: Path, repo_root: Pat
         from .policy.lifecycle import correct_patch51
         return correct_patch51(generate_sultan_patch51_from_input(upstream_input, repo_root), repo_root, gki=False)
     elif patch_id == "gki-android16-6.12-r38-patch51":
-        from .policy.lifecycle import correct_patch51
-        return correct_patch51(generate_gki_r38_patch51_from_input(upstream_input, repo_root), repo_root, gki=True)
+        return generate_gki_r38_patch51_from_input(upstream_input, repo_root)
     else:
         raise ValueError(f"Unknown patch_id: {patch_id}")
 

@@ -288,7 +288,7 @@ class TestPipelineDelivery(unittest.TestCase):
              ".github/fixtures/sultan/50_add_susfs_in_gki-android14-6.1.patch",
              "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"),
             ("gki-android16-6.12", "gki-android16-6.12-r38-patch51",
-             ".github/fixtures/r38/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
+             ".github/fixtures/r38/50_add_susfs_in_gki-android16-6.12.patch",
              "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"),
         ):
             with self.subTest(target=target):

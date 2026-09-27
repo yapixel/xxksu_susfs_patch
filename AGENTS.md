@@ -65,9 +65,16 @@ Public Delivery Verification
 - **Test golden / historical output:** the Sultan Patch 51 fixture is a historical
   correction-test input, not a production generation input. Patch 11 production
   equality is an output assertion only.
-- **Remaining blocker:** GKI r38 still replays a preconstructed Patch 51 fixture
-  before lifecycle corrections. Independent GKI reconstruction remains a
-  prerequisite for clean-room verification; do not claim it is reproducible yet.
+- **Generation input — GKI r38:** accepted Simonpunk Patch 50 plus authenticated
+  clean r38 source excerpts and reviewed r38 transformation rules → Patch 51.
+  The byte generator rejects missing/changed authoritative inputs. The accepted
+  Git commit object supplies UTC Date; real pre/postimages supply index IDs and
+  diffstat. No Patch 51 supplies bytes or metadata. The retained r38 Patch 51 is
+  a historical negative-test golden only. See .github/fixtures/r38/README.md for
+  the complete hunk provenance and metadata migration review.
+- **Clean-room status:** independent GKI reconstruction is implemented; a separate
+  fresh-runner clean-room verification task is still required. Local validation
+  alone must not be reported as CLEAN_ROOM_VERIFIED.
 
 ## 15 Hard Repository Invariants
 

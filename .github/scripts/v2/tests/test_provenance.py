@@ -130,3 +130,66 @@ class ProvenanceTests(unittest.TestCase):
         self.assertEqual(result.classification, WatchClassification.SEMANTIC_DRIFT)
         self.assertIn(p10, result.affected_files)
         self.assertIn("Patch 10", result.details)
+
+
+    def test_gki_reconstructs_without_final_outputs_and_requires_authoritative_inputs(self):
+        from v2.engine.diff_parser import parse_patch
+        from v2.policy.gki_r38 import FILES
+        patch_id = "gki-android16-6.12-r38-patch51"
+        source = self.root / ".github/fixtures/r38/50_add_susfs_in_gki-android16-6.12.patch"
+        # setUp removed production, historical 51 and Midori reference outputs.
+        self.assertFalse(list(self.root.rglob("51_*.patch")))
+        first = self.fresh(patch_id, source.parent)
+        second = self.fresh(patch_id, source.parent)
+        self.assertEqual(first, second)
+        self.assertEqual({f.old_path[2:] for f in parse_patch(first.decode()).files}, set(FILES))
+        # Golden is read only AFTER generation. Date/index IDs are independently
+        # regenerated metadata; all actual hunks must still equal accepted output.
+        expected = (ROOT / TARGET_REL_PATHS[patch_id]).read_bytes()
+        def hunks(data):
+            return re.sub(rb"(?m)^(Date:|index ).*\n", b"", data)
+        self.assertEqual(hunks(first), hunks(expected))
+        self.assertIn(b"Date: Fri, 25 Sep 2026 17:48:27 +0000", first)
+        empty = self.root / "empty"
+        empty.mkdir()
+        with self.assertRaisesRegex(CandidateGenerationError, "Patch 50 missing"):
+            generate_candidate_patch(patch_id, empty, self.root)
+        saved = source.read_bytes()
+        source.unlink()
+        with self.assertRaisesRegex(CandidateGenerationError, "Patch 50 missing"):
+            generate_candidate_patch(patch_id, source.parent, self.root)
+        for old, new in (
+            (b"obj-$(CONFIG_KSU_SUSFS) += susfs.o", b"obj-$(CONFIG_KSU_SUSFS) += wrong.o"),
+            (b"ksu_handle_setresuid", b"changed_credential_hook"),
+        ):
+            with self.subTest(input_mutation=old):
+                changed = saved.replace(old, new)
+                self.assertNotEqual(changed, saved)
+                source.write_bytes(changed)
+                with self.assertRaisesRegex(CandidateGenerationError, "unreviewed GKI Patch 50"):
+                    generate_candidate_patch(patch_id, source.parent, self.root)
+        source.write_bytes(saved)
+        context = self.root / ".github/fixtures/v2/r38-sources.json"
+        saved_context = context.read_bytes()
+        context.unlink()
+        with self.assertRaises(CandidateGenerationError):
+            generate_candidate_patch(patch_id, source.parent, self.root)
+        data = json.loads(saved_context)
+        del data["files"]["fs/notify/fdinfo.c"]
+        context.write_text(json.dumps(data))
+        with self.assertRaisesRegex(CandidateGenerationError, "source context missing"):
+            generate_candidate_patch(patch_id, source.parent, self.root)
+        for field, anchor in (("fs/namei.c", "lookup_dcache"),
+                              ("fs/notify/fdinfo.c", "show_fdinfo")):
+            data = json.loads(saved_context)
+            original = data["files"][field]["content"]
+            data["files"][field]["content"] = original.replace(anchor, "unreviewed_anchor", 1)
+            self.assertNotEqual(data["files"][field]["content"], original)
+            context.write_text(json.dumps(data))
+            with self.assertRaisesRegex(CandidateGenerationError, "r38 source hash mismatch"):
+                generate_candidate_patch(patch_id, source.parent, self.root)
+        context.write_bytes(saved_context)
+        metadata = source.parent / "susfs-source-commit.txt"
+        metadata.write_bytes(metadata.read_bytes() + b"tampered")
+        with self.assertRaisesRegex(CandidateGenerationError, "metadata identity mismatch"):
+            generate_candidate_patch(patch_id, source.parent, self.root)

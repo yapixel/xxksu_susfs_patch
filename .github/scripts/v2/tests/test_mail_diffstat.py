@@ -54,11 +54,17 @@ class MailDiffstatTests(unittest.TestCase):
 
     def test_both_final_patch51_diffstats_and_determinism(self):
         for gki, folder in ((True, "r38"), (False, "sultan")):
-            text = next((ROOT / ".github/fixtures" / folder).glob("51_*.patch")).read_text()
-            first = correct_patch51(text, ROOT, gki=gki)
-            second = correct_patch51(text, ROOT, gki=gki)
+            if gki:
+                from v2.pipeline import generate_gki_r38_patch51_from_input
+                def generate():
+                    return generate_gki_r38_patch51_from_input(ROOT / ".github/fixtures/r38", ROOT)
+            else:
+                text = next((ROOT / ".github/fixtures" / folder).glob("51_*.patch")).read_text()
+                def generate():
+                    return correct_patch51(text, ROOT, gki=False)
+            first, second = generate(), generate()
             with mock_patch.dict("os.environ", {"LC_ALL": "C.UTF-8"}):
-                self.assertEqual(first, correct_patch51(text, ROOT, gki=gki))
+                self.assertEqual(first, generate())
             self.assertEqual(first, second)
             self.assertEqual(parse_patch(first).preamble, parse_patch(second).preamble)
             self.assert_diffstat(first, native=True)
