@@ -18,8 +18,8 @@ Subject: [PATCH] SUSFS de-inlined hooks for android16-6.12-2025-09_r38
  fs/super.c           |   24 ++++
  kernel/kallsyms.c    |   31 +++++
  kernel/sys.c         |    8 +
- mm/memory.c          |   13 ++
- 16 files changed, 1347 insertions(+), 1 deletion(-)
+ mm/memory.c          |   14 ++
+ 16 files changed, 1348 insertions(+), 1 deletion(-)
 
 diff --git a/fs/Makefile b/fs/Makefile
 index 9f5d06f4a1a1..eeea6b70b47a 100644
@@ -2184,7 +2184,7 @@ index 4a87dc5fa867..b3e62ed0639a 100644
  	if (copy_to_user(name, &tmp, sizeof(tmp)))
  		return -EFAULT;
 diff --git a/mm/memory.c b/mm/memory.c
-index dfcefce759a3..9fa3d2b8d267 100644
+index dfcefce759a3..3c5140e893eb 100644
 --- a/mm/memory.c
 +++ b/mm/memory.c
 @@ -79,6 +79,9 @@
@@ -2197,13 +2197,14 @@ index dfcefce759a3..9fa3d2b8d267 100644
  
  #include <trace/events/kmem.h>
  #include <trace/hooks/mm.h>
-@@ -6837,8 +6840,18 @@ static int __access_remote_vm(struct mm_struct *mm, unsigned long addr,
+@@ -6837,8 +6840,19 @@ static int __access_remote_vm(struct mm_struct *mm, unsigned long addr,
  		int bytes, offset;
  		void *maddr;
  		struct vm_area_struct *vma = NULL;
 +#ifdef CONFIG_KSU_SUSFS_SUS_MAP
 +		struct page *page = NULL;
 +
++		vma = vma_lookup(mm, addr);
 +		if (vma && vma->vm_file && SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))
 +			break;
 +		

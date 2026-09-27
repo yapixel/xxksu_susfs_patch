@@ -20,8 +20,8 @@ Subject: [PATCH] SUSFS de-inlined hooks for sultan-android14-6.1
  include/linux/susfs.h |   20 ++++
  kernel/kallsyms.c     |   31 ++++++
  kernel/sys.c          |   26 ++---
- mm/memory.c           |    8 ++
- 18 files changed, 1441 insertions(+), 19 deletions(-)
+ mm/memory.c           |    9 ++
+ 18 files changed, 1442 insertions(+), 19 deletions(-)
 
 diff --git a/fs/Makefile b/fs/Makefile
 index 469ce6ec1..6e3c743e5 100644
@@ -2387,7 +2387,6 @@ index 7595dc25d..9a704f3ec 100644
  		return -EFAULT;
 
 diff --git a/mm/memory.c b/mm/memory.c
-index 58cd1a431..0be8de3f1 100644
 --- a/mm/memory.c
 +++ b/mm/memory.c
 @@ -79,6 +79,9 @@
@@ -2400,11 +2399,12 @@ index 58cd1a431..0be8de3f1 100644
  
  #include <trace/events/kmem.h>
  #include <trace/hooks/mm.h>
-@@ -5934,6 +5937,11 @@ int __access_remote_vm(struct mm_struct *mm, unsigned long addr, void *buf,
+@@ -5934,6 +5937,12 @@
  		void *maddr;
  		struct page *page = NULL;
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MAP
++		vma = vma_lookup(mm, addr);
 +		if (vma && vma->vm_file && SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))
 +			break;
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
