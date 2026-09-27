@@ -1,0 +1,8 @@
+tree 5ed27d85ecf66d6ce484f3a1a3392f7e04fd96d5
+parent 3cdb78f89752b3123c3efd8d72bc4a491c1b3684
+author simonpunk <simonpunk2016@gmail.com> 1790357209 +0800
+committer simonpunk <simonpunk2016@gmail.com> 1790357209 +0800
+
+kernel: SUS_KSTAT: Fix the wrong type of member "is_statically"
+
+- The type of the member is_statically of the struct st_susfs_sus_kstat should be "bool", which should be the same as as the userspace ksu_susfs.

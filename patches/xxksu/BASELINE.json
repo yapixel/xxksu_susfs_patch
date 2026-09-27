@@ -10,7 +10,8 @@
     "repository": "https://gitlab.com/simonpunk/susfs4ksu",
     "resolved_commit": "c8f64e41e3dea2cd44754d7472d3cd0bc0b40784",
     "sha256": "sha256:757d0991e3582e74a7a875e9b03398258b5a32e04bfdab9cc3d9255f341e3ab8",
-    "size": 107571
+    "size": 107571,
+    "role": "semantic_lineage_and_watch_input"
   },
   "patch_11": {
     "patch_file": "patches/xxksu/11_enable_susfs_for_ksu.patch",
@@ -19,7 +20,8 @@
     "strict_apply": "PASS"
   },
   "policy": {
-    "v27_policy_identity": "v2.policy.patch11"
+    "v27_policy_identity": "v2.policy.patch11",
+    "generation_policy": "v2.adapters.xxksu.get_patch11_operation_specs"
   },
   "retained_file_hashes": {
     "kernel/Kconfig": "sha256:e736aec3f381cbaf5c11e71714b65cd7f1d74578a10ec33d8fa883d9e7c45e22",

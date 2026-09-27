@@ -43,6 +43,32 @@ Public Delivery Verification
 
 ---
 
+## Generation Provenance
+
+- **Generation input — Patch 11:** accepted xxKSU source revision plus the reviewed
+  repository adaptation policy in v2/adapters/xxksu.py → Patch 11. Its bytes do
+  not depend on Simonpunk Patch 10 or a previous/golden Patch 11.
+- **Semantic lineage / watch input:** Simonpunk Patch 10 and SuSFS APIs inform
+  Patch 11 policy review. The SuSFS watcher tracks Patch 10 changes and submits
+  them to semantic review; this is distinct from runtime byte generation.
+  Native xxKSU ownership and the retired TRY_UMOUNT/KSU_MARK_GET adaptations remain.
+- **Generation input — Sultan:** accepted Simonpunk Patch 50 plus reviewed
+  de-inlining/correction rules and authenticated target preimages → Patch 51.
+  No previous Patch 51 supplies content or metadata. Its mail Date is the accepted
+  Simonpunk revision's committer timestamp, formatted in UTC. The raw Git object
+  sultan/susfs-source-commit.txt is verified against the baseline's accepted
+  commit ID before its timestamp is used; advance it with an accepted source pin.
+- **Target source:** authenticated kernel/xxKSU preimages, including the retained
+  source bundles, supply context and API definitions; they are not final outputs.
+- **Reference input:** Midori artifacts are comparison-only and never generation
+  inputs. **Production output:** the three public patches/ artifacts.
+- **Test golden / historical output:** the Sultan Patch 51 fixture is a historical
+  correction-test input, not a production generation input. Patch 11 production
+  equality is an output assertion only.
+- **Remaining blocker:** GKI r38 still replays a preconstructed Patch 51 fixture
+  before lifecycle corrections. Independent GKI reconstruction remains a
+  prerequisite for clean-room verification; do not claim it is reproducible yet.
+
 ## 15 Hard Repository Invariants
 
 ### 1. Product / Publication Contract

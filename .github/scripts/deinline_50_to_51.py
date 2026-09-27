@@ -287,6 +287,12 @@ def deinline_patch_content(content: str, target: str = "gki", date_str: str | No
     except Exception:
         diffstat = ""
 
+    # All Sultan callers, including the legacy CLI and watcher preview, use
+    # accepted source provenance when no date was supplied by the V2 pipeline.
+    if date_str is None and is_sultan_target(target):
+        from pathlib import Path
+        from v2.pipeline import _sultan_source_date
+        date_str = _sultan_source_date(Path(__file__).resolve().parents[2])
     import datetime
     if date_str is None:
         date_str = datetime.datetime.now(datetime.timezone.utc).strftime('%a, %d %b %Y %H:%M:%S +0000')
@@ -314,7 +320,7 @@ def deinline_patch(input_patch, output_patch, target="gki"):
         content = f.read()
 
     date_str = None
-    if os.path.isfile(output_patch):
+    if not is_sultan_target(target) and os.path.isfile(output_patch):
         with open(output_patch, 'r', encoding='utf-8', errors='ignore') as f:
             for line in f:
                 if line.startswith('Date: '):

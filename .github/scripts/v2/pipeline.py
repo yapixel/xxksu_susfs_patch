@@ -21,6 +21,8 @@ from __future__ import annotations
 
 import argparse
 import copy
+from datetime import datetime, timezone
+from email.utils import format_datetime
 from dataclasses import dataclass
 import hashlib
 import json
@@ -117,15 +119,22 @@ class PipelineResult:
     publication_state: str = "VALIDATION_ONLY"
 
 
-def _find_date_header(patch_content: str) -> Optional[str]:
-    for line in patch_content.splitlines():
-        if line.startswith("Date: "):
-            return line[len("Date: "):].strip()
-    return None
+def _sultan_source_date(repo_root: Path) -> str:
+    """UTC mail date from the accepted SuSFS Git object, never an output patch."""
+    baseline = json.loads((repo_root / "patches/sultan-android14-6.1/BASELINE.json").read_text())
+    commit = baseline["susfs"]["resolved_commit"]
+    raw = (repo_root / ".github/fixtures/sultan/susfs-source-commit.txt").read_bytes()
+    identity = hashlib.sha1(b"commit " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
+    if identity != commit:
+        raise CandidateGenerationError("Sultan source commit metadata identity mismatch")
+    headers = raw.split(b"\n\n", 1)[0].splitlines()
+    committer = next(line for line in headers if line.startswith(b"committer "))
+    timestamp = int(committer.rsplit(b" ", 2)[1])
+    return format_datetime(datetime.fromtimestamp(timestamp, timezone.utc))
 
 
 def generate_patch11_from_tree(ksu_tree: Path) -> str:
-    """Generate candidate Patch 11 directly from a clean KernelSU tree."""
+    """Generate from xxKSU and reviewed repository policy; Patch 10 is watched lineage."""
     kernel_dir = ksu_tree / "kernel" if (ksu_tree / "kernel").is_dir() else ksu_tree
     entries: dict[str, str] = {}
     missing = []
@@ -176,14 +185,8 @@ def generate_sultan_patch51_from_input(upstream_input: Path, repo_root: Path) ->
     if "diff --git " not in content:
         raise CandidateGenerationError(f"Input file {patch_50_file} does not contain unified diff content")
 
-    # Determine date string from authoritative fixture to ensure deterministic output
-    # Never read from public patches/ path as an input
-    fixture_patch = repo_root / ".github" / "fixtures" / "sultan" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
-    date_str = None
-    if fixture_patch.is_file():
-        date_str = _find_date_header(fixture_patch.read_text(encoding="utf-8", errors="ignore"))
-
-    return deinline_patch_content(content, target="sultan-android14-6.1", date_str=date_str)
+    return deinline_patch_content(
+        content, target="sultan-android14-6.1", date_str=_sultan_source_date(repo_root))
 
 
 def generate_gki_r38_patch51_from_input(upstream_input: Path, repo_root: Path) -> str:
