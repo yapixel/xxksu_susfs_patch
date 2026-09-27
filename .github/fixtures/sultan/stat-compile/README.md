@@ -26,7 +26,8 @@ flags, and the capture command. No SuSFS symbols or kernel types are invented.
 The test reconstructs and applies the real generator's stat diff to the accepted
 native source, then compiles the **entire generated stat.c** against these headers
 using Clang's ARM64 target. It checks SUSFS+KSTAT enabled, SUSFS alone, and both off.
-No compiler availability skip is allowed. This checks declarations and C types,
+Clang and LLD are required; clean-room explicitly installs LLD.
+No compiler/linker availability skip is allowed. This checks declarations and C types,
 not linkage, runtime semantics, or the user's complete device configuration.
 Future accepted target/header changes require recapturing this explicit fixture.
 
