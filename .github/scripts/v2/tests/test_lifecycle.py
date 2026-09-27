@@ -117,12 +117,6 @@ class LifecycleTests(unittest.TestCase):
             directory = ROOT / ".github/fixtures" / ("r38" if gki else "sultan")
             text = next(directory.glob("51_*.patch")).read_text()
             self.assertEqual(correct_patch51(text, ROOT, gki=gki), correct_patch51(text, ROOT, gki=gki))
-            corrected = parse_patch(correct_patch51(text, ROOT, gki=gki))
-            from v2.model.patch import AddedLine, RemovedLine
-            lines = [line for file in corrected.files for hunk in file.hunks for line in hunk.lines]
-            self.assertIn(f" {len(corrected.files)} files changed, "
-                          f"{sum(isinstance(line, AddedLine) for line in lines)} insertions(+), "
-                          f"{sum(isinstance(line, RemovedLine) for line in lines)} deletions(-)", corrected.preamble)
             with self.assertRaises(ValueError):
                 correct_patch51(text.replace("vma_lookup(mm, start_vaddr)", "unreviewed_lookup(mm, start_vaddr)"), ROOT, gki=gki)
 

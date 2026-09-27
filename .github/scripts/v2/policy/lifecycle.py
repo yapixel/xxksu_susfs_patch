@@ -7,11 +7,12 @@ from helper names or successful application. Public patches are never inputs.
 from difflib import unified_diff
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 from ..engine.diff_parser import parse_patch
 from ..engine.emitter import emit_patch
-from ..model.patch import AddedLine, Patch, RemovedLine
+from ..model.patch import Patch
 from ..source.bundle import create_source_bundle, load_source_bundle
 from ..source.patch_apply import apply_patch_to_bundle
 
@@ -179,11 +180,12 @@ def correct_patch51(text: str, root: Path, *, gki: bool) -> str:
         patch.files[index] = parse_patch(diff).files[0]
     if set(transforms) != {file.old_path.removeprefix("a/") for file in patch.files} & set(transforms):
         raise ValueError("missing lifecycle patch file")
-    # The baseline mail diffstat no longer describes the corrected diff.
+    # Reuse the legacy generator's native Git diffstat approach, but only AFTER
+    # every source correction. --stat reports without applying or mutating files.
     if "---" in patch.preamble:
-        lines = [line for file in patch.files for hunk in file.hunks for line in hunk.lines]
-        added = sum(isinstance(line, AddedLine) for line in lines)
-        removed = sum(isinstance(line, RemovedLine) for line in lines)
-        patch.preamble = patch.preamble[:patch.preamble.index("---") + 1] + [
-            f" {len(patch.files)} files changed, {added} insertions(+), {removed} deletions(-)", ""]
+        body = emit_patch(Patch(files=patch.files))
+        stat = subprocess.check_output(
+            ["git", "-c", "core.quotePath=false", "-c", "color.ui=false", "apply", "--stat"],
+            input=body, text=True)
+        patch.preamble = patch.preamble[:patch.preamble.index("---") + 1] + stat.splitlines() + [""]
     return emit_patch(patch)
