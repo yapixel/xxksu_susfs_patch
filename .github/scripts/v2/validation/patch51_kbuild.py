@@ -87,6 +87,17 @@ def source_mentions(path, seen=None):
     return text
 
 
+def affected_sources(candidate, workspace):
+    # Statistics are parsed outside a containing checkout: git apply otherwise
+    # silently filters paths relative to the inherited repository prefix.
+    numstat = run(["git", "apply", "--numstat", str(candidate.resolve())], workspace)
+    touched = {line.split("\t", 2)[2] for line in numstat.splitlines()
+               if line.split("\t", 2)[2].endswith(".c")}
+    if not touched:
+        raise RuntimeError("final diff has no affected C translation units")
+    return touched
+
+
 def verify(tree, candidate, root, workspace, *, llvm="-14", jobs=4):
     from ..clean_room import fetch_git
     from ..pipeline import generate_patch11_from_tree
@@ -95,11 +106,7 @@ def verify(tree, candidate, root, workspace, *, llvm="-14", jobs=4):
     workspace.mkdir(parents=True, exist_ok=True)
     log = workspace / "kbuild.log"
     # Native Git parses the final candidate. There is no second touched-C list.
-    numstat = run(["git", "apply", "--numstat", str(candidate.resolve())], tree)
-    touched = {line.split("\t", 2)[2] for line in numstat.splitlines()
-               if line.split("\t", 2)[2].endswith(".c")}
-    if not touched:
-        raise RuntimeError("final diff has no affected C translation units")
+    touched = affected_sources(candidate, workspace)
     state = json.loads((root / ".github/upstream-state.json").read_text())
     identity = state["sources"]["authoritative"]["backslashxx_kernelsu"]
     ksu = fetch_git(identity, workspace / "xxksu")

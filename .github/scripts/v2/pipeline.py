@@ -796,6 +796,10 @@ def run_pipeline(
     if target_tree is not None:
         target_tree = Path(target_tree).resolve()
         if postimages is not None:
+            # An archive target nested below the checkout must not inherit the
+            # parent repository's path prefix (git apply would skip every file).
+            if not (target_tree / ".git").exists():
+                subprocess.run(["git", "init", "-q", str(target_tree)], check=True)
             subprocess.run(["git", "apply", "--check", str(candidate_path)], cwd=target_tree, check=True)
         # Single-pass validation against target tree
         valid, errors = validate_exact_patch_on_tree(target_tree, candidate_path, dry_run=check_only)

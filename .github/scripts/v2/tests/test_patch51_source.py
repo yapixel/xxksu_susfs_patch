@@ -11,7 +11,7 @@ from v2.policy.patch51_source import generate, reconstruct_postimages, remove_tr
 from v2.source.bundle import create_source_bundle
 from v2.source.patch_apply import apply_patch_to_bundle
 from v2.pipeline import TARGET_REL_PATHS
-from v2.validation.patch51_kbuild import kbuild_objects
+from v2.validation.patch51_kbuild import kbuild_objects, affected_sources
 
 ROOT = Path(__file__).resolve().parents[4]
 
@@ -66,3 +66,16 @@ class Patch51SourceTests(unittest.TestCase):
             plan = "clang -c -o fs/selected-member.o ../fs/different-source-name.c ; fixdep x\n"
             self.assertEqual(kbuild_objects(plan, root, root / "out"),
                              {"fs/different-source-name.c": "fs/selected-member.o"})
+
+    def test_archive_below_checkout_does_not_hide_git_paths(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            checkout, scratch = root / "checkout", root / "scratch"
+            checkout.mkdir(); scratch.mkdir()
+            subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+            nested = checkout / "kernel_tree"
+            nested.mkdir()
+            candidate = checkout / "candidate.patch"
+            candidate.write_text("diff --git a/fs/stat.c b/fs/stat.c\n--- a/fs/stat.c\n+++ b/fs/stat.c\n@@ -1 +1 @@\n-old\n+new\n")
+            self.assertEqual(subprocess.check_output(["git", "apply", "--numstat", str(candidate)], cwd=nested), b"")
+            self.assertEqual(affected_sources(candidate, scratch), {"fs/stat.c"})
