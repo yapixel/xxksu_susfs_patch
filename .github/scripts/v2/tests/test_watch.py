@@ -476,5 +476,68 @@ class SuSFSWatcherRegressionTests(unittest.TestCase):
         self.assertIn("UNKNOWN semantic units", res.details)
 
 
+
+class XxksuDependencyRewriteTests(unittest.TestCase):
+    def test_dependency_only_orphan_revision_enters_review_and_becomes_current(self):
+        import subprocess
+        import tempfile
+        from v2.adapters.xxksu import PATCH11_CANONICAL_FILES
+        from v2.engine.diff_parser import parse_patch
+        from v2.source.baseline import load_authoritative_bundle
+
+        state = json.loads(STATE_FILE.read_text())
+        accepted = state["sources"]["authoritative"]["backslashxx_kernelsu"]
+        dependencies = {"kernel/hook/lsm_hooks_list.c", "kernel/kernel_compat.h",
+                        "kernel/kernel_includes.h"}
+        self.assertTrue(dependencies <= accepted["tracked_files"].keys())
+        self.assertFalse(dependencies & set(PATCH11_CANONICAL_FILES))
+        with tempfile.TemporaryDirectory() as tmp:
+            tree = Path(tmp)
+            def git(*args):
+                return subprocess.check_output(["git", *args], cwd=tree, text=True,
+                                               stderr=subprocess.DEVNULL).strip()
+            git("init", "-b", "accepted")
+            files = {entry.path: entry.content for entry in load_authoritative_bundle("xxksu", REPO_ROOT).files}
+            files.update({path: "/* dependency before review */\n" for path in dependencies})
+            for path, content in files.items():
+                dest = tree / path
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_text(content)
+            git("add", ".")
+            git("-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+                "commit", "--no-gpg-sign", "-m", "accepted source")
+            old = git("rev-parse", "HEAD")
+            info = {**accepted, "repository": str(tree), "commit": old,
+                    "tracked_files": {path: "sha256:" + hashlib.sha256(content.encode()).hexdigest()
+                                      for path, content in files.items()}}
+            info["relevant_content_hash"] = compute_composite_hash(info["tracked_files"])
+            git("checkout", "--orphan", "master")
+            dependency = "kernel/kernel_compat.h"
+            (tree / dependency).write_text("/* dependency changed; source review required */\n")
+            git("add", ".")
+            git("-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+                "commit", "--no-gpg-sign", "-m", "rewritten source")
+            new = git("rev-parse", "HEAD")
+            self.assertEqual(subprocess.run(["git", "merge-base", "--is-ancestor", old, new],
+                                           cwd=tree).returncode, 1)
+            watcher = UpstreamWatcher(REPO_ROOT, STATE_FILE)
+            result = watcher.check_backslashxx_kernelsu(info)
+            self.assertEqual(result.classification, WatchClassification.SAFE_REGEN_CANDIDATE, result.details)
+            self.assertEqual((result.old_identity, result.new_identity), (old, new))
+            self.assertEqual(result.affected_files, (dependency,))
+            self.assertIn("dependency", result.details.lower())
+            self.assertIn("review", result.details.lower())
+            self.assertEqual({f.old_path.removeprefix("a/") for f in parse_patch(result.candidate_patch).files},
+                             set(PATCH11_CANONICAL_FILES))
+            self.assertEqual(result.candidate_patch,
+                             (REPO_ROOT / "patches/xxksu/11_enable_susfs_for_ksu.patch").read_text())
+            info["commit"] = new  # simulated acceptance; next comparison uses B
+            info["tracked_files"][dependency] = "sha256:" + hashlib.sha256((tree / dependency).read_bytes()).hexdigest()
+            info["relevant_content_hash"] = compute_composite_hash(info["tracked_files"])
+            current = watcher.check_backslashxx_kernelsu(info)
+            self.assertEqual(current.classification, WatchClassification.NO_CHANGE)
+            self.assertEqual((current.old_identity, current.new_identity), (new, new))
+
+
 if __name__ == "__main__":
     unittest.main()

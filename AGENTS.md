@@ -85,6 +85,16 @@ for individual reviewed generations, not permanent historical pins. Discovered
 revision != accepted revision triggers classification/review; accepted revisions
 advance after supported change validation or justified semantic reconciliation.
 
+For `backslashxx/KernelSU:master` specifically, force-push/history rewrites are
+normal: ancestry is provenance only, never an acceptance prerequisite. Compare
+the resolved immutable source and dependencies before accepting it; this policy
+does not automatically apply to Simonpunk. The xxKSU watch inventory includes
+`kernel/hook/lsm_hooks_list.c`, `kernel/kernel_compat.h`, and
+`kernel/kernel_includes.h` as dependency surfaces, not Patch 11 mutation targets.
+Their drift requires source review; a mechanically valid candidate is not proof
+of dependency semantics. The unchanged 13-file source bundle remains a focused
+source snapshot, not an assertion about every file in the upstream tree.
+
 No relevant change → no action. Supported/mechanical change → reconstruct and
 validate → production Actions publication. Semantic/anchor/target-API/lifecycle
 uncertainty → fail closed → escalation and independent source review → smallest

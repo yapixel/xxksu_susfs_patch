@@ -266,7 +266,7 @@ class UpstreamWatcher:
                 new_identity=new_commit,
                 old_content_hash=old_hash,
                 new_content_hash=new_hash,
-                details=f"Upstream commit advanced to {new_commit[:12]}, but all {len(tracked_files)} relevant kernel files are byte-for-byte identical.",
+                details=f"Upstream commit advanced to {new_commit[:12]}, but all {len(tracked_files)} tracked source/dependency files are byte-for-byte identical (not a whole-tree comparison).",
                 reproduction_command=repro_cmd,
             )
 
@@ -296,11 +296,8 @@ class UpstreamWatcher:
         # Anchors hold! Try candidate Patch 11 generation and strict application.
         try:
             # Create a source bundle from the fetched files
-            entries = []
-            for p, content in fetched_contents.items():
-                entries.append({"path": p, "content": content})
-            temp_bundle = create_source_bundle("xxksu", "main", entries)
-            candidate_patch = adapter.generate_patch11(temp_bundle)
+            temp_bundle = create_source_bundle("xxksu", "main", fetched_contents)
+            candidate_patch = generate_patch11(temp_bundle)
 
             # Strictly apply to verify 0 rejects, 0 fuzz
             apply_patch_to_bundle(temp_bundle, candidate_patch)
@@ -314,7 +311,12 @@ class UpstreamWatcher:
                 old_content_hash=old_hash,
                 new_content_hash=new_hash,
                 affected_files=tuple(affected_files),
-                details=f"Safe upstream change detected across {len(affected_files)} files. Candidate Patch 11 generated and verified with 0 rejects, 0 fuzz.",
+                details=(f"Source change detected across {len(affected_files)} tracked files. "
+                         "Candidate Patch 11 generated and verified with exact application; "
+                         "this is not approval of dependency semantics. "
+                         + ("Dependency source review required: " + ", ".join(
+                             p for p in affected_files if p not in PATCH11_CANONICAL_FILES)
+                            if any(p not in PATCH11_CANONICAL_FILES for p in affected_files) else "")),
                 candidate_patch=candidate_patch,
                 candidate_patch_name="11_enable_susfs_for_ksu.patch",
                 reproduction_command=repro_cmd,

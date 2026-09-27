@@ -1,11 +1,11 @@
 {
   "patches": [
     {
-      "apply_target": "main",
+      "apply_target": "master",
       "compatibility_target": "backslashxx/KernelSU (xxKSU)",
       "id": "xxksu-patch11",
       "name": "Shared xxKSU Patch 11",
-      "patch_apply_target": "main",
+      "patch_apply_target": "master",
       "relative_path": "patches/xxksu/11_enable_susfs_for_ksu.patch",
       "sha256": "a0419c3ae48dbf93013cc56e0deb8330649b3089efb3bc711ccc7f6b772b020d",
       "susfs_lineage": {
@@ -14,8 +14,8 @@
         "repository": "https://gitlab.com/simonpunk/susfs4ksu"
       },
       "target_lineage": {
-        "commit": "bb0be9297da42ff3f63819125314ce0b13935a06",
-        "ref": "main",
+        "commit": "ae81a610ef8c481b9a73e48a962f8eee910b619e",
+        "ref": "master",
         "repository": "https://github.com/backslashxx/KernelSU"
       },
       "type": "ksu"
