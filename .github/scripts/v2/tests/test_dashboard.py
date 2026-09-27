@@ -432,19 +432,25 @@ class DashboardTests(unittest.TestCase):
         self.assertIn("`midori01/KernelSU:xx.patch`", body)
         self.assertIn("🟢 `IMPLEMENTATION_DIFFERENCE`", body)
         self.assertIn("OUR_EXTRA=0", body)
-        self.assertIn("TRY_UMOUNT legacy SuSFS integration retired", body)
-        self.assertIn("obsolete Official-KSU KSU_MARK_GET override retired", body)
+        self.assertIn("legacy SuSFS TRY_UMOUNT glue retired", body)
+        self.assertIn("obsolete Official-KSU KSU_MARK_GET override independently", body)
         self.assertIn("| Reviewed Comparison |", body)
         self.assertNotIn("| Parity Status | Details |", body)
         rows = [line for line in body.splitlines() if "🟢 `IMPLEMENTATION_DIFFERENCE`" in line]
         self.assertEqual(len(rows), 2)
         for row in rows:
-            self.assertIn("**BOTH", row)
+            self.assertIn("**AGREES:**", row)
+            self.assertIn("**RESULT:**", row)
             self.assertIn("OURS", row)
             self.assertIn("REFERENCE", row)
         patch11 = next(row for row in rows if "xxksu-patch11" in row)
         for token in ("OUR_EXTRA=0", "REFERENCE_EXTRA=0", "SEMANTIC_CONFLICT=0",
-                      "**OURS vs REFERENCE:**", "**OURS:**", "independently justified"):
+                      "**OURS:** explicit/separate SID", "**REFERENCE:** batched SID",
+                      "canonical 8-file", "SuSFS initialization", "no_su / proc_umounted",
+                      "isolated/app UID", "WebView zygote and zygote_next", "ksu_handle_umount",
+                      "SuSFS supercall dispatch", "sdcard monitor startup", "ksu_get_task_mark(cmd.pid)",
+                      "kernel/feature/kernel_umount.c", "kernel/downstream/ksu_hostsredirect.h",
+                      "helper decomposition", "grouped/inlined", "not authorized by Midori"):
             self.assertIn(token, patch11)
         gki = next(row for row in rows if "gki-android16" in row)
         for token in ("**OURS:** mount allocation-provenance", "**REFERENCE:** uses early returns",

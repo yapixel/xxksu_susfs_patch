@@ -980,11 +980,20 @@ def format_patch11_parity_details(rep: Mapping[str, Any]) -> str:
 
     if classification == ReferenceComparisonClassification.IMPLEMENTATION_DIFFERENCE.value:
         return (
-            f"**BOTH:** equivalent currently reviewed SuSFS/xxKSU semantics "
-            f"(OUR_EXTRA={len(our_extras)}, REFERENCE_EXTRA={len(ref_extras)}, SEMANTIC_CONFLICT={len(conflicts)}); "
-            f"native xxKSU try-umount and ksu_get_task_mark(cmd.pid) retained. "
-            f"**OURS vs REFERENCE:** SELinux SID setup/batching and zygote helper organization differ."
-            f"{retired_str}"
+            "**AGREES:** canonical 8-file integration scope; SuSFS initialization; no_su / proc_umounted "
+            "handling; isolated/app UID handling; WebView zygote and zygote_next behavior; interaction "
+            "with native xxKSU ksu_handle_umount; SuSFS supercall dispatch; sdcard monitor startup; "
+            "legacy SuSFS TRY_UMOUNT glue retired; native xxKSU ksu_get_task_mark(cmd.pid) retained; "
+            "kernel/feature/kernel_umount.c and kernel/downstream/ksu_hostsredirect.h remain native/untouched. "
+            "**OURS:** explicit/separate SID update/domain helpers and explicit helper decomposition "
+            "for the reviewed zygote/setuid flow. "
+            "**REFERENCE:** batched SID setup/update, different SID/domain helper organization, "
+            "and differently grouped/inlined portions of the reviewed zygote/setuid flow. "
+            "**RESULT:** "
+            f"OUR_EXTRA={len(our_extras)}, REFERENCE_EXTRA={len(ref_extras)}, SEMANTIC_CONFLICT={len(conflicts)}; "
+            "IMPLEMENTATION_DIFFERENCE, not byte/code equivalence. OURS retired legacy SuSFS TRY_UMOUNT "
+            "glue and the obsolete Official-KSU KSU_MARK_GET override independently, justified against "
+            "current Simonpunk/xxKSU semantics, not authorized by Midori."
         )
     elif classification == ReferenceComparisonClassification.SEMANTIC_MATCH.value:
         return f"Exact semantic match across all feature units{retired_str}."
@@ -1007,14 +1016,14 @@ def format_gki_patch51_parity_details(rep: Mapping[str, Any]) -> str:
         reviewed = rep.get("metadata", {}).get("reviewed_lifecycle_differences", {})
         if {"fs/namei.c", "fs/namespace.c", "fs/proc/task_mmu.c"} <= reviewed.keys():
             return (
-                "**BOTH / AGREES:** lifetime-safe filename_lookup / old_name handling; "
+                "**AGREES:** lifetime-safe filename_lookup / old_name handling; "
                 "OURS vs REFERENCE fs/super.c difference is declaration placement only. "
                 "**OURS:** mount allocation-provenance tracking, inherited-flag clearing, "
                 "early-error accounting, locked non-SuS lookup, VMA-bounded zero pagemap entries, "
                 "and shared smaps gather guard. "
                 "**REFERENCE:** uses early returns for the corresponding non-SuS lookup and "
                 "retains inherited pagemap VMA-boundary and smaps_rollup hidden-VMA gather defects "
-                "that OURS intentionally corrects. Reviewed differences, not blanket semantic equivalence."
+                "that OURS intentionally corrects. **RESULT:** IMPLEMENTATION_DIFFERENCE; explicitly reviewed differences, not blanket semantic or byte/code equivalence."
             )
         return str(rep.get("details", "OURS vs REFERENCE: reviewed implementation differences; not byte parity."))
     elif classification == ReferenceComparisonClassification.SEMANTIC_MATCH.value:
