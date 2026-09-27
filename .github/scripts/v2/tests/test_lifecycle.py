@@ -89,8 +89,8 @@ class LifecycleTests(unittest.TestCase):
         source = self.gki["fs/proc/task_mmu.c"]
         gather = function(source, "static void smap_gather_stats(")
         rollup = function(source, "static int show_smaps_rollup(")
-        # Case 1/2 after lock reacquire passes last_vma_end; case 4 and normal
-        # loop also enter the same function. Execute every distinct start mode.
+        # Normal and reacquired case 1/2 pass zero; case 4 passes last_vma_end.
+        # Every caller enters the same function. Execute each distinct start mode.
         self.assertIn("smap_gather_stats(vma, &mss, last_vma_end)", rollup)
         self.assertIn("mmap_read_lock_killable", rollup)
         self.assertEqual(run_c(SMAPS_MOCKS + gather + SMAPS_CASES), 0)

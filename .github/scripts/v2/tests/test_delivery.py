@@ -526,8 +526,13 @@ class TestPipelineDelivery(unittest.TestCase):
 
         head_before = subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.repo_root, capture_output=True, text=True, check=True).stdout.strip()
 
-        cand_sultan = real_root / ".github" / "fixtures" / "sultan" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
-        cand_gki = real_root / ".github" / "fixtures" / "r38" / "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
+        # Delivery identity test, not generation: setup copied these exact
+        # production bytes. Historical generator fixtures need not equal them.
+        cand_sultan = real_root / "patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
+        cand_gki = real_root / "patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
+        gki_public = self.repo_root / "patches/gki-android16-6.12" / cand_gki.name
+        gki_before = gki_public.read_bytes()
+        self.assertEqual(cand_gki.read_bytes(), gki_before)
 
         promoted, pushed, commit_sha, _ = deliver_multi_candidates(
             {
@@ -550,14 +555,19 @@ class TestPipelineDelivery(unittest.TestCase):
         ).stdout.strip()
         self.assertEqual(rev_count, "1")
 
+        self.assertEqual(gki_public.read_bytes(), gki_before)
+        changed = subprocess.check_output(["git", "diff", "--name-only", head_before, "HEAD"],
+                                          cwd=self.repo_root, text=True).splitlines()
+        self.assertNotIn(str(gki_public.relative_to(self.repo_root)), changed)
+
         valid, errors = verify_patch_manifest(self.repo_root)
         self.assertTrue(valid, f"Manifest invalid: {errors}")
 
     def test_13_multi_candidate_both_unchanged_noop(self):
         """Invariant: When both candidates are already up to date, clean NO_OP with 0 commits."""
         real_root = Path(__file__).resolve().parents[4]
-        cand_sultan = real_root / ".github" / "fixtures" / "sultan" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
-        cand_gki = real_root / ".github" / "fixtures" / "r38" / "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
+        cand_sultan = real_root / "patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
+        cand_gki = real_root / "patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
 
         promoted, pushed, commit_sha, _ = deliver_multi_candidates(
             {
@@ -571,6 +581,10 @@ class TestPipelineDelivery(unittest.TestCase):
         self.assertFalse(promoted)
         self.assertFalse(pushed)
         self.assertIsNone(commit_sha)
+        self.assertEqual(subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=self.repo_root,
+                                                text=True).strip(), self.initial_commit)
+        self.assertEqual(subprocess.check_output(["git", "rev-parse", "origin/main"], cwd=self.repo_root,
+                                                text=True).strip(), self.initial_commit)
 
     def test_14_validation_run_is_read_only(self):
         """Invariant: Validation-only run produces candidate without touching patches/ or metadata."""
