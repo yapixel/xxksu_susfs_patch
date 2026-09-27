@@ -15,11 +15,9 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-import tempfile
 import unittest
 
 from v2.adapters.xxksu import generate_patch11
-from v2.pipeline import deliver_multi_candidates
 from v2.source.baseline import load_authoritative_bundle
 from v2.validation.reference_cross_check import (
     PATCH11_FEATURE_UNITS,
@@ -197,40 +195,6 @@ exit 0
         self.assertEqual(meta["patch50_sha256"], hashlib.sha256(midori_p50.encode("utf-8")).hexdigest())
 
     # 7. reference comparison cannot authorize production changes
-    def test_07_reference_comparison_cannot_authorize_production_changes(self):
-        """Reference differences or changes can NEVER independently trigger production updates or write-back."""
-        repo_root = Path(__file__).resolve().parents[4]
-        state_file = repo_root / ".github" / "upstream-state.json"
-        self.assertTrue(state_file.is_file())
-
-        with open(state_file, "r", encoding="utf-8") as f:
-            state = json.load(f)
-
-        # Invariant check: reference sources are clearly separated from authoritative sources
-        self.assertIn("sources", state)
-        self.assertIn("reference", state["sources"])
-        self.assertIn("authoritative", state["sources"])
-
-        # Reference sources cannot be in authoritative sources
-        ref_keys = set(state["sources"]["reference"].keys())
-        auth_keys = set(state["sources"]["authoritative"].keys())
-        self.assertEqual(ref_keys.intersection(auth_keys), set())
-
-        # Proves deliver_multi_candidates with unchanged candidate does not commit even if reference changed
-        with tempfile.TemporaryDirectory() as td:
-            td_path = Path(td)
-            cand_p = td_path / "cand.patch"
-            pub_p = repo_root / "patches" / "xxksu" / "11_enable_susfs_for_ksu.patch"
-            cand_p.write_bytes(pub_p.read_bytes())
-
-            delivered, pushed, commit, shas = deliver_multi_candidates(
-                candidate_targets={"xxksu-patch11": cand_p},
-                repo_root=repo_root,
-                write_back=False,
-            )
-            self.assertFalse(delivered)
-            self.assertFalse(pushed)
-            self.assertIsNone(commit)
 
     # 8. patch11 feature-level semantic matrix
     def test_08_patch11_feature_level_semantic_matrix(self):

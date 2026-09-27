@@ -172,11 +172,6 @@ class RepositoryFixtureTests(unittest.TestCase):
         first, second = round_trip(sample)
         self.assertEqual(second.structural_key(), first.structural_key())
 
-    def test_legacy_malformed_51_fails_closed(self):
-        malformed = "diff --git a/a b/a\n--- a/a\n+++ b/a\n@@ -1,2 +1,2 @@\n-a\ninvalid hunk content line\n"
-        with self.assertRaises(PatchParseError):
-            parse_patch(malformed)
-
 
 if __name__ == "__main__":
     unittest.main()

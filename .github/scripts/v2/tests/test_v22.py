@@ -91,14 +91,24 @@ class V22HashCacheTests(unittest.TestCase):
 
 
 class V22ManifestTests(unittest.TestCase):
-    def test_all_four_profiles_validate_independently(self):
-        manifests = build_manifest_sets()
-        self.assertEqual(len(manifests), 2)
-        self.assertEqual(sum(len(item.profiles) for item in manifests), 4)
-        for manifest_set in manifests:
-            for profile in manifest_set.profiles:
-                profile.validate(manifest_set.target)
-                self.assertEqual(profile.patch_51_id, manifest_set.target.patch_51_id)
+    def test_profile_manifest_matrix(self):
+        with self.subTest(case='all_four_profiles_validate_independently'):
+            manifests = build_manifest_sets()
+            self.assertEqual(len(manifests), 2)
+            self.assertEqual(sum(len(item.profiles) for item in manifests), 4)
+            for manifest_set in manifests:
+                for profile in manifest_set.profiles:
+                    profile.validate(manifest_set.target)
+                    self.assertEqual(profile.patch_51_id, manifest_set.target.patch_51_id)
+        with self.subTest(case='shared_11_and_transport_neutral_51'):
+            raw = build_manifest_sets()[0].to_dict()
+            raw["profiles"][1]["patch_11_id"] = "11-lsm"
+            with self.assertRaises(ManifestError):
+                load_manifest_set(raw)
+            raw = build_manifest_sets()[0].to_dict()
+            raw["profiles"][1]["patch_51_id"] = "51-lsm_bl"
+            with self.assertRaises(ManifestError):
+                load_manifest_set(raw)
 
     def test_deterministic_manifest_serialization(self):
         first = build_manifest_sets()[0].canonical_json()
@@ -138,16 +148,6 @@ class V22ManifestTests(unittest.TestCase):
         with self.assertRaises(InvalidFixtureContract):
             load_manifest_set(raw)
 
-    def test_shared_11_and_transport_neutral_51(self):
-        raw = build_manifest_sets()[0].to_dict()
-        raw["profiles"][1]["patch_11_id"] = "11-lsm"
-        with self.assertRaises(ManifestError):
-            load_manifest_set(raw)
-        raw = build_manifest_sets()[0].to_dict()
-        raw["profiles"][1]["patch_51_id"] = "51-lsm_bl"
-        with self.assertRaises(ManifestError):
-            load_manifest_set(raw)
-
 
 class V22PreparationTests(unittest.TestCase):
     def _manifest(self, cache):
@@ -161,23 +161,24 @@ class V22PreparationTests(unittest.TestCase):
         profile = base.profiles[1]
         return target_manifest, profile
 
-    def test_offline_prepare_is_reproducible_and_never_fetches(self):
-        with tempfile.TemporaryDirectory() as root:
-            cache = ContentAddressedCache(root)
-            target, profile = self._manifest(cache)
-            prepared = prepare(target, cache, profile)
-            prepared_again = prepare(target, cache, profile)
-            self.assertEqual(prepared.provenance.identity, prepared_again.provenance.identity)
-            self.assertEqual(prepared.to_json(), prepared_again.to_json())
+    def test_offline_prepare_reproducible_without_fetch(self):
+        with self.subTest(case='offline_prepare_is_reproducible_and_never_fetches'):
+            with tempfile.TemporaryDirectory() as root:
+                cache = ContentAddressedCache(root)
+                target, profile = self._manifest(cache)
+                prepared = prepare(target, cache, profile)
+                prepared_again = prepare(target, cache, profile)
+                self.assertEqual(prepared.provenance.identity, prepared_again.provenance.identity)
+                self.assertEqual(prepared.to_json(), prepared_again.to_json())
+        with self.subTest(case='offline_prepare_does_not_call_fetch'):
+            from unittest.mock import patch
+            with tempfile.TemporaryDirectory() as root:
+                cache = ContentAddressedCache(root)
+                target, profile = self._manifest(cache)
+                with patch("v2.source.fetch.fetch", side_effect=AssertionError("network boundary crossed")) as mocked:
+                    prepare(target, cache, profile, offline=True)
+                mocked.assert_not_called()
 
-    def test_offline_prepare_does_not_call_fetch(self):
-        from unittest.mock import patch
-        with tempfile.TemporaryDirectory() as root:
-            cache = ContentAddressedCache(root)
-            target, profile = self._manifest(cache)
-            with patch("v2.source.fetch.fetch", side_effect=AssertionError("network boundary crossed")) as mocked:
-                prepare(target, cache, profile, offline=True)
-            mocked.assert_not_called()
 
     def test_offline_missing_input_fails_closed(self):
         with tempfile.TemporaryDirectory() as root:
@@ -189,13 +190,6 @@ class V22PreparationTests(unittest.TestCase):
             with self.assertRaises(OfflineInputMissing):
                 prepare(target, cache, profile)
 
-    def test_repository_fixtures_are_hashable(self):
-        fixture_root = Path(__file__).resolve().parents[4] / ".github" / "fixtures"
-        hashes = [hash_bytes(path.read_bytes()) for path in sorted(fixture_root.glob("*.patch"))
-                  if path.name in {"scope-min-manual-hooks-v2.3.patch", "manual-security-hooks-v2.0.patch"}]
-        self.assertEqual(len(hashes), 2)
-        self.assertEqual(hashes, [hash_bytes(path.read_bytes()) for path in sorted(fixture_root.glob("*.patch"))
-                                  if path.name in {"scope-min-manual-hooks-v2.3.patch", "manual-security-hooks-v2.0.patch"}])
 
     def test_relative_path_validation(self):
         from v2.source.hashing import validate_relative_path

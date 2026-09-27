@@ -89,6 +89,8 @@ class TestPipelineDelivery(unittest.TestCase):
 
     def test_1_failed_candidate_no_commit_or_push(self):
         """Invariant 1: When candidate validation fails, no commit or push occurs."""
+        protected = list((self.repo_root / "patches").rglob("*")) + [self.repo_root / ".github/upstream-state.json"]
+        before = {p: p.read_bytes() for p in protected if p.is_file()}
         target_tree = self.repo_root / "corrupted_target"
         shutil.copytree(self.ksu_tree, target_tree)
         (target_tree / "kernel" / "ksu.c").write_text("corrupted target context\n", encoding="utf-8")
@@ -109,9 +111,9 @@ class TestPipelineDelivery(unittest.TestCase):
 
         remote_head = subprocess.run(["git", "rev-parse", "main"], cwd=self.remote_path, capture_output=True, text=True, check=True).stdout.strip()
         self.assertEqual(remote_head, self.initial_commit, "Remote main must not move on candidate validation failure")
+        self.assertEqual({p: p.read_bytes() for p in before}, before)
 
-    def test_2_unchanged_candidate_no_commit(self):
-        """Invariant 2: When candidate matches current committed patch, no commit occurs."""
+    def test_delivery_bytes_manifest_and_noop(self):
         res = run_pipeline(
             "xxksu-patch11",
             self.ksu_tree,
@@ -130,9 +132,6 @@ class TestPipelineDelivery(unittest.TestCase):
         head_after = subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.repo_root, capture_output=True, text=True, check=True).stdout.strip()
         self.assertEqual(head_after, self.initial_commit, "HEAD must remain at initial commit")
 
-    def test_3_changed_candidate_one_promotion_commit(self):
-        """Invariant 3: A fully verified candidate change results in exactly one promotion commit."""
-        # Overwrite public patch with placeholder to simulate a previous older patch
         public_patch = self.repo_root / "patches" / "xxksu" / "11_enable_susfs_for_ksu.patch"
         public_patch.write_text("old placeholder patch\n", encoding="utf-8")
         subprocess.run(["git", "add", str(public_patch)], cwd=self.repo_root, check=True)
@@ -167,26 +166,6 @@ class TestPipelineDelivery(unittest.TestCase):
         self.assertIn("auto(pipeline): deliver verified xxksu-patch11 production patch", log_msg)
         self.assertIn(res.candidate_sha256, log_msg)
 
-    def test_4_committed_patches_bytes_equals_validated_candidate(self):
-        """Invariant 4: Committed patch bytes on origin/main match candidate byte-for-byte."""
-        # Overwrite with placeholder
-        public_patch = self.repo_root / "patches" / "xxksu" / "11_enable_susfs_for_ksu.patch"
-        public_patch.write_text("old placeholder patch\n", encoding="utf-8")
-        subprocess.run(["git", "add", str(public_patch)], cwd=self.repo_root, check=True)
-        subprocess.run(["git", "commit", "-m", "mock: simulate older public patch"], cwd=self.repo_root, check=True)
-        subprocess.run(["git", "push", "origin", "main"], cwd=self.repo_root, check=True)
-
-        res = run_pipeline(
-            "xxksu-patch11",
-            self.ksu_tree,
-            target_tree=self.ksu_tree,
-            repo_root=self.repo_root,
-            promote=True,
-            check_only=True,
-            write_back=True,
-            verify_raw_url=False,
-        )
-
         candidate_bytes = res.candidate_path.read_bytes()
 
         # Check local committed file
@@ -202,26 +181,6 @@ class TestPipelineDelivery(unittest.TestCase):
         )
         self.assertEqual(show_proc.stdout, candidate_bytes, "origin/main must contain exact validated candidate bytes")
 
-    def test_5_manifest_sha_equals_committed_public_patch(self):
-        """Invariant 5: patches/manifest.json matches committed public patch SHA-256."""
-        # Overwrite with placeholder
-        public_patch = self.repo_root / "patches" / "xxksu" / "11_enable_susfs_for_ksu.patch"
-        public_patch.write_text("old placeholder patch\n", encoding="utf-8")
-        subprocess.run(["git", "add", str(public_patch)], cwd=self.repo_root, check=True)
-        subprocess.run(["git", "commit", "-m", "mock: simulate older public patch"], cwd=self.repo_root, check=True)
-        subprocess.run(["git", "push", "origin", "main"], cwd=self.repo_root, check=True)
-
-        res = run_pipeline(
-            "xxksu-patch11",
-            self.ksu_tree,
-            target_tree=self.ksu_tree,
-            repo_root=self.repo_root,
-            promote=True,
-            check_only=True,
-            write_back=True,
-            verify_raw_url=False,
-        )
-
         manifest_file = self.repo_root / "patches" / "manifest.json"
         manifest_data = json.loads(manifest_file.read_text(encoding="utf-8"))
         entry = next(p for p in manifest_data["patches"] if p["id"] == "xxksu-patch11")
@@ -230,28 +189,7 @@ class TestPipelineDelivery(unittest.TestCase):
         valid, errors = verify_patch_manifest(self.repo_root)
         self.assertTrue(valid, f"Manifest verification failed: {errors}")
 
-    def test_6_rerun_after_promotion_clean_noop(self):
-        """Invariant 6: Rerunning delivery after promotion is a clean no-op."""
-        # First: promote and deliver
-        public_patch = self.repo_root / "patches" / "xxksu" / "11_enable_susfs_for_ksu.patch"
-        public_patch.write_text("old placeholder patch\n", encoding="utf-8")
-        subprocess.run(["git", "add", str(public_patch)], cwd=self.repo_root, check=True)
-        subprocess.run(["git", "commit", "-m", "mock: simulate older public patch"], cwd=self.repo_root, check=True)
-        subprocess.run(["git", "push", "origin", "main"], cwd=self.repo_root, check=True)
-
-        res1 = run_pipeline(
-            "xxksu-patch11",
-            self.ksu_tree,
-            target_tree=self.ksu_tree,
-            repo_root=self.repo_root,
-            promote=True,
-            check_only=True,
-            write_back=True,
-            verify_raw_url=False,
-        )
-        self.assertTrue(res1.committed)
-        head_after_first = subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.repo_root, capture_output=True, text=True, check=True).stdout.strip()
-
+        head_after_first = res.commit_sha
         # Second: rerun with identical inputs
         res2 = run_pipeline(
             "xxksu-patch11",
@@ -269,6 +207,7 @@ class TestPipelineDelivery(unittest.TestCase):
 
         head_after_second = subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.repo_root, capture_output=True, text=True, check=True).stdout.strip()
         self.assertEqual(head_after_second, head_after_first, "HEAD must not move on clean no-op rerun")
+
 
     def test_7_reference_only_midori_does_not_trigger_write_back(self):
         """Invariant 7: Reference-only tracker modifications do not trigger production write-back."""
@@ -338,111 +277,36 @@ class TestPipelineDelivery(unittest.TestCase):
                 f"Unexpected file committed: {f}",
             )
 
-    def test_9_sultan_patch51_verified_write_back(self):
-        """Invariant: Sultan Patch 51 candidate change results in verified delivery write-back."""
+    def test_patch51_target_delivery(self):
         real_root = Path(__file__).resolve().parents[4]
-        public_patch = self.repo_root / "patches" / "sultan-android14-6.1" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
-        public_patch.write_text("old sultan patch placeholder\n", encoding="utf-8")
-        subprocess.run(["git", "add", str(public_patch)], cwd=self.repo_root, check=True)
-        subprocess.run(["git", "commit", "-m", "mock: simulate older sultan patch"], cwd=self.repo_root, check=True)
-        subprocess.run(["git", "push", "origin", "main"], cwd=self.repo_root, check=True)
+        for target, patch_id, source, output in (
+            ("sultan-android14-6.1", "sultan-android14-6.1-patch51",
+             ".github/fixtures/sultan/50_add_susfs_in_gki-android14-6.1.patch",
+             "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"),
+            ("gki-android16-6.12", "gki-android16-6.12-r38-patch51",
+             ".github/fixtures/r38/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
+             "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"),
+        ):
+            with self.subTest(target=target):
+                public_patch = self.repo_root / "patches" / target / output
+                public_patch.write_text("old patch placeholder\n", encoding="utf-8")
+                subprocess.run(["git", "add", str(public_patch)], cwd=self.repo_root, check=True)
+                subprocess.run(["git", "commit", "-m", "mock: older target patch"], cwd=self.repo_root, check=True)
+                subprocess.run(["git", "push", "origin", "main"], cwd=self.repo_root, check=True)
+                res = run_pipeline(patch_id, real_root / source, target_tree=None, repo_root=self.repo_root,
+                                   promote=True, check_only=True, write_back=True, verify_raw_url=False)
+                self.assertTrue(res.promoted and res.committed and res.pushed)
+                self.assertEqual(public_patch.read_bytes(), res.candidate_path.read_bytes())
+                committed = subprocess.run(["git", "show", f"origin/main:patches/{target}/{output}"],
+                                           cwd=self.repo_root, capture_output=True, check=True).stdout
+                self.assertEqual(committed, res.candidate_path.read_bytes())
+                valid, errors = verify_patch_manifest(self.repo_root)
+                self.assertTrue(valid, errors)
+                rerun = run_pipeline(patch_id, real_root / source, target_tree=None, repo_root=self.repo_root,
+                                     promote=True, check_only=True, write_back=True, verify_raw_url=False)
+                self.assertTrue(rerun.is_noop)
+                self.assertFalse(rerun.committed or rerun.pushed)
 
-        res = run_pipeline(
-            "sultan-android14-6.1-patch51",
-            real_root / ".github" / "fixtures" / "sultan" / "50_add_susfs_in_gki-android14-6.1.patch",
-            target_tree=None,
-            repo_root=self.repo_root,
-            promote=True,
-            check_only=True,
-            write_back=True,
-            verify_raw_url=False,
-        )
-
-        self.assertTrue(res.promoted, "Sultan candidate must be promoted")
-        self.assertTrue(res.committed, "Sultan change must be committed")
-        self.assertTrue(res.pushed, "Sultan change must be pushed")
-
-        # Byte equality on origin/main
-        candidate_bytes = res.candidate_path.read_bytes()
-        self.assertEqual(public_patch.read_bytes(), candidate_bytes)
-        show_bytes = subprocess.run(
-            ["git", "show", "origin/main:patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch"],
-            cwd=self.repo_root,
-            capture_output=True,
-            check=True,
-        ).stdout
-        self.assertEqual(show_bytes, candidate_bytes)
-
-        # Manifest consistency
-        valid, errors = verify_patch_manifest(self.repo_root)
-        self.assertTrue(valid, f"Manifest invalid after Sultan promotion: {errors}")
-
-        # Re-run is clean no-op
-        rerun = run_pipeline(
-            "sultan-android14-6.1-patch51",
-            real_root / ".github" / "fixtures" / "sultan" / "50_add_susfs_in_gki-android14-6.1.patch",
-            target_tree=None,
-            repo_root=self.repo_root,
-            promote=True,
-            check_only=True,
-            write_back=True,
-            verify_raw_url=False,
-        )
-        self.assertTrue(rerun.is_noop)
-        self.assertFalse(rerun.committed)
-
-    def test_10_gki_r38_patch51_verified_write_back(self):
-        """Invariant: GKI r38 Patch 51 candidate change results in verified delivery write-back."""
-        real_root = Path(__file__).resolve().parents[4]
-        public_patch = self.repo_root / "patches" / "gki-android16-6.12" / "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
-        public_patch.write_text("old gki patch placeholder\n", encoding="utf-8")
-        subprocess.run(["git", "add", str(public_patch)], cwd=self.repo_root, check=True)
-        subprocess.run(["git", "commit", "-m", "mock: simulate older gki patch"], cwd=self.repo_root, check=True)
-        subprocess.run(["git", "push", "origin", "main"], cwd=self.repo_root, check=True)
-
-        res = run_pipeline(
-            "gki-android16-6.12-r38-patch51",
-            real_root / ".github" / "fixtures" / "r38" / "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
-            target_tree=None,
-            repo_root=self.repo_root,
-            promote=True,
-            check_only=True,
-            write_back=True,
-            verify_raw_url=False,
-        )
-
-        self.assertTrue(res.promoted, "GKI candidate must be promoted")
-        self.assertTrue(res.committed, "GKI change must be committed")
-        self.assertTrue(res.pushed, "GKI change must be pushed")
-
-        # Byte equality on origin/main
-        candidate_bytes = res.candidate_path.read_bytes()
-        self.assertEqual(public_patch.read_bytes(), candidate_bytes)
-        show_bytes = subprocess.run(
-            ["git", "show", "origin/main:patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"],
-            cwd=self.repo_root,
-            capture_output=True,
-            check=True,
-        ).stdout
-        self.assertEqual(show_bytes, candidate_bytes)
-
-        # Manifest consistency
-        valid, errors = verify_patch_manifest(self.repo_root)
-        self.assertTrue(valid, f"Manifest invalid after GKI promotion: {errors}")
-
-        # Re-run is clean no-op
-        rerun = run_pipeline(
-            "gki-android16-6.12-r38-patch51",
-            real_root / ".github" / "fixtures" / "r38" / "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
-            target_tree=None,
-            repo_root=self.repo_root,
-            promote=True,
-            check_only=True,
-            write_back=True,
-            verify_raw_url=False,
-        )
-        self.assertTrue(rerun.is_noop)
-        self.assertFalse(rerun.committed)
 
     def test_11_multi_candidate_both_changed_single_commit(self):
         """Invariant: Both Sultan and GKI candidates changing produces exactly ONE delivery commit."""

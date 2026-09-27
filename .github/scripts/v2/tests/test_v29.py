@@ -235,7 +235,7 @@ CONFIG_KSU_HACK_ARM64_BRANCH_LINK=y
 
 
 class V29PositiveProfileMatrixTests(unittest.TestCase):
-    """Verify all 16 positive requirements for V2.9 profile composition and config validation."""
+    """Profile identity, configuration, and exact missing-owner rejection."""
 
     def setUp(self) -> None:
         self.bundles = {
@@ -248,14 +248,34 @@ class V29PositiveProfileMatrixTests(unittest.TestCase):
             "sultan-android14-6.1": {"name": "sultan_android14_6_1_51", "target_id": "sultan-android14-6.1"},
         }
 
-    def test_1_all_four_canonical_profile_ids_resolve(self) -> None:
-        self.assertEqual(len(KNOWN_PROFILES), 4)
-        for pid in KNOWN_PROFILES:
-            prof = get_profile_definition(pid)
-            self.assertEqual(prof.profile_id, pid)
-            self.assertIn(prof.target_id, KNOWN_TARGETS)
-            self.assertIn(prof.mode, ("manual", "lsm_bl"))
-            self.assertEqual(prof.profile_id, f"{prof.target_id}-{prof.mode}")
+    def test_profile_identity_matrix(self):
+        with self.subTest(case='1_all_four_canonical_profile_ids_resolve'):
+            self.assertEqual(len(KNOWN_PROFILES), 4)
+            for pid in KNOWN_PROFILES:
+                prof = get_profile_definition(pid)
+                self.assertEqual(prof.profile_id, pid)
+                self.assertIn(prof.target_id, KNOWN_TARGETS)
+                self.assertIn(prof.mode, ("manual", "lsm_bl"))
+                self.assertEqual(prof.profile_id, f"{prof.target_id}-{prof.mode}")
+        with self.subTest(case='6_all_four_use_identical_shared_patch_11_identity'):
+            for pid in KNOWN_PROFILES:
+                prof_def = get_profile_definition(pid)
+                self.assertEqual(prof_def.shared_patch_11_id, "shared-11")
+                manifest = prof_def.get_manifest()
+                self.assertEqual(manifest.patch_11_id, "shared-11")
+        with self.subTest(case='7_target_patch_51_differs_only_by_target_never_by_mode'):
+            for target in KNOWN_TARGETS:
+                manual_prof = get_profile_definition(f"{target}-manual")
+                lsm_prof = get_profile_definition(f"{target}-lsm_bl")
+                self.assertEqual(manual_prof.patch_51_id, lsm_prof.patch_51_id)
+                self.assertNotIn("manual", manual_prof.patch_51_id)
+                self.assertNotIn("lsm_bl", manual_prof.patch_51_id)
+        with self.subTest(case='13_manifests_are_byte_deterministic'):
+            for pid in KNOWN_PROFILES:
+                m1 = get_profile_manifest(pid)
+                m2 = get_profile_manifest(pid)
+                self.assertEqual(m1.to_dict(), m2.to_dict())
+                self.assertEqual(m1.validate().to_dict(), m2.validate().to_dict())
 
     def _assert_incomplete_source_blocked(self, pid: str, bundle: SourceBundle | None = None) -> str:
         prof_def = get_profile_definition(pid)
@@ -284,112 +304,42 @@ class V29PositiveProfileMatrixTests(unittest.TestCase):
         for pid in KNOWN_PROFILES:
             self._assert_incomplete_source_blocked(pid)
 
-    def test_3_manual_composition_rejects_missing_owners(self) -> None:
-        for pid in KNOWN_PROFILES:
-            if pid.endswith("-manual"):
-                self._assert_incomplete_source_blocked(pid)
 
-    def test_4_lsm_composition_rejects_missing_owners(self) -> None:
-        for pid in KNOWN_PROFILES:
-            if pid.endswith("-lsm_bl"):
-                self._assert_incomplete_source_blocked(pid)
-
-    def test_5_failed_composition_has_no_successful_report(self) -> None:
-        for pid in KNOWN_PROFILES:
-            self._assert_incomplete_source_blocked(pid)
-
-    def test_6_all_four_use_identical_shared_patch_11_identity(self) -> None:
-        for pid in KNOWN_PROFILES:
-            prof_def = get_profile_definition(pid)
-            self.assertEqual(prof_def.shared_patch_11_id, "shared-11")
-            manifest = prof_def.get_manifest()
-            self.assertEqual(manifest.patch_11_id, "shared-11")
-
-    def test_7_target_patch_51_differs_only_by_target_never_by_mode(self) -> None:
-        for target in KNOWN_TARGETS:
-            manual_prof = get_profile_definition(f"{target}-manual")
-            lsm_prof = get_profile_definition(f"{target}-lsm_bl")
-            self.assertEqual(manual_prof.patch_51_id, lsm_prof.patch_51_id)
-            self.assertNotIn("manual", manual_prof.patch_51_id)
-            self.assertNotIn("lsm_bl", manual_prof.patch_51_id)
-
-    def test_8_manual_config_validates(self) -> None:
-        res = validate_config(
-            expected=MANUAL_KCONFIG,
-            resolved=_MANUAL_CONFIG_TEXT,
-            mode="manual",
-            raise_on_failure=True,
-        )
-        self.assertEqual(res.status, ValidationStatus.PASS)
-
-    def test_9_lsm_bl_config_validates(self) -> None:
-        res = validate_config(
-            expected=LSM_KCONFIG,
-            resolved=_LSM_BL_CONFIG_TEXT,
-            mode="lsm_bl",
-            prerequisites={"arch": "arm64", "kallsyms": True},
-            raise_on_failure=True,
-        )
-        self.assertEqual(res.status, ValidationStatus.PASS)
-
-    def test_10_incomplete_sources_are_rejected_by_ownership_validation(self) -> None:
-        for pid in KNOWN_PROFILES:
-            self._assert_incomplete_source_blocked(pid)
-
-    def test_11_symbol_validation_precedes_missing_owner_rejection(self) -> None:
-        for pid in KNOWN_PROFILES:
-            self._assert_incomplete_source_blocked(pid)
-
-    def test_12_abi_validation_precedes_missing_owner_rejection(self) -> None:
-        for pid in KNOWN_PROFILES:
-            self._assert_incomplete_source_blocked(pid)
-
-    def test_13_manifests_are_byte_deterministic(self) -> None:
-        for pid in KNOWN_PROFILES:
-            m1 = get_profile_manifest(pid)
-            m2 = get_profile_manifest(pid)
-            self.assertEqual(m1.to_dict(), m2.to_dict())
-            self.assertEqual(m1.validate().to_dict(), m2.validate().to_dict())
-
-    def test_14_incomplete_sources_block_deterministically(self) -> None:
-        pid = "sultan-android14-6.1-manual"
-        first = self._assert_incomplete_source_blocked(pid)
-        second = self._assert_incomplete_source_blocked(pid)
-        self.assertEqual(first, second)
-
-    def test_15_repeated_incomplete_composition_remains_blocked(self) -> None:
-        for pid in KNOWN_PROFILES:
-            self._assert_incomplete_source_blocked(pid)
-            self._assert_incomplete_source_blocked(pid)
-
-    def test_16_incomplete_source_permutations_remain_blocked(self) -> None:
-        pid = "sultan-android14-6.1-lsm_bl"
-        bundle = self.bundles[pid.rsplit("-", 1)[0]]
-        reversed_files = {f.path: f.content for f in reversed(bundle.files)}
-        reversed_bundle = create_source_bundle(
-            target_id=bundle.target_id,
-            kernel_version=bundle.kernel_version,
-            files=reversed_files,
-        )
-        self._assert_incomplete_source_blocked(pid, bundle)
-        self._assert_incomplete_source_blocked(pid, reversed_bundle)
+    def test_valid_config_modes(self):
+        with self.subTest(case='8_manual_config_validates'):
+            res = validate_config(
+                expected=MANUAL_KCONFIG,
+                resolved=_MANUAL_CONFIG_TEXT,
+                mode="manual",
+                raise_on_failure=True,
+            )
+            self.assertEqual(res.status, ValidationStatus.PASS)
+        with self.subTest(case='9_lsm_bl_config_validates'):
+            res = validate_config(
+                expected=LSM_KCONFIG,
+                resolved=_LSM_BL_CONFIG_TEXT,
+                mode="lsm_bl",
+                prerequisites={"arch": "arm64", "kallsyms": True},
+                raise_on_failure=True,
+            )
+            self.assertEqual(res.status, ValidationStatus.PASS)
 
 
 class V29NegativeTests(unittest.TestCase):
-    """Verify all 22 required negative fail-closed conditions for V2.9."""
+    """Fail-closed profile, fixture, configuration, and validation cases."""
 
     def setUp(self) -> None:
-        self.bundle_gki_6_1 = _make_clean_bundle("sultan-android14-6.1", "6.1.25")
+        self.bundle_sultan = _make_clean_bundle("sultan-android14-6.1", "6.1.25")
         self.patch_11 = "shared-11"
-        self.patch_51_gki_6_1 = {"name": "sultan_android14_6_1_51", "target_id": "sultan-android14-6.1"}
+        self.patch_51_sultan = {"name": "sultan_android14_6_1_51", "target_id": "sultan-android14-6.1"}
 
     def test_neg_1_unknown_profile_id(self) -> None:
         with self.assertRaises(UnknownProfile):
             compose_profile(
                 "invalid-profile-id",
-                target_bundle=self.bundle_gki_6_1,
+                target_bundle=self.bundle_sultan,
                 patch_11=self.patch_11,
-                patch_51=self.patch_51_gki_6_1,
+                patch_51=self.patch_51_sultan,
             )
 
     def test_neg_2_profile_target_mismatch(self) -> None:
@@ -397,164 +347,162 @@ class V29NegativeTests(unittest.TestCase):
         with self.assertRaises(TargetProfileMismatch):
             compose_profile(
                 "gki-android16-6.12-manual",
-                target_bundle=self.bundle_gki_6_1,
+                target_bundle=self.bundle_sultan,
                 patch_11=self.patch_11,
                 patch_51={"name": "gki_android16_6_12_51", "target_id": "gki-android16-6.12"},
             )
 
-    def test_neg_3_manual_missing_scope_min_fixture(self) -> None:
-        # Create manifest missing scope-min fixture
-        bad_manifest = ProfileManifest(
-            schema="xxksu-susfs-profile/v1",
-            profile_id="sultan-android14-6.1-manual",
-            target_id="sultan-android14-6.1",
-            mode="manual",
-            fixtures=(FixtureRef(MANUAL_FIXTURES[1], f".github/fixtures/{MANUAL_FIXTURES[1]}"),),
-            kconfig=dict(MANUAL_KCONFIG),
-            prerequisites={"arch": "any", "kallsyms": True},
-            ownership={"exec": MANUAL_FIXTURES[0]},
-            patch_11_id="shared-11",
-            patch_51_id="sultan_android14_6_1_51",
-            adapter_id="sultan_android14_6_1",
-        )
-        with self.assertRaises(InvalidFixtureContract):
-            compose_profile(
-                "sultan-android14-6.1-manual",
-                target_bundle=self.bundle_gki_6_1,
-                patch_11=self.patch_11,
-                patch_51=self.patch_51_gki_6_1,
-                manifest=bad_manifest,
+    def test_invalid_fixture_sets(self):
+        with self.subTest(case='neg_3_manual_missing_scope_min_fixture'):
+            bad_manifest = ProfileManifest(
+                schema="xxksu-susfs-profile/v1",
+                profile_id="sultan-android14-6.1-manual",
+                target_id="sultan-android14-6.1",
+                mode="manual",
+                fixtures=(FixtureRef(MANUAL_FIXTURES[1], f".github/fixtures/{MANUAL_FIXTURES[1]}"),),
+                kconfig=dict(MANUAL_KCONFIG),
+                prerequisites={"arch": "any", "kallsyms": True},
+                ownership={"exec": MANUAL_FIXTURES[0]},
+                patch_11_id="shared-11",
+                patch_51_id="sultan_android14_6_1_51",
+                adapter_id="sultan_android14_6_1",
             )
+            with self.assertRaises(InvalidFixtureContract):
+                compose_profile(
+                    "sultan-android14-6.1-manual",
+                    target_bundle=self.bundle_sultan,
+                    patch_11=self.patch_11,
+                    patch_51=self.patch_51_sultan,
+                    manifest=bad_manifest,
+                )
+        with self.subTest(case='neg_4_manual_missing_manual_security_fixture'):
+            bad_manifest = ProfileManifest(
+                schema="xxksu-susfs-profile/v1",
+                profile_id="sultan-android14-6.1-manual",
+                target_id="sultan-android14-6.1",
+                mode="manual",
+                fixtures=(FixtureRef(MANUAL_FIXTURES[0], f".github/fixtures/{MANUAL_FIXTURES[0]}"),),
+                kconfig=dict(MANUAL_KCONFIG),
+                prerequisites={"arch": "any", "kallsyms": True},
+                ownership={"exec": MANUAL_FIXTURES[0]},
+                patch_11_id="shared-11",
+                patch_51_id="sultan_android14_6_1_51",
+                adapter_id="sultan_android14_6_1",
+            )
+            with self.assertRaises(InvalidFixtureContract):
+                compose_profile(
+                    "sultan-android14-6.1-manual",
+                    target_bundle=self.bundle_sultan,
+                    patch_11=self.patch_11,
+                    patch_51=self.patch_51_sultan,
+                    manifest=bad_manifest,
+                )
+        with self.subTest(case='neg_5_manual_extra_fixture'):
+            extra_fixture = "unsupported-extra-fixture.patch"
+            bad_manifest = ProfileManifest(
+                schema="xxksu-susfs-profile/v1",
+                profile_id="sultan-android14-6.1-manual",
+                target_id="sultan-android14-6.1",
+                mode="manual",
+                fixtures=(
+                    FixtureRef(MANUAL_FIXTURES[0], f".github/fixtures/{MANUAL_FIXTURES[0]}"),
+                    FixtureRef(MANUAL_FIXTURES[1], f".github/fixtures/{MANUAL_FIXTURES[1]}"),
+                    FixtureRef(extra_fixture, f".github/fixtures/{extra_fixture}"),
+                ),
+                kconfig=dict(MANUAL_KCONFIG),
+                prerequisites={"arch": "any", "kallsyms": True},
+                ownership={"exec": MANUAL_FIXTURES[0]},
+                patch_11_id="shared-11",
+                patch_51_id="sultan_android14_6_1_51",
+                adapter_id="sultan_android14_6_1",
+            )
+            with self.assertRaises(InvalidFixtureContract):
+                compose_profile(
+                    "sultan-android14-6.1-manual",
+                    target_bundle=self.bundle_sultan,
+                    patch_11=self.patch_11,
+                    patch_51=self.patch_51_sultan,
+                    manifest=bad_manifest,
+                )
+        with self.subTest(case='neg_6_lsm_bl_containing_either_manual_fixture'):
+            bad_manifest = ProfileManifest(
+                schema="xxksu-susfs-profile/v1",
+                profile_id="sultan-android14-6.1-lsm_bl",
+                target_id="sultan-android14-6.1",
+                mode="lsm_bl",
+                fixtures=(FixtureRef(MANUAL_FIXTURES[0], f".github/fixtures/{MANUAL_FIXTURES[0]}"),),
+                kconfig=dict(LSM_KCONFIG),
+                prerequisites={"arch": "arm64", "kallsyms": True, "XXKSU_BL_COMPOSITE": "XXKSU_BL_COMPOSITE"},
+                ownership={"exec": "XXKSU_BL_COMPOSITE"},
+                patch_11_id="shared-11",
+                patch_51_id="sultan_android14_6_1_51",
+                adapter_id="sultan_android14_6_1",
+            )
+            with self.assertRaises(InvalidFixtureContract):
+                compose_profile(
+                    "sultan-android14-6.1-lsm_bl",
+                    target_bundle=self.bundle_sultan,
+                    patch_11=self.patch_11,
+                    patch_51=self.patch_51_sultan,
+                    manifest=bad_manifest,
+                )
 
-    def test_neg_4_manual_missing_manual_security_fixture(self) -> None:
-        bad_manifest = ProfileManifest(
-            schema="xxksu-susfs-profile/v1",
-            profile_id="sultan-android14-6.1-manual",
-            target_id="sultan-android14-6.1",
-            mode="manual",
-            fixtures=(FixtureRef(MANUAL_FIXTURES[0], f".github/fixtures/{MANUAL_FIXTURES[0]}"),),
-            kconfig=dict(MANUAL_KCONFIG),
-            prerequisites={"arch": "any", "kallsyms": True},
-            ownership={"exec": MANUAL_FIXTURES[0]},
-            patch_11_id="shared-11",
-            patch_51_id="sultan_android14_6_1_51",
-            adapter_id="sultan_android14_6_1",
-        )
-        with self.assertRaises(InvalidFixtureContract):
-            compose_profile(
-                "sultan-android14-6.1-manual",
-                target_bundle=self.bundle_gki_6_1,
-                patch_11=self.patch_11,
-                patch_51=self.patch_51_gki_6_1,
-                manifest=bad_manifest,
-            )
 
-    def test_neg_5_manual_extra_fixture(self) -> None:
-        extra_fixture = "unsupported-extra-fixture.patch"
-        bad_manifest = ProfileManifest(
-            schema="xxksu-susfs-profile/v1",
-            profile_id="sultan-android14-6.1-manual",
-            target_id="sultan-android14-6.1",
-            mode="manual",
-            fixtures=(
-                FixtureRef(MANUAL_FIXTURES[0], f".github/fixtures/{MANUAL_FIXTURES[0]}"),
-                FixtureRef(MANUAL_FIXTURES[1], f".github/fixtures/{MANUAL_FIXTURES[1]}"),
-                FixtureRef(extra_fixture, f".github/fixtures/{extra_fixture}"),
-            ),
-            kconfig=dict(MANUAL_KCONFIG),
-            prerequisites={"arch": "any", "kallsyms": True},
-            ownership={"exec": MANUAL_FIXTURES[0]},
-            patch_11_id="shared-11",
-            patch_51_id="sultan_android14_6_1_51",
-            adapter_id="sultan_android14_6_1",
-        )
-        with self.assertRaises(InvalidFixtureContract):
-            compose_profile(
-                "sultan-android14-6.1-manual",
-                target_bundle=self.bundle_gki_6_1,
-                patch_11=self.patch_11,
-                patch_51=self.patch_51_gki_6_1,
-                manifest=bad_manifest,
-            )
+    def test_missing_patch_inputs(self):
+        with self.subTest(case='neg_7_missing_patch_11'):
+            with self.assertRaises(ValueError):
+                compose_profile(
+                    "sultan-android14-6.1-manual",
+                    target_bundle=self.bundle_sultan,
+                    patch_11="",
+                    patch_51=self.patch_51_sultan,
+                )
+        with self.subTest(case='neg_8_missing_patch_51'):
+            with self.assertRaises(ValueError):
+                compose_profile(
+                    "sultan-android14-6.1-manual",
+                    target_bundle=self.bundle_sultan,
+                    patch_11=self.patch_11,
+                    patch_51="",
+                )
 
-    def test_neg_6_lsm_bl_containing_either_manual_fixture(self) -> None:
-        bad_manifest = ProfileManifest(
-            schema="xxksu-susfs-profile/v1",
-            profile_id="sultan-android14-6.1-lsm_bl",
-            target_id="sultan-android14-6.1",
-            mode="lsm_bl",
-            fixtures=(FixtureRef(MANUAL_FIXTURES[0], f".github/fixtures/{MANUAL_FIXTURES[0]}"),),
-            kconfig=dict(LSM_KCONFIG),
-            prerequisites={"arch": "arm64", "kallsyms": True, "XXKSU_BL_COMPOSITE": "XXKSU_BL_COMPOSITE"},
-            ownership={"exec": "XXKSU_BL_COMPOSITE"},
-            patch_11_id="shared-11",
-            patch_51_id="sultan_android14_6_1_51",
-            adapter_id="sultan_android14_6_1",
-        )
-        with self.assertRaises(InvalidFixtureContract):
-            compose_profile(
-                "sultan-android14-6.1-lsm_bl",
-                target_bundle=self.bundle_gki_6_1,
-                patch_11=self.patch_11,
-                patch_51=self.patch_51_gki_6_1,
-                manifest=bad_manifest,
-            )
-
-    def test_neg_7_missing_patch_11(self) -> None:
-        with self.assertRaises(ValueError):
-            compose_profile(
-                "sultan-android14-6.1-manual",
-                target_bundle=self.bundle_gki_6_1,
-                patch_11="",
-                patch_51=self.patch_51_gki_6_1,
-            )
-
-    def test_neg_8_missing_patch_51(self) -> None:
-        with self.assertRaises(ValueError):
-            compose_profile(
-                "sultan-android14-6.1-manual",
-                target_bundle=self.bundle_gki_6_1,
-                patch_11=self.patch_11,
-                patch_51="",
-            )
 
     def test_neg_9_patch_51_bound_to_wrong_target(self) -> None:
         wrong_p51 = {"name": "gki_android16_6_12_51", "target_id": "gki-android16-6.12"}
         with self.assertRaises(ValueError):
             compose_profile(
                 "sultan-android14-6.1-manual",
-                target_bundle=self.bundle_gki_6_1,
+                target_bundle=self.bundle_sultan,
                 patch_11=self.patch_11,
                 patch_51=wrong_p51,
             )
 
-    def test_neg_10_manual_lsm_y_fails(self) -> None:
-        cfg = dict(MANUAL_KCONFIG)
-        cfg["CONFIG_KSU_LSM_SECURITY_HOOKS"] = "y"
-        with self.assertRaises(FinalConfigMismatch):
-            validate_config(expected=MANUAL_KCONFIG, resolved=cfg, mode="manual", raise_on_failure=True)
+    def test_wrong_mode_config(self):
+        with self.subTest(case='neg_10_manual_lsm_y_fails'):
+            cfg = dict(MANUAL_KCONFIG)
+            cfg["CONFIG_KSU_LSM_SECURITY_HOOKS"] = "y"
+            with self.assertRaises(FinalConfigMismatch):
+                validate_config(expected=MANUAL_KCONFIG, resolved=cfg, mode="manual", raise_on_failure=True)
+        with self.subTest(case='neg_11_manual_bl_y_fails'):
+            cfg = dict(MANUAL_KCONFIG)
+            cfg["CONFIG_KSU_HACK_ARM64_BRANCH_LINK"] = "y"
+            with self.assertRaises(FinalConfigMismatch):
+                validate_config(expected=MANUAL_KCONFIG, resolved=cfg, mode="manual", raise_on_failure=True)
+        with self.subTest(case='neg_12_lsm_bl_lsm_n_fails'):
+            cfg = dict(LSM_KCONFIG)
+            cfg["CONFIG_KSU_LSM_SECURITY_HOOKS"] = "n"
+            cfg["CONFIG_ARM64"] = "y"
+            cfg["CONFIG_KALLSYMS"] = "y"
+            with self.assertRaises(FinalConfigMismatch):
+                validate_config(expected=LSM_KCONFIG, resolved=cfg, mode="lsm_bl", raise_on_failure=True)
+        with self.subTest(case='neg_13_lsm_bl_bl_n_fails'):
+            cfg = dict(LSM_KCONFIG)
+            cfg["CONFIG_KSU_HACK_ARM64_BRANCH_LINK"] = "n"
+            cfg["CONFIG_ARM64"] = "y"
+            cfg["CONFIG_KALLSYMS"] = "y"
+            with self.assertRaises(FinalConfigMismatch):
+                validate_config(expected=LSM_KCONFIG, resolved=cfg, mode="lsm_bl", raise_on_failure=True)
 
-    def test_neg_11_manual_bl_y_fails(self) -> None:
-        cfg = dict(MANUAL_KCONFIG)
-        cfg["CONFIG_KSU_HACK_ARM64_BRANCH_LINK"] = "y"
-        with self.assertRaises(FinalConfigMismatch):
-            validate_config(expected=MANUAL_KCONFIG, resolved=cfg, mode="manual", raise_on_failure=True)
-
-    def test_neg_12_lsm_bl_lsm_n_fails(self) -> None:
-        cfg = dict(LSM_KCONFIG)
-        cfg["CONFIG_KSU_LSM_SECURITY_HOOKS"] = "n"
-        cfg["CONFIG_ARM64"] = "y"
-        cfg["CONFIG_KALLSYMS"] = "y"
-        with self.assertRaises(FinalConfigMismatch):
-            validate_config(expected=LSM_KCONFIG, resolved=cfg, mode="lsm_bl", raise_on_failure=True)
-
-    def test_neg_13_lsm_bl_bl_n_fails(self) -> None:
-        cfg = dict(LSM_KCONFIG)
-        cfg["CONFIG_KSU_HACK_ARM64_BRANCH_LINK"] = "n"
-        cfg["CONFIG_ARM64"] = "y"
-        cfg["CONFIG_KALLSYMS"] = "y"
-        with self.assertRaises(FinalConfigMismatch):
-            validate_config(expected=LSM_KCONFIG, resolved=cfg, mode="lsm_bl", raise_on_failure=True)
 
     def test_neg_14_bl_y_tamper_y_conflict(self) -> None:
         cfg = dict(LSM_KCONFIG)
@@ -570,32 +518,33 @@ class V29NegativeTests(unittest.TestCase):
         with self.assertRaises(FinalConfigMismatch):
             validate_config(expected=MANUAL_KCONFIG, resolved=cfg, mode="manual", raise_on_failure=True)
 
-    def test_neg_16_lsm_bl_missing_arm64_fails(self) -> None:
-        cfg = dict(LSM_KCONFIG)
-        cfg["CONFIG_KALLSYMS"] = "y"
-        # CONFIG_ARM64 omitted or n
-        cfg["CONFIG_ARM64"] = "n"
-        with self.assertRaises(MissingPrerequisite):
-            validate_config(
-                expected=LSM_KCONFIG,
-                resolved=cfg,
-                mode="lsm_bl",
-                prerequisites={"arch": "arm64", "kallsyms": True},
-                raise_on_failure=True,
-            )
+    def test_missing_lsm_prerequisites(self):
+        with self.subTest(case='neg_16_lsm_bl_missing_arm64_fails'):
+            cfg = dict(LSM_KCONFIG)
+            cfg["CONFIG_KALLSYMS"] = "y"
+            # CONFIG_ARM64 omitted or n
+            cfg["CONFIG_ARM64"] = "n"
+            with self.assertRaises(MissingPrerequisite):
+                validate_config(
+                    expected=LSM_KCONFIG,
+                    resolved=cfg,
+                    mode="lsm_bl",
+                    prerequisites={"arch": "arm64", "kallsyms": True},
+                    raise_on_failure=True,
+                )
+        with self.subTest(case='neg_17_lsm_bl_missing_kallsyms_fails'):
+            cfg = dict(LSM_KCONFIG)
+            cfg["CONFIG_ARM64"] = "y"
+            cfg["CONFIG_KALLSYMS"] = "n"
+            with self.assertRaises(MissingPrerequisite):
+                validate_config(
+                    expected=LSM_KCONFIG,
+                    resolved=cfg,
+                    mode="lsm_bl",
+                    prerequisites={"arch": "arm64", "kallsyms": True},
+                    raise_on_failure=True,
+                )
 
-    def test_neg_17_lsm_bl_missing_kallsyms_fails(self) -> None:
-        cfg = dict(LSM_KCONFIG)
-        cfg["CONFIG_ARM64"] = "y"
-        cfg["CONFIG_KALLSYMS"] = "n"
-        with self.assertRaises(MissingPrerequisite):
-            validate_config(
-                expected=LSM_KCONFIG,
-                resolved=cfg,
-                mode="lsm_bl",
-                prerequisites={"arch": "arm64", "kallsyms": True},
-                raise_on_failure=True,
-            )
 
     def test_neg_18_olddefconfig_silent_drop_fails(self) -> None:
         # Simulate olddefconfig silently dropping CONFIG_KSU_SUSFS
@@ -610,65 +559,49 @@ class V29NegativeTests(unittest.TestCase):
                 raise_on_failure=True,
             )
 
-    def test_neg_19_duplicate_transport_owner_fails(self) -> None:
-        claims = list(make_default_manual_claims())
-        # Duplicate transport claim for exec
-        dup = OwnershipClaim("exec", "PATCH_11", "XXKSU_BL_COMPOSITE", "xxksu")
-        claims.append(dup)
+    def test_composition_validation_failures(self):
+        with self.subTest(case='neg_19_duplicate_transport_owner_fails'):
+            claims = list(make_default_manual_claims())
+            # Duplicate transport claim for exec
+            dup = OwnershipClaim("exec", "PATCH_11", "XXKSU_BL_COMPOSITE", "xxksu")
+            claims.append(dup)
 
-        with self.assertRaises(DoubleSideEffect):
-            compose_profile(
-                "sultan-android14-6.1-lsm_bl",
-                target_bundle=self.bundle_gki_6_1,
-                patch_11=self.patch_11,
-                patch_51=self.patch_51_gki_6_1,
-                claims=claims,
-                raise_on_failure=True,
+            with self.assertRaises(DoubleSideEffect):
+                compose_profile(
+                    "sultan-android14-6.1-lsm_bl",
+                    target_bundle=self.bundle_sultan,
+                    patch_11=self.patch_11,
+                    patch_51=self.patch_51_sultan,
+                    claims=claims,
+                    raise_on_failure=True,
+                )
+        with self.subTest(case='neg_20_banned_official_symbol_injected_fails'):
+            corrupted_bundle = self.bundle_sultan.with_updated_file(
+                "fs/exec.c",
+                _SAMPLE_EXEC + "\nint ksu_handle_execveat_sucompat(void) { return 0; }\n",
             )
+            with self.assertRaises(OfficialSymbolLeakage):
+                compose_profile(
+                    "sultan-android14-6.1-lsm_bl",
+                    target_bundle=corrupted_bundle,
+                    patch_11=self.patch_11,
+                    patch_51=self.patch_51_sultan,
+                    raise_on_failure=True,
+                )
+        with self.subTest(case='neg_21_handler_abi_mutated_fails'):
+            corrupted_bundle = self.bundle_sultan.with_updated_file(
+                "security/security.c",
+                _SAMPLE_SECURITY_6_1 + "\nextern void ksu_bprm_check(void);\n",
+            )
+            with self.assertRaises(HandlerABIConflict):
+                compose_profile(
+                    "sultan-android14-6.1-lsm_bl",
+                    target_bundle=corrupted_bundle,
+                    patch_11=self.patch_11,
+                    patch_51=self.patch_51_sultan,
+                    raise_on_failure=True,
+                )
 
-    def test_neg_20_banned_official_symbol_injected_fails(self) -> None:
-        # Inject banned official symbol into fs/exec.c
-        corrupted_files = {
-            "fs/exec.c": _SAMPLE_EXEC + "\nint ksu_handle_execveat_sucompat(void) { return 0; }\n",
-            "fs/open.c": _SAMPLE_OPEN,
-            "fs/stat.c": _SAMPLE_STAT,
-            "kernel/reboot.c": _SAMPLE_REBOOT,
-            "security/security.c": _SAMPLE_SECURITY_6_1,
-        }
-        corrupted_bundle = self.bundle_gki_6_1.with_updated_file(
-            "fs/exec.c",
-            _SAMPLE_EXEC + "\nint ksu_handle_execveat_sucompat(void) { return 0; }\n",
-        )
-        with self.assertRaises(OfficialSymbolLeakage):
-            compose_profile(
-                "sultan-android14-6.1-lsm_bl",
-                target_bundle=corrupted_bundle,
-                patch_11=self.patch_11,
-                patch_51=self.patch_51_gki_6_1,
-                raise_on_failure=True,
-            )
-
-    def test_neg_21_handler_abi_mutated_fails(self) -> None:
-        # Mutate an ABI contract function signature in security.c
-        corrupted_files = {
-            "fs/exec.c": _SAMPLE_EXEC,
-            "fs/open.c": _SAMPLE_OPEN,
-            "fs/stat.c": _SAMPLE_STAT,
-            "kernel/reboot.c": _SAMPLE_REBOOT,
-            "security/security.c": _SAMPLE_SECURITY_6_1 + "\nextern void ksu_bprm_check(void);\n",
-        }
-        corrupted_bundle = self.bundle_gki_6_1.with_updated_file(
-            "security/security.c",
-            _SAMPLE_SECURITY_6_1 + "\nextern void ksu_bprm_check(void);\n",
-        )
-        with self.assertRaises(HandlerABIConflict):
-            compose_profile(
-                "sultan-android14-6.1-lsm_bl",
-                target_bundle=corrupted_bundle,
-                patch_11=self.patch_11,
-                patch_51=self.patch_51_gki_6_1,
-                raise_on_failure=True,
-            )
 
     def test_neg_22_conflicting_duplicate_kconfig_assignment_fails(self) -> None:
         conflicting_text = """

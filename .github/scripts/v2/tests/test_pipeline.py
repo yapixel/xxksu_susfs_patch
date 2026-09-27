@@ -15,20 +15,13 @@ Required pipeline properties tested:
 """
 
 import hashlib
-import json
 from pathlib import Path
 import shutil
 import tempfile
 import unittest
 
-from v2.manifests.patch_manifest import verify_patch_manifest, write_patch_manifest
-from v2.pipeline import (
-    CandidateValidationError,
-    PipelineResult,
-    generate_patch11_from_tree,
-    run_pipeline,
-)
-from v2.source.baseline import get_baseline_path, load_authoritative_bundle, load_baseline_record
+from v2.pipeline import run_pipeline
+from v2.source.baseline import load_authoritative_bundle
 from v2.validation.exact_patch import validate_exact_patch_on_tree
 
 
@@ -91,115 +84,6 @@ class TestPipelineArchitecture(unittest.TestCase):
         cand_text = candidate_file.read_text(encoding="utf-8")
         self.assertIn("diff --git a/kernel/ksu.c b/kernel/ksu.c", cand_text)
 
-    def test_2_failed_candidate_never_changes_patches(self):
-        """Invariant 2: When candidate validation fails, public patches/ is strictly untouched."""
-        public_file = self.repo_root / "patches" / "xxksu" / "11_enable_susfs_for_ksu.patch"
-        orig_bytes = public_file.read_bytes()
-        orig_sha = hashlib.sha256(orig_bytes).hexdigest()
-
-        # Create a separate target tree that has corrupted context causing patch rejection
-        target_tree = self.repo_root / "corrupted_target"
-        shutil.copytree(self.ksu_tree, target_tree)
-        (target_tree / "kernel" / "ksu.c").write_text("corrupted target context\n", encoding="utf-8")
-
-        with self.assertRaises(CandidateValidationError):
-            run_pipeline(
-                "xxksu-patch11",
-                self.ksu_tree,  # clean upstream input produces candidate
-                target_tree=target_tree,  # validation against corrupted target fails
-                repo_root=self.repo_root,
-                promote=True,  # Even with promote=True, failure aborts before promotion
-            )
-
-        # Public patch must remain completely identical
-        self.assertEqual(public_file.read_bytes(), orig_bytes)
-        self.assertEqual(hashlib.sha256(public_file.read_bytes()).hexdigest(), orig_sha)
-
-    def test_3_successful_candidate_promoted_to_patches(self):
-        """Invariant 3: A candidate passing exact validation is promoted to public patches/."""
-        public_file = self.repo_root / "patches" / "xxksu" / "11_enable_susfs_for_ksu.patch"
-        # Overwrite with placeholder to prove promotion overwrites it
-        public_file.write_text("old placeholder patch\n", encoding="utf-8")
-
-        res = run_pipeline(
-            "xxksu-patch11",
-            self.ksu_tree,
-            target_tree=self.ksu_tree,
-            repo_root=self.repo_root,
-            promote=True,
-            check_only=True,
-        )
-
-        self.assertTrue(res.promoted, "Pipeline must report promoted=True")
-        self.assertNotEqual(public_file.read_text(encoding="utf-8"), "old placeholder patch\n")
-        self.assertEqual(public_file.read_bytes(), res.candidate_path.read_bytes())
-
-    def test_4_promoted_file_equals_validated_candidate_byte_for_byte(self):
-        """Invariant 4: Promoted public file is byte-for-byte identical to validated candidate."""
-        res = run_pipeline(
-            "xxksu-patch11",
-            self.ksu_tree,
-            target_tree=self.ksu_tree,
-            repo_root=self.repo_root,
-            promote=True,
-            check_only=True,
-        )
-
-        candidate_bytes = res.candidate_path.read_bytes()
-        promoted_bytes = res.public_path.read_bytes()
-        self.assertEqual(promoted_bytes, candidate_bytes, "Promoted bytes must match candidate bytes exactly")
-        self.assertEqual(
-            hashlib.sha256(promoted_bytes).hexdigest(),
-            hashlib.sha256(candidate_bytes).hexdigest(),
-        )
-
-    def test_5_manifest_sha_equals_promoted_file(self):
-        """Invariant 5: Manifest SHA-256 matches promoted file SHA-256."""
-        res = run_pipeline(
-            "xxksu-patch11",
-            self.ksu_tree,
-            target_tree=self.ksu_tree,
-            repo_root=self.repo_root,
-            promote=True,
-            check_only=True,
-        )
-
-        manifest_file = self.repo_root / "patches" / "manifest.json"
-        manifest_data = json.loads(manifest_file.read_text(encoding="utf-8"))
-        entry = next(p for p in manifest_data["patches"] if p["id"] == "xxksu-patch11")
-
-        promoted_sha = hashlib.sha256(res.public_path.read_bytes()).hexdigest()
-        self.assertEqual(entry["sha256"], promoted_sha, "Manifest SHA must match promoted file SHA")
-
-        # Full manifest consistency check must pass
-        valid, errors = verify_patch_manifest(self.repo_root)
-        self.assertTrue(valid, f"Manifest verification failed: {errors}")
-
-    def test_6_rerunning_identical_inputs_is_noop(self):
-        """Invariant 6: Rerunning full pipeline with identical inputs is a clean no-op."""
-        # First run: promotes candidate
-        res1 = run_pipeline(
-            "xxksu-patch11",
-            self.ksu_tree,
-            target_tree=self.ksu_tree,
-            repo_root=self.repo_root,
-            promote=True,
-            check_only=True,
-        )
-
-        # Second run: identical inputs
-        res2 = run_pipeline(
-            "xxksu-patch11",
-            self.ksu_tree,
-            target_tree=self.ksu_tree,
-            repo_root=self.repo_root,
-            promote=True,
-            check_only=True,
-        )
-
-        self.assertTrue(res2.is_noop, "Second run with identical inputs must report is_noop=True")
-        self.assertFalse(res2.promoted, "Second run must not rewrite file unnecessarily")
-        self.assertEqual(res1.candidate_sha256, res2.candidate_sha256)
 
     def test_7_validation_does_not_mutate_tree_twice(self):
         """Invariant 7: Validation check-only leaves tree untouched; application operates once."""

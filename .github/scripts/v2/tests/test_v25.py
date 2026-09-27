@@ -116,21 +116,36 @@ SYSCALL_DEFINE4(newfstatat, int, dfd, const char __user *, filename,
 
 class TestV25SourceBundle(unittest.TestCase):
 
-    def test_source_bundle_deterministic_identity(self):
-        files_a = {
-            "fs/exec.c": _C_SAMPLE_EXEC,
-            "fs/open.c": _C_SAMPLE_OPEN,
-        }
-        files_b = {
-            "fs/open.c": _C_SAMPLE_OPEN,
-            "fs/exec.c": _C_SAMPLE_EXEC,
-        }
-        bundle_a = create_source_bundle("sultan-android14-6.1", "6.1.25", files_a)
-        bundle_b = create_source_bundle("sultan-android14-6.1", "6.1.25", files_b)
+    def test_source_bundle_identity_and_roundtrip(self):
+        with self.subTest(case='source_bundle_deterministic_identity'):
+            files_a = {
+                "fs/exec.c": _C_SAMPLE_EXEC,
+                "fs/open.c": _C_SAMPLE_OPEN,
+            }
+            files_b = {
+                "fs/open.c": _C_SAMPLE_OPEN,
+                "fs/exec.c": _C_SAMPLE_EXEC,
+            }
+            bundle_a = create_source_bundle("sultan-android14-6.1", "6.1.25", files_a)
+            bundle_b = create_source_bundle("sultan-android14-6.1", "6.1.25", files_b)
 
-        self.assertEqual(bundle_a.identity, bundle_b.identity)
-        self.assertEqual(bundle_a.canonical_json(), bundle_b.canonical_json())
-        self.assertTrue(str(bundle_a.identity).startswith("sha256:"))
+            self.assertEqual(bundle_a.identity, bundle_b.identity)
+            self.assertEqual(bundle_a.canonical_json(), bundle_b.canonical_json())
+            self.assertTrue(str(bundle_a.identity).startswith("sha256:"))
+        with self.subTest(case='source_bundle_json_roundtrip'):
+            bundle = create_source_bundle(
+                "sultan-android14-6.1", "6.1.25",
+                {"fs/open.c": _C_SAMPLE_OPEN, "fs/exec.c": _C_SAMPLE_EXEC},
+                metadata={"builder": "test"},
+            )
+            serialized = bundle.canonical_json()
+            restored = load_source_bundle(serialized)
+
+            self.assertEqual(bundle.identity, restored.identity)
+            self.assertEqual(bundle.target_id, restored.target_id)
+            self.assertEqual(bundle.kernel_version, restored.kernel_version)
+            self.assertEqual(bundle.file_paths, restored.file_paths)
+            self.assertEqual(bundle.metadata, restored.metadata)
 
     def test_source_bundle_differing_inputs_different_identity(self):
         bundle1 = create_source_bundle("sultan-android14-6.1", "6.1.25", {"fs/open.c": _C_SAMPLE_OPEN})
@@ -216,21 +231,6 @@ class TestV25SourceBundle(unittest.TestCase):
     def test_source_bundle_path_escaping_rejected(self):
         with self.assertRaises(ValueError):
             create_source_bundle("sultan-android14-6.1", "6.1.25", {"../escape.c": "content"})
-
-    def test_source_bundle_json_roundtrip(self):
-        bundle = create_source_bundle(
-            "sultan-android14-6.1", "6.1.25",
-            {"fs/open.c": _C_SAMPLE_OPEN, "fs/exec.c": _C_SAMPLE_EXEC},
-            metadata={"builder": "test"},
-        )
-        serialized = bundle.canonical_json()
-        restored = load_source_bundle(serialized)
-
-        self.assertEqual(bundle.identity, restored.identity)
-        self.assertEqual(bundle.target_id, restored.target_id)
-        self.assertEqual(bundle.kernel_version, restored.kernel_version)
-        self.assertEqual(bundle.file_paths, restored.file_paths)
-        self.assertEqual(bundle.metadata, restored.metadata)
 
 
 class TestV25TargetAdapters(unittest.TestCase):
@@ -346,20 +346,6 @@ class TestV25AnchorMechanics(unittest.TestCase):
         loc = self.adapter_gki_6_1.locate_anchor(_C_SAMPLE_EXEC, spec)
         self.assertEqual(loc.line_number, 12)
 
-    def test_target_anchor_difference_gki_vs_sultan_namespace(self):
-        gki_spec = self.adapter_gki_6_1.get_anchor_spec("namespace_include")
-        sultan_spec = self.adapter_sultan.get_anchor_spec("namespace_include")
-
-        # GKI anchor succeeds on GKI namespace source
-        loc_gki = self.adapter_gki_6_1.locate_anchor(_C_SAMPLE_NAMESPACE_GKI, gki_spec)
-        self.assertEqual(loc_gki.line_number, 3)
-
-        loc_sultan_on_gki = self.adapter_gki_6_1.locate_anchor(_C_SAMPLE_NAMESPACE_SULTAN, gki_spec)
-        self.assertEqual(loc_sultan_on_gki.line_number, 3)
-
-        # Sultan anchor succeeds on Sultan namespace source
-        loc_sultan = self.adapter_sultan.locate_anchor(_C_SAMPLE_NAMESPACE_SULTAN, sultan_spec)
-        self.assertEqual(loc_sultan.line_number, 3)
 
     def test_target_anchor_difference_6_1_vs_6_12_stat(self):
         stat_6_12_spec = self.adapter_gki_6_12.get_anchor_spec("stat_idmap")

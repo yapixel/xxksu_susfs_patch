@@ -29,55 +29,56 @@ STATE_FILE = REPO_ROOT / ".github" / "upstream-state.json"
 
 
 class WatchModelTests(unittest.TestCase):
-    def test_all_classifications_present(self):
-        expected = {
-            "NO_CHANGE",
-            "IRRELEVANT_CHANGE",
-            "SAFE_REGEN_CANDIDATE",
-            "SEMANTIC_DRIFT",
-            "ANCHOR_DRIFT",
-            "REFERENCE_DRIFT",
-            "SOURCE_IDENTITY_ERROR",
-        }
-        actual = {c.value for c in WatchClassification}
-        self.assertEqual(actual, expected)
+    def test_classification_escalation_contract(self):
+        with self.subTest(case='all_classifications_present'):
+            expected = {
+                "NO_CHANGE",
+                "IRRELEVANT_CHANGE",
+                "SAFE_REGEN_CANDIDATE",
+                "SEMANTIC_DRIFT",
+                "ANCHOR_DRIFT",
+                "REFERENCE_DRIFT",
+                "SOURCE_IDENTITY_ERROR",
+            }
+            actual = {c.value for c in WatchClassification}
+            self.assertEqual(actual, expected)
+        with self.subTest(case='escalation_predicate'):
+            failing = [
+                WatchClassification.SEMANTIC_DRIFT,
+                WatchClassification.ANCHOR_DRIFT,
+                WatchClassification.SOURCE_IDENTITY_ERROR,
+            ]
+            non_failing = [
+                WatchClassification.NO_CHANGE,
+                WatchClassification.IRRELEVANT_CHANGE,
+                WatchClassification.SAFE_REGEN_CANDIDATE,
+                WatchClassification.REFERENCE_DRIFT,
+            ]
 
-    def test_escalation_predicate(self):
-        failing = [
-            WatchClassification.SEMANTIC_DRIFT,
-            WatchClassification.ANCHOR_DRIFT,
-            WatchClassification.SOURCE_IDENTITY_ERROR,
-        ]
-        non_failing = [
-            WatchClassification.NO_CHANGE,
-            WatchClassification.IRRELEVANT_CHANGE,
-            WatchClassification.SAFE_REGEN_CANDIDATE,
-            WatchClassification.REFERENCE_DRIFT,
-        ]
+            for c in failing:
+                res = SourceResult(
+                    source_id="test",
+                    source_type="authoritative",
+                    classification=c,
+                    old_identity="1",
+                    new_identity="2",
+                    old_content_hash="h1",
+                    new_content_hash="h2",
+                )
+                self.assertTrue(res.requires_escalation(), f"Expected escalation for {c}")
 
-        for c in failing:
-            res = SourceResult(
-                source_id="test",
-                source_type="authoritative",
-                classification=c,
-                old_identity="1",
-                new_identity="2",
-                old_content_hash="h1",
-                new_content_hash="h2",
-            )
-            self.assertTrue(res.requires_escalation(), f"Expected escalation for {c}")
+            for c in non_failing:
+                res = SourceResult(
+                    source_id="test",
+                    source_type="authoritative",
+                    classification=c,
+                    old_identity="1",
+                    new_identity="2",
+                    old_content_hash="h1",
+                    new_content_hash="h2",
+                )
+                self.assertFalse(res.requires_escalation(), f"Expected no escalation for {c}")
 
-        for c in non_failing:
-            res = SourceResult(
-                source_id="test",
-                source_type="authoritative",
-                classification=c,
-                old_identity="1",
-                new_identity="2",
-                old_content_hash="h1",
-                new_content_hash="h2",
-            )
-            self.assertFalse(res.requires_escalation(), f"Expected no escalation for {c}")
 
     def test_composite_hash_deterministic(self):
         map1 = {"b.c": "sha256:222", "a.c": "sha256:111"}

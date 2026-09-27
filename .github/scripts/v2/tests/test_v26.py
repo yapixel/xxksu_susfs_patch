@@ -142,54 +142,30 @@ def _make_clean_bundle(target_id="sultan-android14-6.1", version="6.1.25"):
 class TestV26FixtureAdaptation(unittest.TestCase):
 
     def setUp(self):
-        self.adapter_gki_6_1 = get_adapter("sultan-android14-6.1")
-        self.adapter_gki_6_12 = get_adapter("gki-android16-6.12")
         self.adapter_sultan = get_adapter("sultan-android14-6.1")
-        self.bundle_gki_6_1 = _make_clean_bundle("sultan-android14-6.1", "6.1.25")
-        self.bundle_gki_6_12 = _make_clean_bundle("gki-android16-6.12", "6.12.0")
+        self.adapter_sultan2 = get_adapter("gki-android16-6.12")
         self.bundle_sultan = _make_clean_bundle("sultan-android14-6.1", "6.1.25")
+        self.bundle_sultan2 = _make_clean_bundle("gki-android16-6.12", "6.12.0")
 
-    def test_expected_13_operations_total_on_gki_6_1(self):
-        plan = self.adapter_gki_6_1.adapt_fixtures(self.bundle_gki_6_1)
-        self.assertEqual(plan.operation_count, 13)
-
-        scope_min_ops = [op for op in plan.operations if op.fixture_name == FIXED_FIXTURES[0]]
-        self.assertEqual(len(scope_min_ops), 7)
-
-        manual_sec_ops = [op for op in plan.operations if op.fixture_name == FIXED_FIXTURES[1]]
-        self.assertEqual(len(manual_sec_ops), 6)
-
+    def test_target_fixture_adaptation_matrix(self):
         expected_ids = {
-            "manual.scope_min.exec",
-            "manual.scope_min.access",
-            "manual.scope_min.stat",
-            "manual.scope_min.newfstat_ret",
-            "manual.scope_min.fstat64_ret",
-            "manual.scope_min.fstatat64",
-            "manual.scope_min.reboot",
-            "manual.security.decl",
-            "manual.security.bprm",
-            "manual.security.rename",
-            "manual.security.file_permission",
-            "manual.security.setuid",
+            "manual.scope_min.exec", "manual.scope_min.access", "manual.scope_min.stat",
+            "manual.scope_min.newfstat_ret", "manual.scope_min.fstat64_ret", "manual.scope_min.fstatat64",
+            "manual.scope_min.reboot", "manual.security.decl", "manual.security.bprm",
+            "manual.security.rename", "manual.security.file_permission", "manual.security.setuid",
             "manual.security.setprocattr",
         }
-        self.assertEqual({op.operation_id for op in plan.operations}, expected_ids)
+        for adapter, bundle in ((self.adapter_sultan, self.bundle_sultan), (self.adapter_sultan2, self.bundle_sultan2)):
+            with self.subTest(target=bundle.target_id):
+                plan = adapter.adapt_fixtures(bundle)
+                self.assertEqual({op.operation_id for op in plan.operations}, expected_ids)
+                self.assertEqual(plan.canonical_json(), adapter.adapt_fixtures(bundle).canonical_json())
+                self.assertEqual(plan.identity, adapter.adapt_fixtures(bundle).identity)
+                for fixture, count in zip(FIXED_FIXTURES, (7, 6)):
+                    partial = adapter.adapt_fixture(bundle, fixture)
+                    self.assertEqual(len(partial), count)
+                    self.assertEqual([op for op in plan.operations if op.fixture_name == fixture], list(partial))
 
-    def test_adaptation_model_on_gki_6_12(self):
-        plan = self.adapter_gki_6_12.adapt_fixtures(self.bundle_gki_6_12)
-        self.assertEqual(plan.operation_count, 13)
-
-    def test_adaptation_model_on_sultan_6_1(self):
-        plan = self.adapter_sultan.adapt_fixtures(self.bundle_sultan)
-        self.assertEqual(plan.operation_count, 13)
-
-    def test_adaptation_is_deterministic(self):
-        plan1 = self.adapter_gki_6_1.adapt_fixtures(self.bundle_gki_6_1)
-        plan2 = self.adapter_gki_6_1.adapt_fixtures(self.bundle_gki_6_1)
-
-        self.assertEqual(plan1.identity, plan2.identity)
-        self.assertEqual(plan1.canonical_json(), plan2.canonical_json())
 
     def test_missing_source_fails_closed(self):
         # Bundle missing fs/exec.c
@@ -204,7 +180,7 @@ class TestV26FixtureAdaptation(unittest.TestCase):
             },
         )
         with self.assertRaises(MissingFixtureSource):
-            self.adapter_gki_6_1.adapt_fixtures(incomplete_bundle)
+            self.adapter_sultan.adapt_fixtures(incomplete_bundle)
 
     def test_missing_anchor_in_source_fails_closed(self):
         # fs/open.c without do_faccessat anchor
@@ -220,7 +196,7 @@ class TestV26FixtureAdaptation(unittest.TestCase):
             },
         )
         with self.assertRaises(MissingFixtureSource):
-            self.adapter_gki_6_1.adapt_fixtures(altered_bundle)
+            self.adapter_sultan.adapt_fixtures(altered_bundle)
 
     def test_ambiguous_anchor_in_source_fails_closed(self):
         # Duplicate anchor in do_execveat_common
@@ -240,30 +216,30 @@ class TestV26FixtureAdaptation(unittest.TestCase):
             },
         )
         with self.assertRaises(AmbiguousFixtureMatch):
-            self.adapter_gki_6_1.adapt_fixtures(ambiguous_bundle)
+            self.adapter_sultan.adapt_fixtures(ambiguous_bundle)
 
     def test_duplicate_operation_fails_closed(self):
-        plan = self.adapter_gki_6_1.adapt_fixtures(self.bundle_gki_6_1)
+        plan = self.adapter_sultan.adapt_fixtures(self.bundle_sultan)
         first_op = plan.operations[0]
         with self.assertRaises(DuplicateAdaptationOperation):
             FixtureAdaptationPlan(
                 target_id="sultan-android14-6.1",
-                bundle_identity=str(self.bundle_gki_6_1.identity),
+                bundle_identity=str(self.bundle_sultan.identity),
                 operations=(first_op, first_op),
             )
 
     def test_incompatible_fixture_name_fails_closed(self):
         with self.assertRaises(IncompatibleFixtureTarget):
-            self.adapter_gki_6_1.adapt_fixtures(self.bundle_gki_6_1, ("unsupported-fixture.patch",))
+            self.adapter_sultan.adapt_fixtures(self.bundle_sultan, ("unsupported-fixture.patch",))
 
     def test_bundle_target_incompatibility_fails_closed(self):
         # Pass 6.12 bundle to 6.1 adapter
         with self.assertRaises(UnsupportedTarget):
-            self.adapter_gki_6_1.adapt_fixtures(self.bundle_gki_6_12)
+            self.adapter_sultan.adapt_fixtures(self.bundle_sultan2)
 
     def test_apply_plan_to_bundle(self):
-        plan = self.adapter_gki_6_1.adapt_fixtures(self.bundle_gki_6_1)
-        adapted_bundle = plan.apply_to_bundle(self.bundle_gki_6_1)
+        plan = self.adapter_sultan.adapt_fixtures(self.bundle_sultan)
+        adapted_bundle = plan.apply_to_bundle(self.bundle_sultan)
 
         # Check that mutations occurred in bundle files
         exec_file = adapted_bundle.get_file("fs/exec.c")
@@ -289,16 +265,8 @@ class TestV26FixtureAdaptation(unittest.TestCase):
         self.assertIn("ksu_hide_setprocattr(name", sec_file.content)
 
         # Confirm new bundle has valid, updated SHA-256 identity
-        self.assertNotEqual(adapted_bundle.identity, self.bundle_gki_6_1.identity)
+        self.assertNotEqual(adapted_bundle.identity, self.bundle_sultan.identity)
         self.assertTrue(adapted_bundle.verify_file("fs/exec.c", exec_file.content))
-
-    def test_individual_fixture_adaptation(self):
-        # Test adapt_fixture for each fixture separately
-        scope_ops = self.adapter_gki_6_1.adapt_fixture(self.bundle_gki_6_1, FIXED_FIXTURES[0])
-        self.assertEqual(len(scope_ops), 7)
-
-        sec_ops = self.adapter_gki_6_1.adapt_fixture(self.bundle_gki_6_1, FIXED_FIXTURES[1])
-        self.assertEqual(len(sec_ops), 6)
 
 
 if __name__ == "__main__":

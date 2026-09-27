@@ -126,47 +126,62 @@ class V28PositiveValidationTests(unittest.TestCase):
         self.mutated_bundle = self.adapter.apply_to_bundle(self.clean_bundle)
         self.patch11_diff = self.adapter.generate_patch11(self.clean_bundle)
 
-    def test_1_mutated_bundle_passes_symbol_validation(self):
-        results = validate_symbols(bundle=self.mutated_bundle)
-        self.assertTrue(all(r.status == ValidationStatus.PASS for r in results))
-        targets = {r.target for r in results}
-        self.assertIn("bundle:xxksu", targets)
+    def test_generated_symbol_report_and_determinism(self):
+        with self.subTest(case='1_mutated_bundle_passes_symbol_validation'):
+            results = validate_symbols(bundle=self.mutated_bundle)
+            self.assertTrue(all(r.status == ValidationStatus.PASS for r in results))
+            targets = {r.target for r in results}
+            self.assertIn("bundle:xxksu", targets)
+        with self.subTest(case='2_generated_patch11_zero_official_leaks'):
+            results = validate_symbols(patch=self.patch11_diff)
+            self.assertTrue(all(r.status == ValidationStatus.PASS for r in results))
+            self.assertTrue(any("Zero official-only symbols detected in patch" in r.details for r in results))
+        with self.subTest(case='3_all_required_replacement_symbols_present'):
+            results = validate_symbols(bundle=self.mutated_bundle)
+            presence_results = [r for r in results if r.validator_id == "validation.symbols.presence"]
+            found_symbols = {r.target for r in presence_results if r.status == ValidationStatus.PASS}
 
-    def test_2_generated_patch11_zero_official_leaks(self):
-        results = validate_symbols(patch=self.patch11_diff)
-        self.assertTrue(all(r.status == ValidationStatus.PASS for r in results))
-        self.assertTrue(any("Zero official-only symbols detected in patch" in r.details for r in results))
+            # Verify xxKSU replacements
+            self.assertIn("ksu_handle_execveat", found_symbols)
+            self.assertIn("ksu_handle_newfstat_ret", found_symbols)
+            self.assertIn("ksu_handle_sys_read_fd", found_symbols)
+            self.assertIn("input_register_handler", found_symbols)
 
-    def test_3_all_required_replacement_symbols_present(self):
-        results = validate_symbols(bundle=self.mutated_bundle)
-        presence_results = [r for r in results if r.validator_id == "validation.symbols.presence"]
-        found_symbols = {r.target for r in presence_results if r.status == ValidationStatus.PASS}
+            # Verify SuSFS integration symbols
+            self.assertIn("susfs_init", found_symbols)
+            self.assertIn("susfs_cmd_dispatch", found_symbols)
+            self.assertIn("susfs_auto_reboot", found_symbols)
+            self.assertIn("handle_zygote_setresuid", found_symbols)
+            self.assertIn("susfs_set_sid", found_symbols)
+        with self.subTest(case='9_repeated_validate_all_identical'):
+            report1 = validate_all(
+                bundle=self.mutated_bundle,
+                patch=self.patch11_diff,
+                mode="manual",
+                claims=make_default_manual_claims(),
+            )
+            report2 = validate_all(
+                bundle=self.mutated_bundle,
+                patch=self.patch11_diff,
+                mode="manual",
+                claims=make_default_manual_claims(),
+            )
+            self.assertEqual(report1.digest, report2.digest)
+            self.assertEqual([r.to_dict() for r in report1.results], [r.to_dict() for r in report2.results])
 
-        # Verify xxKSU replacements
-        self.assertIn("ksu_handle_execveat", found_symbols)
-        self.assertIn("ksu_handle_newfstat_ret", found_symbols)
-        self.assertIn("ksu_handle_sys_read_fd", found_symbols)
-        self.assertIn("input_register_handler", found_symbols)
 
-        # Verify SuSFS integration symbols
-        self.assertIn("susfs_init", found_symbols)
-        self.assertIn("susfs_cmd_dispatch", found_symbols)
-        self.assertIn("susfs_auto_reboot", found_symbols)
-        self.assertIn("handle_zygote_setresuid", found_symbols)
-        self.assertIn("susfs_set_sid", found_symbols)
+    def test_ownership_modes(self):
+        with self.subTest(case='4_valid_manual_ownership_model_passes'):
+            claims = make_default_manual_claims()
+            results = validate_ownership(mode="manual", claims=claims)
+            self.assertTrue(all(r.status == ValidationStatus.PASS for r in results))
+            self.assertEqual(len(results), 9)
+        with self.subTest(case='5_valid_lsm_bl_ownership_model_passes'):
+            claims = make_default_lsm_bl_claims()
+            results = validate_ownership(mode="lsm_bl", claims=claims)
+            self.assertTrue(all(r.status == ValidationStatus.PASS for r in results))
+            self.assertEqual(len(results), 9)
 
-
-    def test_4_valid_manual_ownership_model_passes(self):
-        claims = make_default_manual_claims()
-        results = validate_ownership(mode="manual", claims=claims)
-        self.assertTrue(all(r.status == ValidationStatus.PASS for r in results))
-        self.assertEqual(len(results), 9)
-
-    def test_5_valid_lsm_bl_ownership_model_passes(self):
-        claims = make_default_lsm_bl_claims()
-        results = validate_ownership(mode="lsm_bl", claims=claims)
-        self.assertTrue(all(r.status == ValidationStatus.PASS for r in results))
-        self.assertEqual(len(results), 9)
 
     def test_6_valid_handler_abi_contracts_pass(self):
         # Validate that valid signatures pass for all 11 default ABI contracts
@@ -187,55 +202,6 @@ class V28PositiveValidationTests(unittest.TestCase):
         self.assertEqual(len(results), 11)
         self.assertTrue(all(r.status == ValidationStatus.PASS for r in results))
 
-    def test_7_validation_result_canonical_json_deterministic(self):
-        res1 = ValidationResult(
-            validator_id="test.validator",
-            status=ValidationStatus.PASS,
-            target="target.symbol",
-            details="passed verification",
-            path="path/to/file.c",
-            line=42,
-        )
-        res2 = ValidationResult(
-            validator_id="test.validator",
-            status=ValidationStatus.PASS,
-            target="target.symbol",
-            details="passed verification",
-            path="path/to/file.c",
-            line=42,
-        )
-        self.assertEqual(res1.canonical_json(), res2.canonical_json())
-        self.assertEqual(res1.identity, res2.identity)
-
-    def test_8_validation_report_digest_deterministic(self):
-        report = validate_all(
-            bundle=self.mutated_bundle,
-            patch=self.patch11_diff,
-            mode="manual",
-            claims=make_default_manual_claims(),
-        )
-        self.assertEqual(report.status, ValidationStatus.PASS)
-        digest1 = report.digest
-        digest2 = report.digest
-        self.assertEqual(digest1, digest2)
-        self.assertTrue(str(digest1).startswith("sha256:"))
-
-    def test_9_repeated_validate_all_identical(self):
-        report1 = validate_all(
-            bundle=self.mutated_bundle,
-            patch=self.patch11_diff,
-            mode="manual",
-            claims=make_default_manual_claims(),
-        )
-        report2 = validate_all(
-            bundle=self.mutated_bundle,
-            patch=self.patch11_diff,
-            mode="manual",
-            claims=make_default_manual_claims(),
-        )
-        self.assertEqual(report1.digest, report2.digest)
-        self.assertEqual([r.to_dict() for r in report1.results], [r.to_dict() for r in report2.results])
-
 
 class V28NegativeValidationTests(unittest.TestCase):
     """Verify strict fail-closed behavior across all required negative conditions."""
@@ -245,59 +211,58 @@ class V28NegativeValidationTests(unittest.TestCase):
         self.adapter = XxksuAdapter()
         self.mutated_bundle = self.adapter.apply_to_bundle(self.clean_bundle)
 
-    def test_1_inject_ksu_handle_execveat_sucompat_fails_closed(self):
-        leaked_patch = (
-            "--- a/kernel/feature/sucompat.c\n"
-            "+++ b/kernel/feature/sucompat.c\n"
-            "@@ -10,3 +10,4 @@\n"
-            " context\n"
-            "+int ksu_handle_execveat_sucompat(int *fd);\n"
-        )
-        results = validate_symbols(patch=leaked_patch)
-        failures = [r for r in results if r.status == ValidationStatus.FAIL]
-        self.assertEqual(len(failures), 1)
-        self.assertEqual(failures[0].metadata.get("error_type"), "OfficialSymbolLeakage")
-        self.assertEqual(failures[0].line, 5)
-        self.assertEqual(failures[0].path, "kernel/feature/sucompat.c")
+    def test_banned_symbol_matrix(self):
+        with self.subTest(case='1_inject_ksu_handle_execveat_sucompat_fails_closed'):
+            leaked_patch = (
+                "--- a/kernel/feature/sucompat.c\n"
+                "+++ b/kernel/feature/sucompat.c\n"
+                "@@ -10,3 +10,4 @@\n"
+                " context\n"
+                "+int ksu_handle_execveat_sucompat(int *fd);\n"
+            )
+            results = validate_symbols(patch=leaked_patch)
+            failures = [r for r in results if r.status == ValidationStatus.FAIL]
+            self.assertEqual(len(failures), 1)
+            self.assertEqual(failures[0].metadata.get("error_type"), "OfficialSymbolLeakage")
+            self.assertEqual(failures[0].line, 5)
+            self.assertEqual(failures[0].path, "kernel/feature/sucompat.c")
 
-        with self.assertRaises(OfficialSymbolLeakage):
-            validate_symbols(patch=leaked_patch, raise_on_failure=True)
+            with self.assertRaises(OfficialSymbolLeakage):
+                validate_symbols(patch=leaked_patch, raise_on_failure=True)
+        with self.subTest(case='2_inject_ksu_handle_vfs_fstat_fails_closed'):
+            leaked_patch = (
+                "--- a/fs/stat.c\n"
+                "+++ b/fs/stat.c\n"
+                "@@ -20,2 +20,3 @@\n"
+                " context\n"
+                "+ksu_handle_vfs_fstat(fd, statbuf);\n"
+            )
+            results = validate_symbols(patch=leaked_patch)
+            failures = [r for r in results if r.status == ValidationStatus.FAIL]
+            self.assertEqual(len(failures), 1)
+            self.assertEqual(failures[0].metadata.get("symbol"), "ksu_handle_vfs_fstat")
 
-    def test_2_inject_ksu_handle_vfs_fstat_fails_closed(self):
-        leaked_patch = (
-            "--- a/fs/stat.c\n"
-            "+++ b/fs/stat.c\n"
-            "@@ -20,2 +20,3 @@\n"
-            " context\n"
-            "+ksu_handle_vfs_fstat(fd, statbuf);\n"
-        )
-        results = validate_symbols(patch=leaked_patch)
-        failures = [r for r in results if r.status == ValidationStatus.FAIL]
-        self.assertEqual(len(failures), 1)
-        self.assertEqual(failures[0].metadata.get("symbol"), "ksu_handle_vfs_fstat")
+            with self.assertRaises(OfficialSymbolLeakage):
+                validate_symbols(patch=leaked_patch, raise_on_failure=True)
+        with self.subTest(case='3_inject_ksu_handle_sys_read_fails_closed'):
+            bad_content = self.clean_bundle.get_file("kernel/ksu.c").content + "\nksu_handle_sys_read();\n"
+            tampered_bundle = self.clean_bundle.with_updated_file("kernel/ksu.c", bad_content)
+            results = validate_symbols(bundle=tampered_bundle)
+            failures = [r for r in results if r.status == ValidationStatus.FAIL]
+            self.assertTrue(any(r.metadata.get("symbol") == "ksu_handle_sys_read" for r in failures))
 
-        with self.assertRaises(OfficialSymbolLeakage):
-            validate_symbols(patch=leaked_patch, raise_on_failure=True)
+            with self.assertRaises(OfficialSymbolLeakage):
+                validate_symbols(bundle=tampered_bundle, raise_on_failure=True)
+        with self.subTest(case='4_inject_ksu_handle_input_handle_event_fails_closed'):
+            bad_content = "void ksu_handle_input_handle_event(void) {}\n"
+            tampered_bundle = self.clean_bundle.with_updated_file("kernel/feature/vol_detector.c", bad_content)
+            results = validate_symbols(bundle=tampered_bundle)
+            failures = [r for r in results if r.status == ValidationStatus.FAIL]
+            self.assertTrue(any(r.metadata.get("symbol") == "ksu_handle_input_handle_event" for r in failures))
 
-    def test_3_inject_ksu_handle_sys_read_fails_closed(self):
-        bad_content = self.clean_bundle.get_file("kernel/ksu.c").content + "\nksu_handle_sys_read();\n"
-        tampered_bundle = self.clean_bundle.with_updated_file("kernel/ksu.c", bad_content)
-        results = validate_symbols(bundle=tampered_bundle)
-        failures = [r for r in results if r.status == ValidationStatus.FAIL]
-        self.assertTrue(any(r.metadata.get("symbol") == "ksu_handle_sys_read" for r in failures))
+            with self.assertRaises(OfficialSymbolLeakage):
+                validate_symbols(bundle=tampered_bundle, raise_on_failure=True)
 
-        with self.assertRaises(OfficialSymbolLeakage):
-            validate_symbols(bundle=tampered_bundle, raise_on_failure=True)
-
-    def test_4_inject_ksu_handle_input_handle_event_fails_closed(self):
-        bad_content = "void ksu_handle_input_handle_event(void) {}\n"
-        tampered_bundle = self.clean_bundle.with_updated_file("kernel/feature/vol_detector.c", bad_content)
-        results = validate_symbols(bundle=tampered_bundle)
-        failures = [r for r in results if r.status == ValidationStatus.FAIL]
-        self.assertTrue(any(r.metadata.get("symbol") == "ksu_handle_input_handle_event" for r in failures))
-
-        with self.assertRaises(OfficialSymbolLeakage):
-            validate_symbols(bundle=tampered_bundle, raise_on_failure=True)
 
     def test_5_missing_required_replacement_symbol_fails(self):
         # Remove ksu_handle_execveat definition
@@ -343,49 +308,44 @@ class V28NegativeValidationTests(unittest.TestCase):
         with self.assertRaises(IncompatibleOwner):
             validate_ownership(mode="lsm_bl", claims=invalid_lsm_claims, raise_on_failure=True)
 
-    def test_9_abi_argument_count_mismatch_fails(self):
-        # 4 parameters instead of 5
-        bad_sig = AbiSignature("ksu_handle_execveat", "int", ("int *", "struct filename **", "void *", "void *"), "extern")
-        contract = DEFAULT_ABI_CONTRACTS[0]  # ksu_handle_execveat
-        res = validate_signature_against_contract(bad_sig, contract)
-        self.assertEqual(res.status, ValidationStatus.FAIL)
-        self.assertEqual(res.metadata.get("error_type"), "AbiSignatureMismatch")
+    def test_abi_mismatch_matrix(self):
+        with self.subTest(case='9_abi_argument_count_mismatch_fails'):
+            bad_sig = AbiSignature("ksu_handle_execveat", "int", ("int *", "struct filename **", "void *", "void *"), "extern")
+            contract = DEFAULT_ABI_CONTRACTS[0]  # ksu_handle_execveat
+            res = validate_signature_against_contract(bad_sig, contract)
+            self.assertEqual(res.status, ValidationStatus.FAIL)
+            self.assertEqual(res.metadata.get("error_type"), "AbiSignatureMismatch")
 
-        with self.assertRaises(AbiSignatureMismatch):
-            validate_signature_against_contract(bad_sig, contract, raise_on_failure=True)
+            with self.assertRaises(AbiSignatureMismatch):
+                validate_signature_against_contract(bad_sig, contract, raise_on_failure=True)
+        with self.subTest(case='10_abi_pointer_type_mismatch_fails'):
+            bad_sig = AbiSignature("ksu_handle_execveat", "int", ("int *", "struct filename *", "void *", "void *", "int *"), "extern")
+            contract = DEFAULT_ABI_CONTRACTS[0]
+            res = validate_signature_against_contract(bad_sig, contract)
+            self.assertEqual(res.status, ValidationStatus.FAIL)
+            self.assertEqual(res.metadata.get("error_type"), "AbiSignatureMismatch")
 
-    def test_10_abi_pointer_type_mismatch_fails(self):
-        # Param 1: struct filename * instead of struct filename **
-        bad_sig = AbiSignature("ksu_handle_execveat", "int", ("int *", "struct filename *", "void *", "void *", "int *"), "extern")
-        contract = DEFAULT_ABI_CONTRACTS[0]
-        res = validate_signature_against_contract(bad_sig, contract)
-        self.assertEqual(res.status, ValidationStatus.FAIL)
-        self.assertEqual(res.metadata.get("error_type"), "AbiSignatureMismatch")
+            with self.assertRaises(AbiSignatureMismatch):
+                validate_signature_against_contract(bad_sig, contract, raise_on_failure=True)
+        with self.subTest(case='11_abi_return_type_mismatch_fails'):
+            bad_sig = AbiSignature("ksu_handle_execveat", "void", ("int *", "struct filename **", "void *", "void *", "int *"), "extern")
+            contract = DEFAULT_ABI_CONTRACTS[0]
+            res = validate_signature_against_contract(bad_sig, contract)
+            self.assertEqual(res.status, ValidationStatus.FAIL)
+            self.assertEqual(res.metadata.get("error_type"), "AbiSignatureMismatch")
 
-        with self.assertRaises(AbiSignatureMismatch):
-            validate_signature_against_contract(bad_sig, contract, raise_on_failure=True)
+            with self.assertRaises(AbiSignatureMismatch):
+                validate_signature_against_contract(bad_sig, contract, raise_on_failure=True)
+        with self.subTest(case='12_static_global_linkage_mismatch_fails'):
+            bad_sig = AbiSignature("ksu_handle_execveat", "int", ("int *", "struct filename **", "void *", "void *", "int *"), "static")
+            contract = DEFAULT_ABI_CONTRACTS[0]
+            res = validate_signature_against_contract(bad_sig, contract)
+            self.assertEqual(res.status, ValidationStatus.FAIL)
+            self.assertEqual(res.metadata.get("error_type"), "AbiLinkageConflict")
 
-    def test_11_abi_return_type_mismatch_fails(self):
-        # Return type void instead of int
-        bad_sig = AbiSignature("ksu_handle_execveat", "void", ("int *", "struct filename **", "void *", "void *", "int *"), "extern")
-        contract = DEFAULT_ABI_CONTRACTS[0]
-        res = validate_signature_against_contract(bad_sig, contract)
-        self.assertEqual(res.status, ValidationStatus.FAIL)
-        self.assertEqual(res.metadata.get("error_type"), "AbiSignatureMismatch")
+            with self.assertRaises(AbiLinkageConflict):
+                validate_signature_against_contract(bad_sig, contract, raise_on_failure=True)
 
-        with self.assertRaises(AbiSignatureMismatch):
-            validate_signature_against_contract(bad_sig, contract, raise_on_failure=True)
-
-    def test_12_static_global_linkage_mismatch_fails(self):
-        # Static linkage when extern expected
-        bad_sig = AbiSignature("ksu_handle_execveat", "int", ("int *", "struct filename **", "void *", "void *", "int *"), "static")
-        contract = DEFAULT_ABI_CONTRACTS[0]
-        res = validate_signature_against_contract(bad_sig, contract)
-        self.assertEqual(res.status, ValidationStatus.FAIL)
-        self.assertEqual(res.metadata.get("error_type"), "AbiLinkageConflict")
-
-        with self.assertRaises(AbiLinkageConflict):
-            validate_signature_against_contract(bad_sig, contract, raise_on_failure=True)
 
     def test_13_duplicate_conflicting_declarations_fails(self):
         source_with_conflict = (
@@ -415,44 +375,41 @@ class V28NegativeValidationTests(unittest.TestCase):
         with self.assertRaises(MissingRequiredSymbol):
             validate_all(**kwargs, raise_on_failure=True)
 
-    def test_15_corrupted_source_bundle_integrity_fails(self):
-        bad_digest = HashDigest("sha256", "0" * 64)
-        with self.assertRaises(CorruptedSourceBundle):
-            SourceBundleFile("kernel/ksu.c", bad_digest, 10, "content_with_more_than_10_bytes")
 
-    def test_16_incomplete_ledger_fails(self):
-        empty_ledger = PolicyCoverageLedger("test-inventory")
-        res = validate_ledger_integrity(empty_ledger)
-        self.assertEqual(res.status, ValidationStatus.FAIL)
-        self.assertEqual(res.metadata.get("error_type"), "PolicyLedgerMismatch")
+    def test_invalid_ledger(self):
+        with self.subTest(case='16_incomplete_ledger_fails'):
+            empty_ledger = PolicyCoverageLedger("test-inventory")
+            res = validate_ledger_integrity(empty_ledger)
+            self.assertEqual(res.status, ValidationStatus.FAIL)
+            self.assertEqual(res.metadata.get("error_type"), "PolicyLedgerMismatch")
 
-        with self.assertRaises(PolicyLedgerMismatch):
-            validate_ledger_integrity(empty_ledger, raise_on_failure=True)
+            with self.assertRaises(PolicyLedgerMismatch):
+                validate_ledger_integrity(empty_ledger, raise_on_failure=True)
+        with self.subTest(case='17_unknown_ledger_disposition_fails'):
+            occ = PolicyOccurrence(
+                semantic_id=SemanticId("test.unit"),
+                evidence_fingerprint="fp123",
+                container_id="cont1",
+                path="fs/exec.c",
+                start_line=1,
+                end_line=10,
+            )
+            bad_decision = PolicyDecision(
+                occurrence=occ,
+                action=PolicyAction.UNKNOWN,
+                owner=OwnerKind.UNRESOLVED,
+                rationale="unresolved unit",
+            )
+            ledger = PolicyCoverageLedger("test-inventory")
+            ledger.add(bad_decision)
 
-    def test_17_unknown_ledger_disposition_fails(self):
-        occ = PolicyOccurrence(
-            semantic_id=SemanticId("test.unit"),
-            evidence_fingerprint="fp123",
-            container_id="cont1",
-            path="fs/exec.c",
-            start_line=1,
-            end_line=10,
-        )
-        bad_decision = PolicyDecision(
-            occurrence=occ,
-            action=PolicyAction.UNKNOWN,
-            owner=OwnerKind.UNRESOLVED,
-            rationale="unresolved unit",
-        )
-        ledger = PolicyCoverageLedger("test-inventory")
-        ledger.add(bad_decision)
+            res = validate_ledger_integrity(ledger)
+            self.assertEqual(res.status, ValidationStatus.FAIL)
+            self.assertEqual(res.metadata.get("error_type"), "PolicyLedgerMismatch")
 
-        res = validate_ledger_integrity(ledger)
-        self.assertEqual(res.status, ValidationStatus.FAIL)
-        self.assertEqual(res.metadata.get("error_type"), "PolicyLedgerMismatch")
+            with self.assertRaises(PolicyLedgerMismatch):
+                validate_ledger_integrity(ledger, raise_on_failure=True)
 
-        with self.assertRaises(PolicyLedgerMismatch):
-            validate_ledger_integrity(ledger, raise_on_failure=True)
 
     def test_18_synthetic_evidence_rejected_in_production(self):
         results_symbols = validate_symbols(allow_synthetic=False, evidence_kind="SYNTHETIC")

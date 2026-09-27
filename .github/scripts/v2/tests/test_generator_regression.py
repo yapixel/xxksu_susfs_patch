@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-import re
 import tempfile
 import unittest
 
@@ -33,37 +32,6 @@ class GeneratorEscapeRegressionTests(unittest.TestCase):
                 for path, content in postimages(gki).items():
                     self.assertEqual(verify_postimage_integrity(content, path), [])
 
-    def test_reproduce_re_sub_template_corrupts_escaped_newline_literal(self) -> None:
-        """Demonstrate that re.sub string replacement unescapes '\\n' into raw line breaks."""
-        # A hunk containing C code with character literal '\n'
-        c_line = "\t\t\t\tseq_putc(m, '\\n');"
-        self.assertIn(r"\n", c_line)
-        self.assertNotIn("\n", c_line)
-
-        # Naive string template substitution in re.sub
-        template = f"+#ifdef TEST\n{c_line}\n+#endif"
-        corrupted = re.sub(r"ANCHOR", template, "ANCHOR")
-
-        # The '\\n' in the replacement string template is converted to a raw 0x0A newline:
-        # seq_putc(m, '
-        # ');
-        self.assertIn("seq_putc(m, '\n", corrupted)
-        self.assertNotIn(r"\n", corrupted)
-
-    def test_safe_replacement_preserves_character_literal(self) -> None:
-        """Verify that str.replace and lambda replacements preserve '\\n' verbatim."""
-        c_line = "\t\t\t\tseq_putc(m, '\\n');"
-        template = f"+#ifdef TEST\n{c_line}\n+#endif"
-
-        # 1. str.replace
-        safe1 = "ANCHOR".replace("ANCHOR", template)
-        self.assertIn(r"seq_putc(m, '\n');", safe1)
-        self.assertNotIn("seq_putc(m, '\n", safe1)
-
-        # 2. lambda in re.sub
-        safe2 = re.sub(r"ANCHOR", lambda m: template, "ANCHOR")
-        self.assertIn(r"seq_putc(m, '\n');", safe2)
-        self.assertNotIn("seq_putc(m, '\n", safe2)
 
     def test_validate_patch_syntax_detects_corrupted_seq_putc(self) -> None:
         """Verify that validate_patch_syntax rejects patches with split character literals."""

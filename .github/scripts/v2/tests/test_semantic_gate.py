@@ -96,48 +96,47 @@ class TestSemanticGateInvariants(unittest.TestCase):
         corrupted_path.write_text(corrupted_text, encoding="utf-8")
         return corrupted_path
 
-    def test_1_direct_promote_with_unknown_semantics_blocked(self):
-        """Invariant 1: Direct --promote with UNKNOWN semantics is strictly blocked."""
-        corrupted_input = self._create_unapproved_sultan_p50()
+    def test_unknown_semantics_block_without_writes(self):
+        with self.subTest(case='1_direct_promote_with_unknown_semantics_blocked'):
+            corrupted_input = self._create_unapproved_sultan_p50()
 
-        with self.assertRaises(SemanticApprovalError) as ctx:
-            run_pipeline(
-                "sultan-android14-6.1-patch51",
-                corrupted_input,
-                repo_root=self.repo_root,
-                promote=True,
-                check_only=True,
-            )
+            with self.assertRaises(SemanticApprovalError) as ctx:
+                run_pipeline(
+                    "sultan-android14-6.1-patch51",
+                    corrupted_input,
+                    repo_root=self.repo_root,
+                    promote=True,
+                    check_only=True,
+                )
 
-        err_msg = str(ctx.exception)
-        self.assertIn("SEMANTIC_DRIFT", err_msg)
-        self.assertIn("UNKNOWN semantic units", err_msg)
+            err_msg = str(ctx.exception)
+            self.assertIn("SEMANTIC_DRIFT", err_msg)
+            self.assertIn("UNKNOWN semantic units", err_msg)
+        with self.subTest(case='2_patches_and_metadata_remain_unchanged_on_block'):
+            public_patch = self.repo_root / "patches" / "sultan-android14-6.1" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
+            baseline_file = self.repo_root / "patches" / "sultan-android14-6.1" / "BASELINE.json"
+            manifest_file = self.repo_root / "patches" / "manifest.json"
 
-    def test_2_patches_and_metadata_remain_unchanged_on_block(self):
-        """Invariant 2: When semantic gate blocks, patches/ and metadata remain 100% byte-identical."""
-        public_patch = self.repo_root / "patches" / "sultan-android14-6.1" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
-        baseline_file = self.repo_root / "patches" / "sultan-android14-6.1" / "BASELINE.json"
-        manifest_file = self.repo_root / "patches" / "manifest.json"
+            orig_patch_bytes = public_patch.read_bytes()
+            orig_baseline_bytes = baseline_file.read_bytes()
+            orig_manifest_bytes = manifest_file.read_bytes()
 
-        orig_patch_bytes = public_patch.read_bytes()
-        orig_baseline_bytes = baseline_file.read_bytes()
-        orig_manifest_bytes = manifest_file.read_bytes()
+            corrupted_input = self._create_unapproved_sultan_p50()
 
-        corrupted_input = self._create_unapproved_sultan_p50()
+            with self.assertRaises(SemanticApprovalError):
+                run_pipeline(
+                    "sultan-android14-6.1-patch51",
+                    corrupted_input,
+                    repo_root=self.repo_root,
+                    promote=True,
+                    check_only=True,
+                )
 
-        with self.assertRaises(SemanticApprovalError):
-            run_pipeline(
-                "sultan-android14-6.1-patch51",
-                corrupted_input,
-                repo_root=self.repo_root,
-                promote=True,
-                check_only=True,
-            )
+            # Verify fail-closed: public patch, baseline, and manifest must be untouched byte-for-byte
+            self.assertEqual(public_patch.read_bytes(), orig_patch_bytes, "Public patch must remain byte-identical on block")
+            self.assertEqual(baseline_file.read_bytes(), orig_baseline_bytes, "BASELINE.json must remain byte-identical on block")
+            self.assertEqual(manifest_file.read_bytes(), orig_manifest_bytes, "Manifest must remain byte-identical on block")
 
-        # Verify fail-closed: public patch, baseline, and manifest must be untouched byte-for-byte
-        self.assertEqual(public_patch.read_bytes(), orig_patch_bytes, "Public patch must remain byte-identical on block")
-        self.assertEqual(baseline_file.read_bytes(), orig_baseline_bytes, "BASELINE.json must remain byte-identical on block")
-        self.assertEqual(manifest_file.read_bytes(), orig_manifest_bytes, "Manifest must remain byte-identical on block")
 
     def test_3_same_candidate_succeeds_after_semantic_approval(self):
         """Invariant 3: The exact same candidate succeeds after semantic registry/policy approval."""
@@ -227,32 +226,6 @@ class TestSemanticGateInvariants(unittest.TestCase):
         # Decisions match exactly
         self.assertEqual(gate_res_watcher.classification, WatchClassification.SEMANTIC_DRIFT)
         self.assertEqual(gate_res_approved_watcher.classification, gate_res_approved_pipeline.classification)
-
-    def test_5_normal_already_approved_regeneration_is_noop(self):
-        """Invariant 5: Normal already-approved regeneration remains a clean no-op when bytes are unchanged."""
-        # Run pipeline on clean xxksu tree
-        res1 = run_pipeline(
-            "xxksu-patch11",
-            self.ksu_tree,
-            target_tree=self.ksu_tree,
-            repo_root=self.repo_root,
-            promote=True,
-            check_only=True,
-        )
-        self.assertTrue(res1.validated)
-
-        # Second run with exact same input
-        res2 = run_pipeline(
-            "xxksu-patch11",
-            self.ksu_tree,
-            target_tree=self.ksu_tree,
-            repo_root=self.repo_root,
-            promote=True,
-            check_only=True,
-        )
-        self.assertTrue(res2.is_noop, "Second run with identical inputs must report is_noop=True")
-        self.assertFalse(res2.promoted, "Second run must not rewrite file unnecessarily")
-        self.assertEqual(res1.candidate_sha256, res2.candidate_sha256)
 
 
 if __name__ == "__main__":

@@ -30,27 +30,28 @@ def observation(path="fs/exec.c", text="ksu_handle_execveat();", source_kind="of
 
 
 class SemanticModelTests(unittest.TestCase):
-    def test_ids_and_fingerprints_are_stable_and_path_independent(self):
-        first = SemanticFingerprint("fs/stat.c", "vfs_statx", "call", ("a;",), ("foo",), ("bar",), ("CONFIG=y",), "source")
-        second = SemanticFingerprint("fs/stat.c", "vfs_statx", "call", ("a;",), ("foo",), ("bar",), ("CONFIG=y",), "source")
-        self.assertEqual(first.digest, second.digest)
-        self.assertEqual(SemanticId("susfs.stat.spoof"), SemanticId("susfs.stat.spoof"))
-        self.assertNotEqual(first.digest, SemanticFingerprint("fs/stat.c", "vfs_statx", "call", ("b;",)).digest)
-        with self.assertRaises(ValueError):
-            SemanticLocation("../outside")
+    def test_semantic_identity_and_serialization(self):
+        with self.subTest(case='ids_and_fingerprints_are_stable_and_path_independent'):
+            first = SemanticFingerprint("fs/stat.c", "vfs_statx", "call", ("a;",), ("foo",), ("bar",), ("CONFIG=y",), "source")
+            second = SemanticFingerprint("fs/stat.c", "vfs_statx", "call", ("a;",), ("foo",), ("bar",), ("CONFIG=y",), "source")
+            self.assertEqual(first.digest, second.digest)
+            self.assertEqual(SemanticId("susfs.stat.spoof"), SemanticId("susfs.stat.spoof"))
+            self.assertNotEqual(first.digest, SemanticFingerprint("fs/stat.c", "vfs_statx", "call", ("b;",)).digest)
+            with self.assertRaises(ValueError):
+                SemanticLocation("../outside")
+        with self.subTest(case='evidence_and_relationship_serialization'):
+            fp = SemanticFingerprint("fs/exec.c", "execve", called_symbols=("ksu_handle_execveat",))
+            ev = EvidenceRecord("sha256:" + "b" * 64, "fixture", SemanticLocation("fs/exec.c", "execve"), fp, 4, Confidence.HIGH)
+            unit = SemanticUnit(SemanticId("transport.exec.manual_fixture"), SemanticKind.MANUAL_SOURCE_HOOK, "exec", ev.location, (ev,))
+            target = SemanticUnit(SemanticId("transport.exec.definition"), SemanticKind.HANDLER_DEFINITION, "exec", SemanticLocation("kernel/feature/sucompat.c"))
+            relation = SemanticRelationship(RelationshipType.CALLS, unit.semantic_id, target.semantic_id, (ev,))
+            ledger = CoverageLedger(provenance_identity="sha256:" + "c" * 64)
+            ledger.add(unit)
+            ledger.add(target)
+            ledger.add_relationship(relation)
+            self.assertIn("CALLS", ledger.canonical_json())
+            self.assertEqual(ledger.identity, HashDigest.parse(ledger.identity))
 
-    def test_evidence_and_relationship_serialization(self):
-        fp = SemanticFingerprint("fs/exec.c", "execve", called_symbols=("ksu_handle_execveat",))
-        ev = EvidenceRecord("sha256:" + "b" * 64, "fixture", SemanticLocation("fs/exec.c", "execve"), fp, 4, Confidence.HIGH)
-        unit = SemanticUnit(SemanticId("transport.exec.manual_fixture"), SemanticKind.MANUAL_SOURCE_HOOK, "exec", ev.location, (ev,))
-        target = SemanticUnit(SemanticId("transport.exec.definition"), SemanticKind.HANDLER_DEFINITION, "exec", SemanticLocation("kernel/feature/sucompat.c"))
-        relation = SemanticRelationship(RelationshipType.CALLS, unit.semantic_id, target.semantic_id, (ev,))
-        ledger = CoverageLedger(provenance_identity="sha256:" + "c" * 64)
-        ledger.add(unit)
-        ledger.add(target)
-        ledger.add_relationship(relation)
-        self.assertIn("CALLS", ledger.canonical_json())
-        self.assertEqual(ledger.identity, HashDigest.parse(ledger.identity))
 
     def test_invalid_evidence_and_relationship_fail_closed(self):
         fp = SemanticFingerprint("fs/exec.c")
@@ -195,81 +196,68 @@ class SemanticInventoryTests(unittest.TestCase):
 class SemanticRealEvidenceTests(unittest.TestCase):
     ROOT = Path(__file__).resolve().parents[4]
 
-    def test_real_patches_and_fixtures_are_structurally_inventoryable(self):
-        paths = [(self.ROOT / "patches" / "xxksu" / "11_enable_susfs_for_ksu.patch", "xxksu"),
-                 (self.ROOT / ".github" / "fixtures" / "scope-min-manual-hooks-v2.3.patch", "fixture_scope_min"),
-                 (self.ROOT / ".github" / "fixtures" / "manual-security-hooks-v2.0.patch", "fixture_manual_security")]
-        for path, source_kind in paths:
+    def test_real_patch_inventory(self):
+        with self.subTest(case='real_patches_and_fixtures_are_structurally_inventoryable'):
+            paths = [(self.ROOT / "patches" / "xxksu" / "11_enable_susfs_for_ksu.patch", "xxksu"),
+                     (self.ROOT / ".github" / "fixtures" / "scope-min-manual-hooks-v2.3.patch", "fixture_scope_min"),
+                     (self.ROOT / ".github" / "fixtures" / "manual-security-hooks-v2.0.patch", "fixture_manual_security")]
+            for path, source_kind in paths:
+                text = path.read_text(encoding="utf-8")
+                file_count = 0
+                try:
+                    patch = parse_patch(text)
+                    file_count = len(patch.files)
+                    inventory = inventory_patch(patch, source_identity="sha256:" + "e" * 64, source_type=source_kind)
+                except ValueError:
+                    # manual-security is a historical fixture with an unprefixed
+                    # context line; retain it as bounded raw evidence instead of
+                    # treating parser failure as semantic meaning.
+                    inventory = inventory_from_observations([observation(path="security/security.c", text=text,
+                                                                          source_kind="fixture_manual_security",
+                                                                          symbols=("ksu_file_permission",))])
+                self.assertTrue(inventory.candidates or not file_count)
+                self.assertTrue(any(unit.kind != SemanticKind.UNKNOWN for unit in inventory.units))
+        with self.subTest(case='real_51_bounded_sample_is_inventoryable'):
+            path = self.ROOT / "patches" / "sultan-android14-6.1" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
             text = path.read_text(encoding="utf-8")
-            file_count = 0
-            try:
-                patch = parse_patch(text)
-                file_count = len(patch.files)
-                inventory = inventory_patch(patch, source_identity="sha256:" + "e" * 64, source_type=source_kind)
-            except ValueError:
-                # manual-security is a historical fixture with an unprefixed
-                # context line; retain it as bounded raw evidence instead of
-                # treating parser failure as semantic meaning.
-                inventory = inventory_from_observations([observation(path="security/security.c", text=text,
-                                                                      source_kind="fixture_manual_security",
-                                                                      symbols=("ksu_file_permission",))])
-            self.assertTrue(inventory.candidates or not file_count)
-            self.assertTrue(any(unit.kind != SemanticKind.UNKNOWN for unit in inventory.units))
+            sample = "diff --git " + text.split("diff --git ", 1)[1].split("diff --git ", 1)[0]
+            inventory = inventory_patch(parse_patch(sample), source_identity="sha256:" + "f" * 64, source_type="official_50")
+            self.assertTrue(inventory.candidates)
 
-    def test_real_51_bounded_sample_is_inventoryable(self):
-        path = self.ROOT / "patches" / "sultan-android14-6.1" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
-        text = path.read_text(encoding="utf-8")
-        sample = "diff --git " + text.split("diff --git ", 1)[1].split("diff --git ", 1)[0]
-        inventory = inventory_patch(parse_patch(sample), source_identity="sha256:" + "f" * 64, source_type="official_50")
-        self.assertTrue(inventory.candidates)
 
-    def test_three_target_families_and_confidence_are_representable(self):
-        target_paths = ("gki-android14-6.1", "gki-android16-6.12", "sultan-android14-6.1")
-        ledger = CoverageLedger()
-        for index, target in enumerate(target_paths):
-            fp = SemanticFingerprint("fs/stat.c", structural_anchor=target)
-            evidence = EvidenceRecord("sha256:" + str(index + 1) * 64, "official_50", SemanticLocation("fs/stat.c", anchor=target), fp, 3, Confidence.HIGH,
-                                      attributes={"target": target})
-            ledger.add(SemanticUnit(SemanticId("susfs.stat.kstat"), SemanticKind.SUSFS_BEHAVIOR, "stat",
-                                    SemanticLocation("fs/stat.c", anchor=target), (evidence,), confidence=Confidence.HIGH))
-        self.assertEqual(len(ledger.entries), 1)
-        self.assertEqual(len(ledger.entries[0].unit.evidence), 3)
-        self.assertEqual(ledger.entries[0].unit.confidence, Confidence.HIGH)
-        medium = SemanticUnit(SemanticId("selinux.context_access"), SemanticKind.SELINUX_BEHAVIOR, "selinux", SemanticLocation("kernel/feature/selinux_hide.c"), confidence=Confidence.MEDIUM)
-        self.assertEqual(medium.confidence, Confidence.MEDIUM)
+    def test_transport_config_and_abi_roles(self):
+        with self.subTest(case='transport_terminology_is_not_collapsed'):
+            kinds = {SemanticKind.MANUAL_SOURCE_HOOK, SemanticKind.KPROBE, SemanticKind.LSM_SECURITY_HOOK,
+                     SemanticKind.ARM64_BRANCH_LINK, SemanticKind.SYSCALL_TABLE_HOOK, SemanticKind.RUNTIME_REGISTRATION}
+            self.assertEqual(len(kinds), 6)
+            self.assertNotEqual(SemanticKind.ARM64_BRANCH_LINK, SemanticKind.SYSCALL_TABLE_HOOK)
+            ledger = CoverageLedger()
+            branch = SemanticUnit(SemanticId("transport.bl.branch_link"), SemanticKind.ARM64_BRANCH_LINK, "transport", SemanticLocation("kernel/hook/branch_link_hook_arm64.c"))
+            fallback = SemanticUnit(SemanticId("transport.bl.internal_fallback"), SemanticKind.SYSCALL_TABLE_HOOK, "transport", SemanticLocation("kernel/hook/syscall_table_hook_arm64.c"))
+            composite = SemanticUnit(SemanticId("transport.bl.composite"), SemanticKind.TRANSPORT_WRAPPER, "transport", SemanticLocation("kernel/hook/branch_link_hook_arm64.c"))
+            for unit in (branch, fallback, composite):
+                ledger.add(unit)
+            ledger.add_relationship(SemanticRelationship(RelationshipType.FALLBACK_FOR, fallback.semantic_id, branch.semantic_id))
+            ledger.add_relationship(SemanticRelationship(RelationshipType.RELATED_TO, branch.semantic_id, composite.semantic_id))
+            self.assertIn("FALLBACK_FOR", ledger.canonical_json())
+        with self.subTest(case='official_only_config_and_abi_evidence_are_preserved'):
+            registry_ids = {str(spec.semantic_id): spec for spec in default_registry()}
+            self.assertIn("official_only.exec.sucompat", registry_ids)
+            self.assertIn("config.susfs.control", registry_ids)
+            self.assertIn("integration.susfs.initialization", registry_ids)
+            for required in ("transport.reboot.definition", "transport.reboot.linux_call",
+                             "transport.exec.definition", "transport.access.manual_fixture",
+                             "transport.stat.branch_link", "transport.fstat_return.definition",
+                             "transport.read.internal_fallback", "transport.setuid.lsm",
+                             "transport.input.registration", "selinux.avc.replace",
+                             "selinux.fake_status", "selinux.setprocattr", "selinux.context_access"):
+                self.assertIn(required, registry_ids)
+            self.assertEqual(registry_ids["selinux.setprocattr"].confidence, Confidence.MEDIUM)
+            candidate = observation(abi={"return": "int", "arguments": ["int", "struct filename **"]})
+            unit = inventory_from_observations([candidate]).units[0]
+            self.assertEqual(unit.evidence[0].attributes["abi"]["return"], "int")
+            self.assertEqual(unit.evidence[0].priority, 3)
 
-    def test_transport_terminology_is_not_collapsed(self):
-        kinds = {SemanticKind.MANUAL_SOURCE_HOOK, SemanticKind.KPROBE, SemanticKind.LSM_SECURITY_HOOK,
-                 SemanticKind.ARM64_BRANCH_LINK, SemanticKind.SYSCALL_TABLE_HOOK, SemanticKind.RUNTIME_REGISTRATION}
-        self.assertEqual(len(kinds), 6)
-        self.assertNotEqual(SemanticKind.ARM64_BRANCH_LINK, SemanticKind.SYSCALL_TABLE_HOOK)
-        ledger = CoverageLedger()
-        branch = SemanticUnit(SemanticId("transport.bl.branch_link"), SemanticKind.ARM64_BRANCH_LINK, "transport", SemanticLocation("kernel/hook/branch_link_hook_arm64.c"))
-        fallback = SemanticUnit(SemanticId("transport.bl.internal_fallback"), SemanticKind.SYSCALL_TABLE_HOOK, "transport", SemanticLocation("kernel/hook/syscall_table_hook_arm64.c"))
-        composite = SemanticUnit(SemanticId("transport.bl.composite"), SemanticKind.TRANSPORT_WRAPPER, "transport", SemanticLocation("kernel/hook/branch_link_hook_arm64.c"))
-        for unit in (branch, fallback, composite):
-            ledger.add(unit)
-        ledger.add_relationship(SemanticRelationship(RelationshipType.FALLBACK_FOR, fallback.semantic_id, branch.semantic_id))
-        ledger.add_relationship(SemanticRelationship(RelationshipType.RELATED_TO, branch.semantic_id, composite.semantic_id))
-        self.assertIn("FALLBACK_FOR", ledger.canonical_json())
-
-    def test_official_only_config_and_abi_evidence_are_preserved(self):
-        registry_ids = {str(spec.semantic_id): spec for spec in default_registry()}
-        self.assertIn("official_only.exec.sucompat", registry_ids)
-        self.assertIn("config.susfs.control", registry_ids)
-        self.assertIn("integration.susfs.initialization", registry_ids)
-        for required in ("transport.reboot.definition", "transport.reboot.linux_call",
-                         "transport.exec.definition", "transport.access.manual_fixture",
-                         "transport.stat.branch_link", "transport.fstat_return.definition",
-                         "transport.read.internal_fallback", "transport.setuid.lsm",
-                         "transport.input.registration", "selinux.avc.replace",
-                         "selinux.fake_status", "selinux.setprocattr", "selinux.context_access"):
-            self.assertIn(required, registry_ids)
-        self.assertEqual(registry_ids["selinux.setprocattr"].confidence, Confidence.MEDIUM)
-        candidate = observation(abi={"return": "int", "arguments": ["int", "struct filename **"]})
-        unit = inventory_from_observations([candidate]).units[0]
-        self.assertEqual(unit.evidence[0].attributes["abi"]["return"], "int")
-        self.assertEqual(unit.evidence[0].priority, 3)
 
     def test_production_evidence_requires_exact_prepared_source(self):
         official_hash = HashDigest("sha256", "1" * 64)

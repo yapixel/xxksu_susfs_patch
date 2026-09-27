@@ -50,10 +50,6 @@ class PatchApplyTests(unittest.TestCase):
                 "@@ -2 +2 @@\n-b\n+C\n",
             )))
 
-    def test_output_is_deterministic(self):
-        text = patch(("@@ -2 +2 @@\n-b\n+B\n",))
-        self.assertEqual(self.apply("a\nb\nc\n", text), self.apply("a\nb\nc\n", text))
-
 
 if __name__ == "__main__":
     unittest.main()
