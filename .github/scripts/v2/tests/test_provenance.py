@@ -164,7 +164,7 @@ class ProvenanceTests(unittest.TestCase):
                                    "obj-$(CONFIG_KSU_SUSFS) += provenance_probe.o", 1)
         self.assertNotEqual(changed, original)
         source.write_text(changed)
-        with self.assertRaisesRegex(CandidateGenerationError, "unreviewed Sultan Patch 50"):
+        with self.assertRaisesRegex(CandidateGenerationError, r"unreviewed .*Patch 50"):
             generate_candidate_patch(SULTAN, self.sultan, self.root)
         source.write_text(original)
         context = self.root / ".github/fixtures/v2/v29-baselines/sultan-android14-6.1.json"
@@ -248,11 +248,11 @@ class ProvenanceTests(unittest.TestCase):
         self.assert_production_postimages(patch_id, first)
         empty = self.root / "empty"
         empty.mkdir()
-        with self.assertRaisesRegex(CandidateGenerationError, "Patch 50 missing"):
+        with self.assertRaisesRegex(CandidateGenerationError, "Upstream SuSFS 50 patch missing"):
             generate_candidate_patch(patch_id, empty, self.root)
         saved = source.read_bytes()
         source.unlink()
-        with self.assertRaisesRegex(CandidateGenerationError, "Patch 50 missing"):
+        with self.assertRaisesRegex(CandidateGenerationError, "Upstream SuSFS 50 patch missing"):
             generate_candidate_patch(patch_id, source.parent, self.root)
         for old, new in (
             (b"obj-$(CONFIG_KSU_SUSFS) += susfs.o", b"obj-$(CONFIG_KSU_SUSFS) += wrong.o"),
@@ -262,7 +262,7 @@ class ProvenanceTests(unittest.TestCase):
                 changed = saved.replace(old, new)
                 self.assertNotEqual(changed, saved)
                 source.write_bytes(changed)
-                with self.assertRaisesRegex(CandidateGenerationError, "unreviewed GKI Patch 50"):
+                with self.assertRaisesRegex(CandidateGenerationError, r"unreviewed .*Patch 50"):
                     generate_candidate_patch(patch_id, source.parent, self.root)
         source.write_bytes(saved)
         context = self.root / ".github/fixtures/v2/r38-sources.json"

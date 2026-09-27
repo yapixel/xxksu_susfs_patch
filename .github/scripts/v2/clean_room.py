@@ -263,8 +263,7 @@ def verify(work, report):
         else:
             paths = {f.old_path.removeprefix("a/") for f in parse_patch(first.decode()).files}
             require(paths == set(PATCH11_CANONICAL_FILES), "Patch 11 ownership boundary changed")
-        missing = "Missing required KernelSU files" if target == "xxksu" else (
-            "Upstream SuSFS 50 patch" if target.startswith("sultan") else "Patch 50 missing")
+        missing = "Missing required KernelSU files" if target == "xxksu" else "Upstream SuSFS 50 patch missing"
         generate_process(env_root, patch_id, empty, missing=missing)
         if target.startswith("gki"):
             ctx = env_root / ".github/fixtures/v2/r38-sources.json"
