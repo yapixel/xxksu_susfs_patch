@@ -280,10 +280,16 @@ def verify(work, report):
             require(not reference.blocks_promotion and reference.classification.value != "REFERENCE_UNAVAILABLE",
                     f"incomplete/blocking reference check: {patch_id}: {reference.details}")
 
+    # Existing dashboard tests write reference diagnostics relative to their
+    # repository. Run the unchanged suite in a disposable checkout.
+    test_root = work / "test-checkout"
+    command("git", "clone", "--quiet", "--no-hardlinks", str(ROOT), str(test_root))
+    test_env = {**os.environ, "PYTHONPATH": str(test_root / ".github/scripts"),
+                "GITHUB_WORKSPACE": str(test_root)}
     for focused in (True, False):
         output = work / ("focused.json" if focused else "tests.json")
         result = subprocess.run([sys.executable, "-m", "v2.clean_room",
-                                 "focused" if focused else "tests", str(output)], cwd=ROOT)
+                                 "focused" if focused else "tests", str(output)], cwd=test_root, env=test_env)
         data = json.loads(output.read_text())
         report["focused" if focused else "tests"] = data
         require(result.returncode == 0, f"tests failed or skipped: {data}")
