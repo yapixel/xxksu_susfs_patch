@@ -64,7 +64,7 @@ def make_clean_report(timestamp: str = "2026-09-24T22:00:00Z") -> WatchReport:
             source_type="reference",
             classification=WatchClassification.NO_CHANGE,
             old_identity="bc1b8e371d80fb8dbed5ac10096e39f9cf864d56",
-            new_identity="719d466e7228a0f9f3819125314ce0b13935a06",
+            new_identity="aaaaaaaaaaaaa0f9f3819125314ce0b13935a06",
             old_content_hash="sha256:6d0a6b64ffcc",
             new_content_hash="sha256:6d0a6b64ffcc",
         ),
@@ -158,7 +158,7 @@ class DashboardTests(unittest.TestCase):
                 source_type="reference",
                 classification=WatchClassification.REFERENCE_DRIFT,
                 old_identity="bc1b8e371d80",
-                new_identity="719d466e7228",
+                new_identity="aaaaaaaaaaaa",
                 old_content_hash="h_old",
                 new_content_hash="h_new",
             )
@@ -347,31 +347,52 @@ class DashboardTests(unittest.TestCase):
             self.assertIn("## Production Patches", trimmed)
 
     # 14. commit/rebase-only Midori change with identical normalized content remains NO_CHANGE
-    def test_reference_content_identity(self):
-        with self.subTest(case='14_commit_rebase_only_midori_with_identical_normalized_content_remains_no_change'):
-            clean = make_clean_report()
-            # Midori has different git commit but normalized sha is unchanged -> NO_CHANGE
-            midori_res = next(r for r in clean.results if r.source_id == "midori_kernelsu_xx_patch")
-            self.assertEqual(midori_res.classification, WatchClassification.NO_CHANGE)
-            self.assertNotEqual(midori_res.old_identity, midori_res.new_identity)
-
-            status = calculate_overall_status(clean)
-            self.assertEqual(status, OverallStatus.HEALTHY)
-
-            body = render_dashboard_body(report=clean, repo_root=REPO_ROOT)
-            self.assertIn("| `Midori xx.patch` | Reference Only | 🟢 `NO_CHANGE` | `cc36da9e333c` (commit: `bc1b8e37`) | — (commit: `719d466e`) | — |", body)
-            self.assertIn("| `Midori GKI 50 Patch` | Reference Only | 🟢 `NO_CHANGE` | `1fa63a063144` | — | — |", body)
-            self.assertIn("| `xxKSU` | Authoritative | 🟢 `NO_CHANGE` | `bb0be9297da4` (tracking: `master`) | — | — |", body)
-        with self.subTest(case='19_reference_patch_primary_identity_is_normalized_content'):
-            report = make_clean_report()
-            body = render_dashboard_body(report=report, repo_root=REPO_ROOT)
-            # Check Midori xx.patch row: normalized content cc36da9e333c is primary, commit bc1b8e37 is metadata
-            self.assertIn("`cc36da9e333c` (commit: `bc1b8e37`)", body)
-            # Check Midori GKI 50 patch row: normalized content 1fa63a063144 is primary
-            self.assertIn("`1fa63a063144`", body)
-            # Check Authoritative rows remain commit-identity based
-            self.assertIn("`bb0be9297da4`", body)
-            self.assertIn("`c254cf2dcdff`", body)
+    def test_source_identity_presentation(self):
+        from dataclasses import replace
+        from v2.watch.cli import generate_markdown_summary
+        from v2.watch.dashboard import render_source_identity
+        state_path = REPO_ROOT / ".github/upstream-state.json"
+        sources = json.loads(state_path.read_text())["sources"]
+        report = make_clean_report()
+        before = report.to_dict()
+        issue = render_dashboard_body(report=report, repo_root=REPO_ROOT)
+        summary = generate_markdown_summary(report, state_path)
+        for result in report.results:
+            info = sources[result.source_type][result.source_id]
+            entry = render_source_identity(result, info)
+            with self.subTest(source=result.source_id):
+                self.assertIn(entry, issue)
+                self.assertIn(entry, summary)
+                self.assertNotIn("sha256:", entry)
+                self.assertNotIn("**:**", entry)
+                self.assertNotIn("``", entry)
+                self.assertIn("`NO_CHANGE`", entry)
+                if result.source_type == "authoritative":
+                    repo = info["repository"].removesuffix(".git")
+                    separator = "/-/commit/" if "gitlab.com" in repo else "/commit/"
+                    self.assertIn(f"]({repo})", entry)
+                    self.assertIn(f"- Tracking ref: `{info['ref']}`", entry)
+                    self.assertIn(f"- Accepted commit: [`{result.old_identity[:12]}`]({repo}{separator}{result.old_identity})", entry)
+                    drift = replace(result, new_identity="f" * 40, classification=WatchClassification.SEMANTIC_DRIFT)
+                    changed = render_source_identity(drift, info)
+                    self.assertIn(f"- Discovered commit: [`{'f' * 12}`]({repo}{separator}{'f' * 40})", changed)
+                    self.assertIn("`SEMANTIC_DRIFT`", changed)
+                else:
+                    self.assertIn("- Reference ref/path:", entry)
+                    self.assertNotIn("Accepted commit", entry)
+        for body in (issue, summary):
+            self.assertNotIn("Old Content Hash", body)
+            self.assertNotIn("New Content Hash", body)
+            self.assertNotIn("normalized", body)
+        midori = render_source_identity(replace(report.results[3], new_identity="a" * 40), sources["reference"]["midori_kernelsu_xx_patch"])
+        self.assertIn("**[midori01/KernelSU](https://github.com/midori01/KernelSU)**", midori)
+        self.assertIn("- Resolved patch commit: [`aaaaaaaaaaaa`]", midori)
+        file_result = replace(report.results[4], classification=WatchClassification.REFERENCE_DRIFT,
+                              new_content_hash="sha256:" + "f" * 64)
+        file_entry = render_source_identity(file_result, sources["reference"]["midori_gki_patch_50"])
+        self.assertIn("Resolved commit: not provided", file_entry)
+        self.assertIn("Content drift:", file_entry)
+        self.assertEqual(report.to_dict(), before)
 
     # 15. rendered body stays below 30 KiB
 

@@ -11,50 +11,31 @@ import sys
 
 from .checker import UpstreamWatcher
 from .escalation import escalate_issue
+from .dashboard import render_source_identity
 from .model import WatchClassification, WatchReport
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 
-def generate_markdown_summary(report: WatchReport) -> str:
-    lines = [
-        "## 🛰️ Upstream Watch & Auto-Maintenance Report (Phase 1)",
-        f"- **Timestamp:** `{report.timestamp}`",
-        "",
-        "| Source | Type | Classification | Old Identity | New Identity | Candidate Patch |",
-        "| :--- | :--- | :--- | :--- | :--- | :--- |",
-    ]
-    for r in report.results:
-        cand_str = f"✅ `{r.candidate_patch_name}`" if r.candidate_patch else "—"
-        badge = "🟢" if r.classification in (WatchClassification.NO_CHANGE, WatchClassification.IRRELEVANT_CHANGE) else (
-            "🔵" if r.classification == WatchClassification.SAFE_REGEN_CANDIDATE else (
-                "🟡" if r.classification == WatchClassification.REFERENCE_DRIFT else "🔴"
-            )
-        )
-        lines.append(
-            f"| `{r.source_id}` | `{r.source_type}` | {badge} `{r.classification.value}` | `{r.old_identity[:12]}` | `{r.new_identity[:12]}` | {cand_str} |"
-        )
-
-    lines.append("")
-    lines.append("### Details & Diagnostics")
-    for r in report.results:
-        lines.append(f"<details><summary><b>{r.source_id}</b> — <code>{r.classification.value}</code></summary>")
-        lines.append("")
-        lines.append(f"- **Old Content Hash:** `{r.old_content_hash}`")
-        lines.append(f"- **New Content Hash:** `{r.new_content_hash}`")
-        if r.affected_files:
-            lines.append(f"- **Affected Files:** {', '.join(f'`{f}`' for f in r.affected_files)}")
-        if r.affected_semantics:
-            lines.append(f"- **Affected Semantics / Anchors:** {', '.join(f'`{s}`' for s in r.affected_semantics)}")
-        lines.append("")
-        lines.append("```")
-        lines.append(r.details)
-        lines.append("```")
-        lines.append("")
-        lines.append("</details>")
-        lines.append("")
-
+def generate_markdown_summary(report: WatchReport, state_path: Path = Path(".github/upstream-state.json")) -> str:
+    sources = json.loads(state_path.read_text(encoding="utf-8")).get("sources", {})
+    lines = ["## 🛰️ Upstream Watch & Auto-Maintenance Report",
+             f"- **Timestamp:** `{report.timestamp}`", ""]
+    for result in report.results:
+        info = sources.get(result.source_type, {}).get(result.source_id, {})
+        lines.extend([render_source_identity(result, info), ""])
+        if result.candidate_patch_name:
+            lines.append(f"- Candidate: `{result.candidate_patch_name}`")
+        if result.classification != WatchClassification.NO_CHANGE:
+            lines.extend([f"<details><summary>Diagnostics: {result.source_id}</summary>", ""])
+            if result.affected_files:
+                lines.append("- Affected files: " + ", ".join(f"`{p}`" for p in result.affected_files))
+            if result.affected_semantics:
+                lines.append("- Affected semantics: " + ", ".join(result.affected_semantics))
+            if result.details:
+                lines.extend(["", "~~~", result.details, "~~~"])
+            lines.extend(["", "</details>", ""])
     return "\n".join(lines)
 
 
@@ -98,7 +79,7 @@ def main(argv: list[str] | None = None) -> int:
         report = WatchReport(results=report.results, timestamp=report.timestamp, escalations=tuple(escalations))
 
     # Output
-    summary_md = generate_markdown_summary(report)
+    summary_md = generate_markdown_summary(report, args.state_file)
     step_summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if step_summary:
         with open(step_summary, "a", encoding="utf-8") as f:

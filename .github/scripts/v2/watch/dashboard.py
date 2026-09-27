@@ -18,6 +18,7 @@ import re
 import shutil
 import subprocess
 from typing import Any, Mapping, Optional, Sequence, Tuple
+from urllib.parse import urlparse
 
 from .model import SourceResult, WatchClassification, WatchReport
 
@@ -405,6 +406,53 @@ def get_git_revision(repo_root: Path) -> tuple[str, str]:
     return rev, branch
 
 
+def render_source_identity(result: SourceResult, info: Mapping[str, Any]) -> str:
+    """Human-facing identity only; content comparison remains in the watcher."""
+    reference = result.source_type == "reference"
+    url = info.get("url", "")
+    parsed = urlparse(info.get("repository") or url)
+    parts = parsed.path.strip("/").split("/")
+    host = parsed.netloc
+    if host == "raw.githubusercontent.com":
+        host = "github.com"
+    repository = f"https://{host}/{'/'.join(parts[:2])}".removesuffix(".git") if host else ""
+    label = urlparse(repository).path.strip("/") or result.source_id
+    name = f"[{label}]({repository})" if repository else label
+    lines = [f"**{name}** — `{result.classification.value}`"]
+
+    def commit_link(commit):
+        if not re.fullmatch(r"[0-9a-fA-F]{40}", commit or ""):
+            return None
+        separator = "/-/commit/" if host == "gitlab.com" else "/commit/"
+        return f"[`{commit[:12]}`]({repository}{separator}{commit})" if repository else f"`{commit[:12]}`"
+
+    if reference:
+        lines.append("- Role: reference only")
+        if url:
+            reference_path = "/".join(parts[2:])
+            lines.append(f"- Reference ref/path: [`{reference_path}`]({url})")
+        recorded = commit_link(info.get("commit_or_ref") or result.old_identity)
+        resolved = commit_link(result.new_identity)
+        if recorded:
+            lines.append(f"- Recorded reference commit: {recorded}")
+        if resolved:
+            lines.append(f"- Resolved patch commit: {resolved}")
+        else:
+            lines.append("- Resolved commit: not provided by this file reference")
+    else:
+        if info.get("ref"):
+            lines.append(f"- Tracking ref: `{info['ref']}`")
+        accepted = result.old_identity or info.get("commit", "")
+        lines.append(f"- Accepted commit: {commit_link(accepted) or 'unavailable'}")
+        if result.new_identity and result.new_identity != accepted:
+            lines.append(f"- Discovered commit: {commit_link(result.new_identity) or 'unavailable'}")
+    if (result.classification != WatchClassification.NO_CHANGE
+            and result.old_content_hash != result.new_content_hash
+            and (reference or result.old_identity == result.new_identity)):
+        lines.append(f"- Content drift: `{result.old_content_hash[:19]}` → `{result.new_content_hash[:19]}`")
+    return "\n".join(lines)
+
+
 def render_dashboard_body(
     report: WatchReport,
     repo_root: Optional[Path] = None,
@@ -443,135 +491,12 @@ def render_dashboard_body(
         "",
         "## Upstream Sources",
         "",
-        "| Source | Type | Status | Current Identity | Discovered Upstream | Escalation |",
-        "| :--- | :--- | :--- | :--- | :--- | :--- |",
     ]
-
-    # Map results by source_id
-    results_map = {r.source_id: r for r in report.results}
-
-    # Order sources deterministically: authoritative first, then reference
-    tracked_source_order = [
-        ("backslashxx_kernelsu", "Authoritative"),
-        ("susfs_sultan", "Authoritative"),
-        ("susfs_gki", "Authoritative"),
-        ("midori_kernelsu_xx_patch", "Reference Only"),
-        ("midori_gki_patch_50", "Reference Only"),
-    ]
-
-    # Load declared refs and reference normalized metadata
     state_file = root / ".github" / "upstream-state.json"
-    ref_sources_state: dict[str, Any] = {}
-    authoritative_sources_state: dict[str, Any] = {}
-    if state_file.is_file():
-        try:
-            sources_state = json.loads(state_file.read_text(encoding="utf-8")).get("sources", {})
-            ref_sources_state = sources_state.get("reference", {})
-            authoritative_sources_state = sources_state.get("authoritative", {})
-        except Exception:
-            pass
-
-    for source_id, s_type in tracked_source_order:
-        disp_name = SOURCE_DISPLAY_NAMES.get(source_id, source_id)
-        if source_id in results_map:
-            r = results_map[source_id]
-            badge_map = {
-                WatchClassification.NO_CHANGE: "🟢 `NO_CHANGE`",
-                WatchClassification.IRRELEVANT_CHANGE: "🟢 `IRRELEVANT_CHANGE`",
-                WatchClassification.SAFE_REGEN_CANDIDATE: "🔵 `SAFE_REGEN_CANDIDATE`",
-                WatchClassification.REFERENCE_DRIFT: "🟠 `REFERENCE_DRIFT`",
-                WatchClassification.ANCHOR_DRIFT: "🔴 `ANCHOR_DRIFT`",
-                WatchClassification.SEMANTIC_DRIFT: "🔴 `SEMANTIC_DRIFT`",
-                WatchClassification.SOURCE_IDENTITY_ERROR: "🔴 `SOURCE_IDENTITY_ERROR`",
-            }
-            status_badge = badge_map.get(r.classification, f"🔴 `{r.classification.value}`")
-
-            if s_type == "Authoritative":
-                # Authoritative sources remain commit-identity based
-                curr_id = f"`{r.old_identity[:12]}`" if r.old_identity else f"`{r.old_content_hash[:12]}`"
-                tracking_ref = authoritative_sources_state.get(source_id, {}).get("ref")
-                if tracking_ref:
-                    curr_id += f" (tracking: `{tracking_ref}`)"
-                if r.new_identity and r.new_identity != r.old_identity:
-                    disc_up = f"`{r.new_identity[:12]}`"
-                else:
-                    disc_up = "—"
-            else:
-                # Reference-only patch sources: present normalized patch content identity as primary;
-                # show upstream commit SHA only as metadata.
-                ref_state = ref_sources_state.get(source_id, {})
-                norm_hash = ref_state.get("normalized_sha256", "").removeprefix("sha256:")[:12]
-                if not norm_hash:
-                    norm_hash = r.old_content_hash.removeprefix("sha256:")[:12]
-
-                commit_ref = ref_state.get("commit_or_ref")
-                if commit_ref and len(commit_ref) >= 7 and not commit_ref.startswith("http") and not commit_ref.startswith("sha256:"):
-                    commit_meta = f" (commit: `{commit_ref[:8]}`)"
-                elif (
-                    r.old_identity
-                    and len(r.old_identity) >= 7
-                    and not r.old_identity.startswith("http")
-                    and not r.old_identity.startswith("sha256:")
-                    and all(c in "0123456789abcdefABCDEF" for c in r.old_identity[:8])
-                ):
-                    commit_meta = f" (commit: `{r.old_identity[:8]}`)"
-                else:
-                    commit_meta = ""
-
-                curr_id = f"`{norm_hash}`{commit_meta}"
-
-                if r.classification == WatchClassification.REFERENCE_DRIFT:
-                    new_norm = r.new_content_hash.removeprefix("sha256:")[:12]
-                    disc_up = f"`{new_norm}`"
-                    if (
-                        r.new_identity
-                        and r.new_identity != r.old_identity
-                        and len(r.new_identity) >= 7
-                        and not r.new_identity.startswith("http")
-                        and not r.new_identity.startswith("sha256:")
-                        and all(c in "0123456789abcdefABCDEF" for c in r.new_identity[:8])
-                    ):
-                        disc_up += f" (commit: `{r.new_identity[:8]}`)"
-                else:
-                    if (
-                        r.new_identity
-                        and r.new_identity != r.old_identity
-                        and len(r.new_identity) >= 7
-                        and not r.new_identity.startswith("http")
-                        and not r.new_identity.startswith("sha256:")
-                        and all(c in "0123456789abcdefABCDEF" for c in r.new_identity[:8])
-                    ):
-                        disc_up = f"— (commit: `{r.new_identity[:8]}`)"
-                    else:
-                        disc_up = "—"
-        else:
-            # Fallback if filtered
-            status_badge = "🟢 `NO_CHANGE`"
-            if s_type == "Reference Only":
-                ref_state = ref_sources_state.get(source_id, {})
-                norm_hash = ref_state.get("normalized_sha256", "").removeprefix("sha256:")[:12] or "—"
-                commit_ref = ref_state.get("commit_or_ref")
-                commit_meta = (
-                    f" (commit: `{commit_ref[:8]}`)"
-                    if commit_ref and len(commit_ref) >= 7 and not commit_ref.startswith("http") and not commit_ref.startswith("sha256:")
-                    else ""
-                )
-                curr_id = f"`{norm_hash}`{commit_meta}"
-            else:
-                curr_id = "—"
-            disc_up = "—"
-
-        # Linked escalation
-        matching_esc = [esc for esc in open_escalations if esc.get("source_id") == source_id]
-        if matching_esc:
-            esc_item = matching_esc[0]
-            esc_str = f"[#{esc_item['number']}]({esc_item['url']})" if esc_item.get("url") else f"#{esc_item['number']}"
-        else:
-            esc_str = "—"
-
-        lines.append(
-            f"| `{disp_name}` | {s_type} | {status_badge} | {curr_id} | {disc_up} | {esc_str} |"
-        )
+    sources = json.loads(state_file.read_text(encoding="utf-8")).get("sources", {}) if state_file.is_file() else {}
+    for result in report.results:
+        info = sources.get(result.source_type, {}).get(result.source_id, {})
+        lines.extend([render_source_identity(result, info), ""])
 
     # 2. Production Patches (from manifest.json)
     lines.append("")
