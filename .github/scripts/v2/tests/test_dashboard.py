@@ -361,7 +361,7 @@ class DashboardTests(unittest.TestCase):
             body = render_dashboard_body(report=clean, repo_root=REPO_ROOT)
             self.assertIn("| `Midori xx.patch` | Reference Only | 🟢 `NO_CHANGE` | `cc36da9e333c` (commit: `bc1b8e37`) | — (commit: `719d466e`) | — |", body)
             self.assertIn("| `Midori GKI 50 Patch` | Reference Only | 🟢 `NO_CHANGE` | `1fa63a063144` | — | — |", body)
-            self.assertIn("| `xxKSU` | Authoritative | 🟢 `NO_CHANGE` | `bb0be9297da4` | — | — |", body)
+            self.assertIn("| `xxKSU` | Authoritative | 🟢 `NO_CHANGE` | `bb0be9297da4` (tracking: `master`) | — | — |", body)
         with self.subTest(case='19_reference_patch_primary_identity_is_normalized_content'):
             report = make_clean_report()
             body = render_dashboard_body(report=report, repo_root=REPO_ROOT)

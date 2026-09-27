@@ -459,12 +459,15 @@ def render_dashboard_body(
         ("midori_gki_patch_50", "Reference Only"),
     ]
 
-    # Load upstream-state.json for reference normalized metadata
+    # Load declared refs and reference normalized metadata
     state_file = root / ".github" / "upstream-state.json"
     ref_sources_state: dict[str, Any] = {}
+    authoritative_sources_state: dict[str, Any] = {}
     if state_file.is_file():
         try:
-            ref_sources_state = json.loads(state_file.read_text(encoding="utf-8")).get("sources", {}).get("reference", {})
+            sources_state = json.loads(state_file.read_text(encoding="utf-8")).get("sources", {})
+            ref_sources_state = sources_state.get("reference", {})
+            authoritative_sources_state = sources_state.get("authoritative", {})
         except Exception:
             pass
 
@@ -486,6 +489,9 @@ def render_dashboard_body(
             if s_type == "Authoritative":
                 # Authoritative sources remain commit-identity based
                 curr_id = f"`{r.old_identity[:12]}`" if r.old_identity else f"`{r.old_content_hash[:12]}`"
+                tracking_ref = authoritative_sources_state.get(source_id, {}).get("ref")
+                if tracking_ref:
+                    curr_id += f" (tracking: `{tracking_ref}`)"
                 if r.new_identity and r.new_identity != r.old_identity:
                     disc_up = f"`{r.new_identity[:12]}`"
                 else:
