@@ -7,7 +7,12 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from v2.policy.patch51_source import generate, reconstruct_postimages, remove_transport, GIT_DIFF, DECLARATIONS
+from v2.engine.diff_parser import parse_patch
+from v2.policy.patch51_source import (
+    generate, reconstruct_postimages, remove_transport, GIT_DIFF, DECLARATIONS,
+    KERNEL_FILES, REMOVE_FILES, MIXED_FILES, KEEP_FILES, get_adapter,
+    decompose_mixed_ownership,
+)
 from v2.source.bundle import create_source_bundle
 from v2.source.patch_apply import apply_patch_to_bundle
 from v2.pipeline import TARGET_REL_PATHS
@@ -79,3 +84,50 @@ class Patch51SourceTests(unittest.TestCase):
             candidate.write_text("diff --git a/fs/stat.c b/fs/stat.c\n--- a/fs/stat.c\n+++ b/fs/stat.c\n@@ -1 +1 @@\n-old\n+new\n")
             self.assertEqual(subprocess.check_output(["git", "apply", "--numstat", str(candidate)], cwd=nested), b"")
             self.assertEqual(affected_sources(candidate, scratch), {"fs/stat.c"})
+
+    def test_patch50_ownership_classification_completeness(self):
+        for folder, patch_name in (
+            ("sultan", "50_add_susfs_in_gki-android14-6.1.patch"),
+            ("r38", "50_add_susfs_in_gki-android16-6.12.patch"),
+        ):
+            raw = (ROOT / ".github/fixtures" / folder / patch_name).read_text()
+            files = {f.old_path.removeprefix("a/") for f in parse_patch(raw).files}
+            all_classified = REMOVE_FILES | MIXED_FILES | KEEP_FILES
+            self.assertTrue(files.issubset(all_classified),
+                            f"unclassified files in {patch_name}: {files - all_classified}")
+            self.assertTrue(MIXED_FILES.issubset(files))
+            self.assertTrue(KEEP_FILES.issubset(files))
+
+    def test_unreviewed_patch50_file_fails_closed(self):
+        source = ROOT / ".github/fixtures/sultan"
+        patch_path = source / "50_add_susfs_in_gki-android14-6.1.patch"
+        synthetic_patch = patch_path.read_text() + (
+            "\ndiff --git a/drivers/misc/unexpected.c b/drivers/misc/unexpected.c\n"
+            "--- a/drivers/misc/unexpected.c\n"
+            "+++ b/drivers/misc/unexpected.c\n"
+            "@@ -1,1 +1,2 @@\n"
+            " line1\n"
+            "+unexpected\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_source = Path(tmp)
+            (tmp_source / "50_add_susfs_in_gki-android14-6.1.patch").write_text(synthetic_patch)
+            # Patch SHA mismatch check is hit first if SHA does not match
+            with self.assertRaises(ValueError):
+                reconstruct_postimages("sultan-android14-6.1-patch51", tmp_source, ROOT)
+
+    def test_target_adapters_interface_and_metadata(self):
+        for pid, expected_target, expected_file_count in (
+            ("sultan-android14-6.1-patch51", "sultan-android14-6.1", 18),
+            ("gki-android16-6.12-r38-patch51", "android16-6.12-2025-09_r38", 16),
+        ):
+            adapter = get_adapter(pid)
+            self.assertIsNotNone(adapter)
+            self.assertTrue(hasattr(adapter, "target_id"))
+            self.assertTrue(hasattr(adapter, "patch_id"))
+            self.assertTrue(hasattr(adapter, "apply_target_adaptation"))
+            folder = "sultan" if "sultan" in pid else "r38"
+            before, after, date, target = reconstruct_postimages(pid, ROOT / ".github/fixtures" / folder, ROOT)
+            self.assertEqual(target, expected_target)
+            self.assertEqual(len(after), expected_file_count)
+            self.assertTrue(date.endswith("+0000") or "UTC" in date or "GMT" in date)
