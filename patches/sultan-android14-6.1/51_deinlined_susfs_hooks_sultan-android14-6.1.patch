@@ -1269,7 +1269,7 @@ diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
 +			pagemap_entry_t pme = make_pme(0, 0);
 +
 +			for (; start < next; start += PAGE_SIZE) {
-+				ret = add_to_pagemap(&pme, pm);
++				ret = add_to_pagemap(start, &pme, pm);
 +				if (ret)
 +					return ret;
 +			}
