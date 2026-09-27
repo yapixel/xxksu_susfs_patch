@@ -1,0 +1,34 @@
+name: Clean-Room Reproducibility Verification
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 3 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clean-room-verification
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONPATH: .github/scripts
+    steps:
+      - name: Checkout current main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up repository-supported Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Verify fresh reconstruction, contracts, references and immutability
+        run: python3 -m v2.clean_room
