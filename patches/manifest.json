@@ -28,7 +28,7 @@
       "name": "Sultan Android 14 / 6.1 Patch 51",
       "patch_apply_target": "16.0.0-sultan",
       "relative_path": "patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch",
-      "sha256": "3aae69eb0d4e4311276f128332a57d6a8a858b0e3ec9a5aaf28a2eb32e41fc4f",
+      "sha256": "67cc15066921d8cd0e235e45486b5421c02239b91bc997d911c33d7a5de4fe63",
       "susfs_lineage": {
         "commit": "a8324101bca5e5a2dd7d0dc82b1650e10923eec9",
         "ref": "sultan-shiba-susfs-minimal",
