@@ -6,7 +6,7 @@ on:
       ksu_commit:
         description: "Authoritative KernelSU Commit to Test"
         required: false
-        default: "bb0be9297da42ff3f63819125314ce0b13935a06"
+        default: ""
   push:
     branches:
       - main
@@ -25,7 +25,6 @@ permissions:
 
 env:
   KSU_REPO: "backslashxx/KernelSU"
-  KSU_COMMIT: "bb0be9297da42ff3f63819125314ce0b13935a06"
 
 jobs:
   pipeline_11_patch:
@@ -37,13 +36,30 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.sha }}
           fetch-depth: 0
 
       - name: Set up Python 3
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      - name: Freeze accepted upstream identities
+        env:
+          KSU_OVERRIDE: ${{ github.event.inputs.ksu_commit || '' }}
+        run: |
+          set -euo pipefail
+          PYTHONPATH=.github/scripts python3 - <<'PY' >> "$GITHUB_ENV"
+          import os, re
+          from v2.manifests.defaults import accepted_sources
+          sources = accepted_sources()
+          ksu = os.environ.get("KSU_OVERRIDE") or sources["backslashxx_kernelsu"]["commit"]
+          if not re.fullmatch(r"[0-9a-f]{40}", ksu):
+              raise ValueError("KernelSU override must be an exact reviewed candidate SHA, not a moving ref")
+          print("KSU_COMMIT=" + ksu)
+          print("SULTAN_SUSFS_COMMIT=" + sources["susfs_sultan"]["commit"])
+          print("GKI_SUSFS_COMMIT=" + sources["susfs_gki"]["commit"])
+          PY
 
       - name: Verify Initial Patches Manifest Consistency
         run: |
@@ -53,7 +69,7 @@ jobs:
       - name: Fetch Clean Authoritative KernelSU Source
         run: |
           set -euo pipefail
-          TARGET_COMMIT="${{ github.event.inputs.ksu_commit || env.KSU_COMMIT }}"
+          TARGET_COMMIT="${{ env.KSU_COMMIT }}"
           echo "📥 Fetching authoritative KernelSU source from ${{ env.KSU_REPO }} @ $TARGET_COMMIT..."
           git init clean_ksu
           cd clean_ksu

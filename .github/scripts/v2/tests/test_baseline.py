@@ -32,10 +32,11 @@ class BaselineRecordContractTests(unittest.TestCase):
         self.xxksu_path = get_baseline_path("xxksu", REPO_ROOT)
 
     def test_pinned_baseline_records(self):
+        sources = json.loads((REPO_ROOT / ".github/upstream-state.json").read_text())["sources"]["authoritative"]
         for target, version, commit, susfs in (
-            ("sultan-android14-6.1", "6.1", "af5c65b9547a9f33c5f566430d0434aecab5a8b5", "a8324101bca5e5a2dd7d0dc82b1650e10923eec9"),
-            ("gki-android16-6.12", "6.12", "c8909f7cf1380810b285cbeee347dd01a8c9ec5c", "b213c54126fb243595ce7876e91d84d6e0861fec"),
-            ("xxksu", "main", "bb0be9297da42ff3f63819125314ce0b13935a06", None),
+            ("sultan-android14-6.1", "6.1", "af5c65b9547a9f33c5f566430d0434aecab5a8b5", sources["susfs_sultan"]["commit"]),
+            ("gki-android16-6.12", "6.12", "c8909f7cf1380810b285cbeee347dd01a8c9ec5c", sources["susfs_gki"]["commit"]),
+            ("xxksu", "main", sources["backslashxx_kernelsu"]["commit"], None),
         ):
             with self.subTest(target=target):
                 path = get_baseline_path(target, REPO_ROOT)
@@ -50,8 +51,8 @@ class BaselineRecordContractTests(unittest.TestCase):
                     for mode in ("manual", "lsm_bl"):
                         self.assertEqual(record.validation_results[f"{target}-{mode}"], "PASS")
                 else:
-                    self.assertEqual(record.upstream["tree"], "cc3afab7a762a029c2d8dd7d9e8a4f1358a7df9c")
-                    self.assertEqual(record.upstream["archive_sha256"], "e2cd42a7206e8956341089135f67c876f11b7759e5288c8a2ee06cc4ff313075")
+                    self.assertRegex(record.upstream["tree"], r"^[0-9a-f]{40}$")
+                    self.assertRegex(record.upstream["archive_sha256"], r"^[0-9a-f]{64}$")
                     self.assertEqual(record.patch_10["resolved_commit"], "c8f64e41e3dea2cd44754d7472d3cd0bc0b40784")
                     self.assertEqual(record.patch_11["strict_apply"], "PASS")
 

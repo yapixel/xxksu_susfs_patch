@@ -72,6 +72,14 @@ Patch 11 modifies exactly: `kernel/Kconfig`, `kernel/hook/setuid_hook.c`,
 
 ## Watch, acceptance, and publication
 
+**Tracking ref** is the mutable remote branch used for discovery. **Discovered
+revision** is its resolved immutable SHA. **Accepted revision** is the reviewed
+SHA authorized for production. Workflows read accepted state, never duplicated
+historical SHA defaults; one checkout/immutable identity is used throughout a run.
+After review, advance coherent BASELINE/state records, tracked hashes/source bundles
+and authenticated commit metadata where required; do not bypass their checks.
+A changed ref is discovered even when semantic drift remains unaccepted.
+
 Tracking refs discover upstream state; accepted revisions are immutable identities
 for individual reviewed generations, not permanent historical pins. Discovered
 revision != accepted revision triggers classification/review; accepted revisions

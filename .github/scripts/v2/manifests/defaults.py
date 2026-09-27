@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import json
+import re
+from pathlib import Path
+
 from ..model.manifest import (
     ADAPTERS, KNOWN_TARGETS, LSM_KCONFIG, MANUAL_FIXTURES, MANUAL_KCONFIG,
     ManifestSet, ProfileManifest, TargetManifest,
@@ -10,28 +14,41 @@ from ..model.provenance import FixtureRef, InputRef, PatchRef, RepositoryRef
 _TARGET_DATA = {
     "gki-android16-6.12": {
         "kernel": ("https://android.googlesource.com/kernel/common", "android16-6.12"),
-        "susfs50": ("https://gitlab.com/simonpunk/susfs4ksu", "gki-android16-6.12"),
-        "susfs50_commit": "b213c54126fb243595ce7876e91d84d6e0861fec",
     },
     "sultan-android14-6.1": {
         "kernel": ("https://github.com/kerneltoast/android_kernel_google_tensynos", "16.0.0-sultan"),
-        "susfs50": ("https://gitlab.com/simonpunk/susfs4ksu", "sultan-shiba-susfs-minimal"),
-        "susfs50_commit": "a8324101bca5e5a2dd7d0dc82b1650e10923eec9",
     },
 }
 
-_XXKSU_COMMIT = "bb0be9297da42ff3f63819125314ce0b13935a06"
+def accepted_sources(repo_root: Path | None = None) -> dict:
+    """Read reviewed run identities, not tracking HEADs or historical defaults."""
+    from .patch_manifest import get_repo_root
+    root = get_repo_root(repo_root)
+    sources = json.loads((root / ".github/upstream-state.json").read_text())["sources"]["authoritative"]
+    for key, target, field in (("backslashxx_kernelsu", "xxksu", "upstream"),
+                               ("susfs_sultan", "sultan-android14-6.1", "susfs"),
+                               ("susfs_gki", "gki-android16-6.12", "susfs")):
+        baseline = json.loads((root / "patches" / target / "BASELINE.json").read_text())[field]
+        source = sources[key]
+        if (not re.fullmatch(r"[0-9a-f]{40}", source["commit"])
+                or source["commit"] != baseline["resolved_commit"]
+                or source["repository"].removesuffix(".git") != baseline["repository"].removesuffix(".git")):
+            raise ValueError(f"accepted source identity mismatch: {key}")
+    return sources
 
 
 def _target(target_id: str) -> TargetManifest:
     data = _TARGET_DATA[target_id]
+    sources = accepted_sources()
+    susfs = sources["susfs_sultan" if target_id.startswith("sultan") else "susfs_gki"]
+    xxksu = sources["backslashxx_kernelsu"]
     kernel_url, kernel_ref = data["kernel"]
-    susfs_url, susfs_ref = data["susfs50"]
+    susfs_url, susfs_ref = susfs["repository"].removesuffix(".git"), susfs["ref"]
     refs = (
         RepositoryRef("kernel", kernel_url, requested_ref=kernel_ref),
         PatchRef("official-10", "https://gitlab.com/simonpunk/susfs4ksu", requested_ref=susfs_ref),
-        PatchRef("official-50", susfs_url, requested_ref=susfs_ref, resolved_commit=data["susfs50_commit"]),
-        RepositoryRef("xxksu", "https://github.com/backslashxx/KernelSU", requested_ref="master", resolved_commit=_XXKSU_COMMIT),
+        PatchRef("official-50", susfs_url, requested_ref=susfs_ref, resolved_commit=susfs["commit"]),
+        RepositoryRef("xxksu", xxksu["repository"].removesuffix(".git"), requested_ref=xxksu["ref"], resolved_commit=xxksu["commit"]),
     )
     return TargetManifest("xxksu-susfs-target/v1", target_id, refs, ADAPTERS[target_id],
                           f"{target_id.replace('-', '_')}_51", (f"{target_id}-manual", f"{target_id}-lsm_bl"))

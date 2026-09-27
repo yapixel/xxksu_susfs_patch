@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       ksu_branch:
-        description: "KernelSU Branch or Commit"
+        description: "Exact reviewed KernelSU candidate SHA (empty: accepted revision)"
         required: false
-        default: "bb0be9297da42ff3f63819125314ce0b13935a06"
+        default: ""
       test_fail_validation:
         description: "Simulate validation failure for atomicity test (sultan | gki | none)"
         required: false
@@ -33,7 +33,6 @@ permissions:
 env:
   SUSFS_REPO_URL: "https://gitlab.com/simonpunk/susfs4ksu.git"
   KSU_REPO: "backslashxx/KernelSU"
-  KSU_COMMIT: "bb0be9297da42ff3f63819125314ce0b13935a06"
 
 jobs:
   validate_sultan:
@@ -45,13 +44,30 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.sha }}
           fetch-depth: 0
 
       - name: Set up Python 3
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      - name: Freeze accepted upstream identities
+        env:
+          KSU_OVERRIDE: ${{ github.event.inputs.ksu_branch || '' }}
+        run: |
+          set -euo pipefail
+          PYTHONPATH=.github/scripts python3 - <<'PY' >> "$GITHUB_ENV"
+          import os, re
+          from v2.manifests.defaults import accepted_sources
+          sources = accepted_sources()
+          ksu = os.environ.get("KSU_OVERRIDE") or sources["backslashxx_kernelsu"]["commit"]
+          if not re.fullmatch(r"[0-9a-f]{40}", ksu):
+              raise ValueError("KernelSU override must be an exact reviewed candidate SHA, not a moving ref")
+          print("KSU_COMMIT=" + ksu)
+          print("SULTAN_SUSFS_COMMIT=" + sources["susfs_sultan"]["commit"])
+          print("GKI_SUSFS_COMMIT=" + sources["susfs_gki"]["commit"])
+          PY
 
       - name: Verify Initial Patches Manifest Consistency
         run: |
@@ -60,11 +76,12 @@ jobs:
 
       - name: Clone Upstream SuSFS Source
         run: |
-          echo "📥 Fetching upstream SuSFS (commit: a8324101bca5e5a2dd7d0dc82b1650e10923eec9)..."
+          set -euo pipefail
+          echo "📥 Fetching upstream SuSFS (commit: $SULTAN_SUSFS_COMMIT)..."
           git init susfs_src
           cd susfs_src
           git remote add origin "${{ env.SUSFS_REPO_URL }}"
-          git fetch --depth=1 origin "a8324101bca5e5a2dd7d0dc82b1650e10923eec9"
+          git fetch --depth=1 origin "$SULTAN_SUSFS_COMMIT"
           git checkout FETCH_HEAD
 
       - name: Prepare Clean Kernel Source Tree (Sultan 6.1)
@@ -111,14 +128,14 @@ jobs:
           set -euo pipefail
           cd kernel_tree
           
-          echo "🧪 Setting up authoritative xxKSU (${{ github.event.inputs.ksu_branch || env.KSU_COMMIT }})..."
+          echo "🧪 Setting up authoritative xxKSU (${{ env.KSU_COMMIT }})..."
           if [ ! -d "KernelSU" ]; then
             git init KernelSU
             cd KernelSU
             git config user.name "yapixel"
             git config user.email "yapixel@users.noreply.github.com"
             git remote add origin "https://github.com/${{ env.KSU_REPO }}.git"
-            git fetch --depth=1 origin "${{ github.event.inputs.ksu_branch || env.KSU_COMMIT }}"
+            git fetch --depth=1 origin "${{ env.KSU_COMMIT }}"
             git checkout FETCH_HEAD
             cd ..
           fi
@@ -161,13 +178,30 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.sha }}
           fetch-depth: 0
 
       - name: Set up Python 3
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      - name: Freeze accepted upstream identities
+        env:
+          KSU_OVERRIDE: ${{ github.event.inputs.ksu_branch || '' }}
+        run: |
+          set -euo pipefail
+          PYTHONPATH=.github/scripts python3 - <<'PY' >> "$GITHUB_ENV"
+          import os, re
+          from v2.manifests.defaults import accepted_sources
+          sources = accepted_sources()
+          ksu = os.environ.get("KSU_OVERRIDE") or sources["backslashxx_kernelsu"]["commit"]
+          if not re.fullmatch(r"[0-9a-f]{40}", ksu):
+              raise ValueError("KernelSU override must be an exact reviewed candidate SHA, not a moving ref")
+          print("KSU_COMMIT=" + ksu)
+          print("SULTAN_SUSFS_COMMIT=" + sources["susfs_sultan"]["commit"])
+          print("GKI_SUSFS_COMMIT=" + sources["susfs_gki"]["commit"])
+          PY
 
       - name: Verify Initial Patches Manifest Consistency
         run: |
@@ -176,11 +210,12 @@ jobs:
 
       - name: Clone Upstream SuSFS Source
         run: |
-          echo "📥 Fetching upstream SuSFS (commit: b213c54126fb243595ce7876e91d84d6e0861fec)..."
+          set -euo pipefail
+          echo "📥 Fetching upstream SuSFS (commit: $GKI_SUSFS_COMMIT)..."
           git init susfs_src
           cd susfs_src
           git remote add origin "${{ env.SUSFS_REPO_URL }}"
-          git fetch --depth=1 origin "b213c54126fb243595ce7876e91d84d6e0861fec"
+          git fetch --depth=1 origin "$GKI_SUSFS_COMMIT"
           git checkout FETCH_HEAD
 
       - name: Prepare Clean Kernel Source Tree (android16-6.12-2025-09_r38)
@@ -238,14 +273,14 @@ jobs:
           set -euo pipefail
           cd kernel_tree
 
-          echo "🧪 Setting up authoritative xxKSU (${{ github.event.inputs.ksu_branch || env.KSU_COMMIT }})..."
+          echo "🧪 Setting up authoritative xxKSU (${{ env.KSU_COMMIT }})..."
           if [ ! -d "KernelSU" ]; then
             git init KernelSU
             cd KernelSU
             git config user.name "yapixel"
             git config user.email "yapixel@users.noreply.github.com"
             git remote add origin "https://github.com/${{ env.KSU_REPO }}.git"
-            git fetch --depth=1 origin "${{ github.event.inputs.ksu_branch || env.KSU_COMMIT }}"
+            git fetch --depth=1 origin "${{ env.KSU_COMMIT }}"
             git checkout FETCH_HEAD
             cd ..
           fi
@@ -297,7 +332,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.sha }}
           fetch-depth: 0
 
       - name: Set up Python 3

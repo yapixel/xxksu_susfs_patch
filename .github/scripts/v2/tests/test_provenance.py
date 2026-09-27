@@ -62,9 +62,8 @@ class ProvenanceTests(unittest.TestCase):
             generate_candidate_patch("xxksu-patch11", self.ksu, self.root)
 
     def test_sultan_without_outputs_is_deterministic_and_inputs_are_required(self):
-        # Approved metadata-only migration; body/golden is checked only as output.
-        expected = re.sub(rb"(?m)^Date:.*$", b"Date: Fri, 25 Sep 2026 17:26:49 +0000",
-                          (ROOT / TARGET_REL_PATHS[SULTAN]).read_bytes())
+        # Production is a final assertion only, never a generation input.
+        expected = (ROOT / TARGET_REL_PATHS[SULTAN]).read_bytes()
         self.assertEqual(self.fresh(SULTAN, self.sultan), expected)
         self.assertEqual(self.fresh(SULTAN, self.sultan), expected)
         source = self.sultan / "50_add_susfs_in_gki-android14-6.1.patch"
@@ -76,7 +75,7 @@ class ProvenanceTests(unittest.TestCase):
                         "--target", "sultan-android14-6.1"], cwd=self.root,
                        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
                        check=True, capture_output=True)
-        self.assertIn("Date: Fri, 25 Sep 2026 17:26:49 +0000", output.read_text())
+        self.assertIn(re.search(rb"(?m)^Date:.*$", expected).group().decode(), output.read_text())
         original = source.read_text()
         source.unlink()
         with self.assertRaises(CandidateGenerationError):
@@ -146,7 +145,6 @@ class ProvenanceTests(unittest.TestCase):
         # Golden is read only AFTER independent generation; it supplies no input.
         expected = (ROOT / TARGET_REL_PATHS[patch_id]).read_bytes()
         self.assertEqual(first, expected)
-        self.assertIn(b"Date: Fri, 25 Sep 2026 17:48:27 +0000", first)
         empty = self.root / "empty"
         empty.mkdir()
         with self.assertRaisesRegex(CandidateGenerationError, "Patch 50 missing"):
@@ -190,3 +188,75 @@ class ProvenanceTests(unittest.TestCase):
         metadata.write_bytes(metadata.read_bytes() + b"tampered")
         with self.assertRaisesRegex(CandidateGenerationError, "metadata identity mismatch"):
             generate_candidate_patch(patch_id, source.parent, self.root)
+
+    def test_tracking_drift_and_reviewed_revision_advancement(self):
+        from v2.manifests.defaults import accepted_sources
+        state_path = self.root / ".github/upstream-state.json"
+        state = json.loads(state_path.read_text())
+        cases = (("backslashxx_kernelsu", "xxksu", "upstream", "xxksu-patch11", self.ksu),
+                 ("susfs_sultan", "sultan-android14-6.1", "susfs", SULTAN, self.sultan),
+                 ("susfs_gki", "gki-android16-6.12", "susfs", "gki-android16-6.12-r38-patch51",
+                  self.root / ".github/fixtures/r38"))
+        for key, target, field, patch_id, source in cases:
+            with self.subTest(source=key):
+                info = state["sources"]["authoritative"][key]
+                old = info["commit"]
+                if target == "xxksu":
+                    new = "f" * 40
+                    tracked = "kernel/Kconfig"
+                    old_text = (self.ksu / tracked).read_text()
+                    changed = old_text.replace("endmenu", "unreviewed_anchor", 1)
+                else:
+                    metadata = source / "susfs-source-commit.txt"
+                    raw = metadata.read_bytes() + b"\nSimulated reviewed revision\n"
+                    new = hashlib.sha1(b"commit " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
+                    tracked = next(p for p in info["tracked_files"] if "/50_" in p)
+                    old_text = (source / Path(tracked).name).read_text()
+                    changed = old_text.replace("susfs.o", "unreviewed.o", 1)
+                self.assertNotEqual(changed, old_text)
+                watcher = UpstreamWatcher(self.root, state_path)
+                def fetch(url, revision, paths):
+                    return {tracked: old_text if revision == old else changed}
+                with patch("v2.watch.checker.fetch_remote_commit", return_value=new) as resolve, \
+                     patch("v2.watch.checker.fetch_git_files", side_effect=fetch) as files:
+                    result = (watcher.check_backslashxx_kernelsu(info) if target == "xxksu" else
+                              watcher.check_susfs_authoritative(key, target, info))
+                resolve.assert_called_once_with(info["repository"], info["ref"])
+                self.assertEqual((result.old_identity, result.new_identity), (old, new))
+                self.assertNotEqual(result.classification, WatchClassification.NO_CHANGE)
+                self.assertTrue(any(call.args[1] == new for call in files.call_args_list))
+                # Simulated human approval of a new revision with identical source:
+                # synchronize identity records and authenticated commit metadata only.
+                info["commit"] = new
+                state_path.write_text(json.dumps(state))
+                baseline = self.root / "patches" / target / "BASELINE.json"
+                data = json.loads(baseline.read_text())
+                data[field]["resolved_commit"] = new
+                with self.assertRaisesRegex(ValueError, "accepted source identity mismatch"):
+                    accepted_sources(self.root)
+                baseline.write_text(json.dumps(data))
+                if target != "xxksu":
+                    metadata.write_bytes(raw)
+                self.assertEqual(accepted_sources(self.root)[key]["commit"], new)
+                self.assertEqual(self.fresh(patch_id, source),
+                                 (ROOT / TARGET_REL_PATHS[patch_id]).read_bytes())
+
+        # Execute the actual workflow identity-freezing shell, not a test resolver.
+        for name in ("generate-11-ksu-patch.yml", "generate-51-kernel-patches.yml"):
+            workflow = (ROOT / ".github/workflows" / name).read_text()
+            self.assertNotIn("ref: main", workflow)
+            self.assertNotRegex(workflow, r"bb0be929|a8324101|b213c541")
+            blocks = re.findall(r"name: Freeze accepted upstream identities.*?        run: \|\n(.*?)(?=\n      - name:)", workflow, re.S)
+            self.assertEqual(len(blocks), 1 if "11-" in name else 2)
+            for block in blocks:
+                script = "\n".join(line[10:] for line in block.splitlines())
+                output = self.root / "run-identities"
+                env = {**os.environ, "GITHUB_ENV": str(output), "KSU_OVERRIDE": "",
+                       "PYTHONDONTWRITEBYTECODE": "1"}
+                subprocess.run(["bash", "-c", script], cwd=self.root, env=env, check=True)
+                self.assertIn("KSU_COMMIT=" + state["sources"]["authoritative"]["backslashxx_kernelsu"]["commit"], output.read_text())
+                self.assertIn("SULTAN_SUSFS_COMMIT=" + state["sources"]["authoritative"]["susfs_sultan"]["commit"], output.read_text())
+                self.assertIn("GKI_SUSFS_COMMIT=" + state["sources"]["authoritative"]["susfs_gki"]["commit"], output.read_text())
+                env["KSU_OVERRIDE"] = "master"
+                self.assertNotEqual(subprocess.run(["bash", "-c", script], cwd=self.root,
+                                    env=env, capture_output=True).returncode, 0)
