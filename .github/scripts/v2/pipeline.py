@@ -20,6 +20,7 @@ If candidate generation/validation fails, `patches/` is NEVER modified.
 from __future__ import annotations
 
 import argparse
+import copy
 from dataclasses import dataclass
 import hashlib
 import json
@@ -34,7 +35,7 @@ from typing import Mapping, Optional, Sequence, Tuple
 
 from .adapters.xxksu import PATCH11_CANONICAL_FILES, generate_patch11
 from .engine.diff_parser import parse_patch
-from .manifests.patch_manifest import verify_patch_manifest, write_patch_manifest
+from .manifests.patch_manifest import verify_patch_manifest, generate_patch_manifest, format_manifest
 from .semantic.gate import verify_semantic_gate_for_pipeline
 from .semantic.registry import SemanticRegistry
 from .source.bundle import SourceBundle, create_source_bundle
@@ -113,6 +114,7 @@ class PipelineResult:
     pushed: bool = False
     commit_sha: Optional[str] = None
     details: str = ""
+    publication_state: str = "VALIDATION_ONLY"
 
 
 def _find_date_header(patch_content: str) -> Optional[str]:
@@ -228,70 +230,72 @@ def _extract_git_commit(upstream_input: Path) -> Optional[str]:
     return None
 
 
-def _update_baseline_record(patch_id: str, candidate_sha: str, repo_root: Path, upstream_commit: Optional[str] = None) -> None:
-    import json
-    if patch_id == "xxksu-patch11":
-        base_file = repo_root / "patches" / "xxksu" / "BASELINE.json"
-        if base_file.is_file():
-            data = json.loads(base_file.read_text(encoding="utf-8"))
-            data.setdefault("patch_11", {})["patch_sha256"] = f"sha256:{candidate_sha}"
-            if upstream_commit:
-                data.setdefault("upstream", {})["resolved_commit"] = upstream_commit
-            base_file.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-    elif patch_id == "sultan-android14-6.1-patch51":
-        base_file = repo_root / "patches" / "sultan-android14-6.1" / "BASELINE.json"
-        if base_file.is_file():
-            data = json.loads(base_file.read_text(encoding="utf-8"))
-            data.setdefault("patch_51", {})["patch_sha256"] = f"sha256:{candidate_sha}"
-            if upstream_commit:
-                data.setdefault("susfs", {})["resolved_commit"] = upstream_commit
-            base_file.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-    elif patch_id == "gki-android16-6.12-r38-patch51":
-        base_file = repo_root / "patches" / "gki-android16-6.12" / "BASELINE.json"
-        if base_file.is_file():
-            data = json.loads(base_file.read_text(encoding="utf-8"))
-            data.setdefault("patch_51", {})["patch_sha256"] = f"sha256:{candidate_sha}"
+def _plan_metadata_updates(
+    candidate_shas: Mapping[str, str], upstream_commits: Mapping[str, str],
+    repo_root: Path,
+) -> dict[Path, bytes]:
+    """Read-only plan for the existing baseline/provenance synchronization fields.
+
+    Commits are supplied only after the caller's validation gates. Equality of
+    patch bytes does not imply equality of accepted source provenance.
+    """
+    updates = {}
+    for patch_id, candidate_sha in candidate_shas.items():
+        path = TARGET_REL_PATHS[patch_id].parent / "BASELINE.json"
+        full_path = repo_root / path
+        if not full_path.is_file():
+            continue
+        before = json.loads(full_path.read_bytes())
+        data = copy.deepcopy(before)
+        key = "patch_11" if patch_id == "xxksu-patch11" else "patch_51"
+        data.setdefault(key, {})["patch_sha256"] = f"sha256:{candidate_sha}"
+        if patch_id == "gki-android16-6.12-r38-patch51":
             compat = data.setdefault("metadata", {}).setdefault("compatibility_patches", {}).setdefault("gki-android16-6.12-r38", {})
             compat["patch_sha256"] = f"sha256:{candidate_sha}"
-            if upstream_commit:
-                data.setdefault("susfs", {})["resolved_commit"] = upstream_commit
-            base_file.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        commit = upstream_commits.get(patch_id)
+        if commit:
+            lineage = "upstream" if patch_id == "xxksu-patch11" else "susfs"
+            data.setdefault(lineage, {})["resolved_commit"] = commit
+        if data != before:
+            updates[path] = (json.dumps(data, indent=2) + "\n").encode()
 
-
-def _update_upstream_state(patch_id: str, upstream_input: Path, repo_root: Path) -> bool:
-    """Synchronize authoritative commit in .github/upstream-state.json if available.
-
-    Returns True if an authoritative source commit was updated, False otherwise.
-    """
-    state_file = repo_root / ".github" / "upstream-state.json"
-    if not state_file.is_file():
-        return False
-
-    commit = _extract_git_commit(upstream_input)
-    if not commit:
-        return False
-
-    source_map = {
-        "xxksu-patch11": "backslashxx_kernelsu",
-        "sultan-android14-6.1-patch51": "susfs_sultan",
-        "gki-android16-6.12-r38-patch51": "susfs_gki",
-    }
-    source_key = source_map.get(patch_id)
-    if not source_key:
-        return False
-
-    try:
-        import json
-        data = json.loads(state_file.read_text(encoding="utf-8"))
+    state_path = Path(".github/upstream-state.json")
+    if upstream_commits and (repo_root / state_path).is_file():
+        before = json.loads((repo_root / state_path).read_bytes())
+        data = copy.deepcopy(before)
         authoritative = data.get("sources", {}).get("authoritative", {})
-        if source_key in authoritative:
-            if authoritative[source_key].get("commit") != commit:
-                authoritative[source_key]["commit"] = commit
-                state_file.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-                return True
-    except Exception:
-        pass
-    return False
+        source_keys = {
+            "xxksu-patch11": "backslashxx_kernelsu",
+            "sultan-android14-6.1-patch51": "susfs_sultan",
+            "gki-android16-6.12-r38-patch51": "susfs_gki",
+        }
+        for patch_id in candidate_shas:
+            commit = upstream_commits.get(patch_id)
+            key = source_keys[patch_id]
+            if commit and key in authoritative:
+                authoritative[key]["commit"] = commit
+        if data != before:
+            updates[state_path] = (json.dumps(data, indent=2) + "\n").encode()
+    return updates
+
+
+def _manifest_is_current(repo_root: Path) -> bool:
+    return (not (repo_root / "patches/manifest.json").is_file()
+            or verify_patch_manifest(repo_root)[0])
+
+
+def _publish_metadata(updates: Mapping[Path, bytes], repo_root: Path) -> None:
+    """Apply only planned metadata changes, then synchronize shared manifest once."""
+    for path, content in updates.items():
+        (repo_root / path).write_bytes(content)
+    manifest = repo_root / "patches/manifest.json"
+    if manifest.is_file():
+        expected = format_manifest(generate_patch_manifest(repo_root)).encode()
+        if manifest.read_bytes() != expected:
+            manifest.write_bytes(expected)
+        valid, errors = verify_patch_manifest(repo_root)
+        if not valid:
+            raise PromotionError("Manifest consistency check failed:\n" + "\n".join(errors))
 
 
 def _resolve_repo_slug(repo_root: Path, git_remote: str) -> Optional[str]:
@@ -534,7 +538,9 @@ def deliver_multi_candidates(
 ) -> Tuple[bool, bool, Optional[str], dict[str, str]]:
     """Atomically promote and deliver multiple validated candidates to git.
 
-    Returns (promoted: bool, committed: bool, commit_sha: Optional[str], candidate_shas: dict[str, str]).
+    Returns (state_changed: bool, pushed: bool, commit_sha: Optional[str], candidate_shas: dict[str, str]).
+    state_changed includes metadata-only promotion; all supplied candidates must
+    already have passed the upstream validation jobs.
     """
     if repo_root is None:
         repo_root = Path.cwd()
@@ -584,8 +590,9 @@ def deliver_multi_candidates(
         if public_bytes != cand_bytes:
             changed_targets[patch_id] = (cand_path, cand_bytes, cand_sha)
 
-    if not changed_targets:
-        # All candidates are already up to date on disk
+    metadata_updates = _plan_metadata_updates(candidate_shas, upstream_commits or {}, repo_root)
+    if not changed_targets and not metadata_updates and _manifest_is_current(repo_root):
+        # FULL_STATE_NOOP: validation is complete; no publication work is needed.
         if write_back and verify_raw_url:
             for patch_id, (cand_path, cand_bytes, cand_sha) in candidate_data.items():
                 _verify_existing_delivery(patch_id, cand_sha, cand_bytes, repo_root, git_remote, git_branch)
@@ -599,16 +606,7 @@ def deliver_multi_candidates(
         if public_path.read_bytes() != cand_bytes:
             raise PromotionError(f"Promoted file at {public_path} does not match candidate bytes")
 
-        up_commit = upstream_commits.get(patch_id) if upstream_commits else None
-        _update_baseline_record(patch_id, cand_sha, repo_root, upstream_commit=up_commit)
-
-    # Regenerate manifest and verify
-    manifest_path = repo_root / "patches" / "manifest.json"
-    if manifest_path.is_file():
-        write_patch_manifest(repo_root)
-        valid, errors = verify_patch_manifest(repo_root)
-        if not valid:
-            raise PromotionError("Manifest consistency check failed after multi-promotion:\n" + "\n".join(errors))
+    _publish_metadata(metadata_updates, repo_root)
 
     if not write_back:
         return True, False, None, candidate_shas
@@ -618,18 +616,8 @@ def deliver_multi_candidates(
     if not git_dir.exists():
         return True, False, None, candidate_shas
 
-    allowed_paths = [Path("patches/manifest.json")]
-    for patch_id in changed_targets:
-        allowed_paths.append(TARGET_REL_PATHS[patch_id])
-        if patch_id == "xxksu-patch11":
-            allowed_paths.append(Path("patches/xxksu/BASELINE.json"))
-        elif patch_id == "sultan-android14-6.1-patch51":
-            allowed_paths.append(Path("patches/sultan-android14-6.1/BASELINE.json"))
-        elif patch_id == "gki-android16-6.12-r38-patch51":
-            allowed_paths.append(Path("patches/gki-android16-6.12/BASELINE.json"))
-
-    if (repo_root / ".github" / "upstream-state.json").is_file():
-        allowed_paths.append(Path(".github/upstream-state.json"))
+    allowed_paths = [Path("patches/manifest.json"), *metadata_updates]
+    allowed_paths.extend(TARGET_REL_PATHS[patch_id] for patch_id in changed_targets)
 
     for rel_path in allowed_paths:
         full_path = repo_root / rel_path
@@ -666,10 +654,10 @@ def deliver_multi_candidates(
     if not email_proc.stdout.strip():
         subprocess.run(["git", "config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"], cwd=repo_root, check=True)
 
-    summary_lines = "\n".join(f"- {pid}: {csha}" for pid, (_, _, csha) in changed_targets.items())
+    summary_lines = "\n".join(f"- {pid}: {csha}" for pid, csha in candidate_shas.items())
     commit_msg = (
         "auto(pipeline): deliver verified 51 patch production outputs [skip ci]\n\n"
-        f"Promoted candidates:\n{summary_lines}\n"
+        f"Validated candidates:\n{summary_lines}\n"
     )
 
     commit_proc = subprocess.run(
@@ -880,10 +868,26 @@ def run_pipeline(
     pushed = False
     commit_sha = None
 
+    publication_state = "VALIDATION_ONLY"
     if promote:
-        if public_bytes_before is not None and public_bytes_before == candidate_bytes:
-            is_noop = True
-        else:
+        upstream_commit = _extract_git_commit(upstream_input)
+        metadata_updates = _plan_metadata_updates(
+            {patch_id: candidate_sha},
+            {patch_id: upstream_commit} if upstream_commit else {}, repo_root,
+        )
+        patch_changed = public_bytes_before != candidate_bytes
+        if not patch_changed and not metadata_updates and _manifest_is_current(repo_root):
+            if write_back and verify_raw_url:
+                _verify_existing_delivery(patch_id, candidate_sha, candidate_bytes,
+                                          repo_root, git_remote, git_branch)
+            return PipelineResult(
+                patch_id=patch_id, candidate_path=candidate_path, public_path=public_path,
+                candidate_sha256=candidate_sha, validated=True, promoted=False,
+                is_noop=True, publication_state="FULL_STATE_NOOP",
+                details="Validated candidate and authoritative metadata already current",
+            )
+        publication_state = "PATCH_PROMOTION" if patch_changed else "METADATA_ONLY_PROMOTION"
+        if patch_changed:
             public_path.parent.mkdir(parents=True, exist_ok=True)
             public_path.write_bytes(candidate_bytes)
             promoted = True
@@ -895,17 +899,8 @@ def run_pipeline(
                 f"Promoted file at {public_path} does not match validated candidate bytes at {candidate_path}"
             )
 
-        # Step 5: Regenerate manifest/metadata and verify consistency
-        upstream_commit = _extract_git_commit(upstream_input)
-        _update_baseline_record(patch_id, candidate_sha, repo_root, upstream_commit=upstream_commit)
-        updated_upstream_state = _update_upstream_state(patch_id, upstream_input, repo_root)
-
-        manifest_path = repo_root / "patches" / "manifest.json"
-        if manifest_path.is_file():
-            write_patch_manifest(repo_root)
-            valid, errors = verify_patch_manifest(repo_root)
-            if not valid:
-                raise PromotionError("Manifest consistency check failed after promotion:\n" + "\n".join(errors))
+        _publish_metadata(metadata_updates, repo_root)
+        updated_upstream_state = Path(".github/upstream-state.json") in metadata_updates
 
         # Step 6: Delivery / Write-Back (origin/main)
         if write_back:
@@ -920,8 +915,6 @@ def run_pipeline(
                 verify_raw_url=verify_raw_url,
                 updated_upstream_state=updated_upstream_state,
             )
-            if not committed:
-                is_noop = True
 
     return PipelineResult(
         patch_id=patch_id,
@@ -931,13 +924,14 @@ def run_pipeline(
         validated=True,
         promoted=promoted,
         is_noop=is_noop,
+        publication_state=publication_state,
         committed=committed,
         pushed=pushed,
         commit_sha=commit_sha,
         details=(
             "Pipeline delivered verified changes to git"
             if committed
-            else ("Pipeline completed successfully: generated -> validated -> promoted" if promote else "Candidate generated and validated successfully")
+            else (f"Pipeline completed successfully: {publication_state}" if promote else "Candidate generated and validated successfully")
         ),
     )
 
@@ -1004,7 +998,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         status_str = (
             "DELIVERED"
             if res.pushed
-            else ("COMMITTED" if res.committed else ("PROMOTED" if res.promoted else ("NO_OP (up to date)" if res.is_noop else "CANDIDATE_READY")))
+            else ("COMMITTED" if res.committed else ("PROMOTED" if res.promoted else ("NO_OP (up to date)" if res.is_noop else (res.publication_state if promote else "CANDIDATE_READY"))))
         )
         print(f"✅ Pipeline SUCCESS for {res.patch_id} [{status_str}]:")
         print(f"  - Candidate:  {res.candidate_path}")

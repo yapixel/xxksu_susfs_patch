@@ -18,6 +18,9 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
+from contextlib import ExitStack
+import v2.pipeline as pipeline
 
 from v2.manifests.patch_manifest import verify_patch_manifest
 from v2.pipeline import (
@@ -151,6 +154,7 @@ class TestPipelineDelivery(unittest.TestCase):
         )
 
         self.assertTrue(res.promoted, "Candidate must be promoted")
+        self.assertEqual(res.publication_state, "PATCH_PROMOTION")
         self.assertTrue(res.committed, "Candidate change must be committed")
         self.assertTrue(res.pushed, "Candidate change must be pushed")
 
@@ -325,15 +329,17 @@ class TestPipelineDelivery(unittest.TestCase):
         cand_sultan = real_root / ".github" / "fixtures" / "sultan" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
         cand_gki = real_root / ".github" / "fixtures" / "r38" / "51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
 
-        promoted, pushed, commit_sha, shas = deliver_multi_candidates(
-            {
-                "sultan-android14-6.1-patch51": cand_sultan,
-                "gki-android16-6.12-r38-patch51": cand_gki,
-            },
-            repo_root=self.repo_root,
-            write_back=True,
-            verify_raw_url=False,
-        )
+        with patch("v2.pipeline._publish_metadata", wraps=pipeline._publish_metadata) as metadata:
+            promoted, pushed, commit_sha, shas = deliver_multi_candidates(
+                {
+                    "sultan-android14-6.1-patch51": cand_sultan,
+                    "gki-android16-6.12-r38-patch51": cand_gki,
+                },
+                repo_root=self.repo_root,
+                write_back=True,
+                verify_raw_url=False,
+            )
+        metadata.assert_called_once()
 
         self.assertTrue(promoted, "Both targets should be promoted")
         self.assertTrue(pushed, "Changes should be pushed")
@@ -380,52 +386,47 @@ class TestPipelineDelivery(unittest.TestCase):
         self.assertTrue(valid, f"Manifest invalid after multi-delivery: {errors}")
 
     def test_12_multi_candidate_one_changed_one_unchanged(self):
-        """Invariant: When one candidate changed and one unchanged, still exactly one delivery commit."""
         real_root = Path(__file__).resolve().parents[4]
-        sultan_patch = self.repo_root / "patches" / "sultan-android14-6.1" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
-        sultan_patch.write_text("old sultan patch placeholder\n", encoding="utf-8")
-        subprocess.run(["git", "add", str(sultan_patch)], cwd=self.repo_root, check=True)
-        subprocess.run(["git", "commit", "-m", "mock: simulate older sultan patch only"], cwd=self.repo_root, check=True)
-        subprocess.run(["git", "push", "origin", "main"], cwd=self.repo_root, check=True)
+        candidates = {pid: real_root / rel for pid, rel in pipeline.TARGET_REL_PATHS.items()
+                      if pid != "xxksu-patch11"}
+        for index, changed_id in enumerate(candidates):
+            with self.subTest(changed=changed_id):
+                changed_rel = pipeline.TARGET_REL_PATHS[changed_id]
+                changed_path = self.repo_root / changed_rel
+                changed_path.write_text("old patch placeholder\n")
+                subprocess.run(["git", "add", str(changed_path)], cwd=self.repo_root, check=True)
+                subprocess.run(["git", "commit", "-m", "mock: old single target"], cwd=self.repo_root, check=True)
+                subprocess.run(["git", "push", "origin", "main"], cwd=self.repo_root, check=True)
+                head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=self.repo_root, text=True).strip()
+                unchanged_id = next(pid for pid in candidates if pid != changed_id)
+                unchanged = pipeline.TARGET_REL_PATHS[unchanged_id]
+                protected = {self.repo_root / unchanged, self.repo_root / unchanged.parent / "BASELINE.json"}
+                snapshot = {p: p.read_bytes() for p in protected}
 
-        head_before = subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.repo_root, capture_output=True, text=True, check=True).stdout.strip()
+                def guard(original):
+                    def write(path, *args, **kwargs):
+                        self.assertNotIn(path.resolve(), protected)
+                        return original(path, *args, **kwargs)
+                    return write
 
-        # Delivery identity test, not generation: setup copied these exact
-        # production bytes. Historical generator fixtures need not equal them.
-        cand_sultan = real_root / "patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
-        cand_gki = real_root / "patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
-        gki_public = self.repo_root / "patches/gki-android16-6.12" / cand_gki.name
-        gki_before = gki_public.read_bytes()
-        self.assertEqual(cand_gki.read_bytes(), gki_before)
-
-        promoted, pushed, commit_sha, _ = deliver_multi_candidates(
-            {
-                "sultan-android14-6.1-patch51": cand_sultan,
-                "gki-android16-6.12-r38-patch51": cand_gki,
-            },
-            repo_root=self.repo_root,
-            write_back=True,
-            verify_raw_url=False,
-        )
-
-        self.assertTrue(promoted)
-        self.assertTrue(pushed)
-        rev_count = subprocess.run(
-            ["git", "rev-list", "--count", f"{head_before}..HEAD"],
-            cwd=self.repo_root,
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.strip()
-        self.assertEqual(rev_count, "1")
-
-        self.assertEqual(gki_public.read_bytes(), gki_before)
-        changed = subprocess.check_output(["git", "diff", "--name-only", head_before, "HEAD"],
-                                          cwd=self.repo_root, text=True).splitlines()
-        self.assertNotIn(str(gki_public.relative_to(self.repo_root)), changed)
-
-        valid, errors = verify_patch_manifest(self.repo_root)
-        self.assertTrue(valid, f"Manifest invalid: {errors}")
+                with patch.object(Path, "write_bytes", guard(Path.write_bytes)), \
+                     patch.object(Path, "write_text", guard(Path.write_text)), \
+                     patch("v2.pipeline._publish_metadata", wraps=pipeline._publish_metadata) as metadata:
+                    promoted, pushed, commit, _ = deliver_multi_candidates(
+                        candidates, repo_root=self.repo_root, write_back=True, verify_raw_url=False,
+                        upstream_commits={changed_id: str(index + 1) * 40},
+                    )
+                self.assertTrue(promoted and pushed)
+                metadata.assert_called_once()
+                self.assertEqual(subprocess.check_output(["git", "rev-parse", "HEAD^"], cwd=self.repo_root, text=True).strip(), head)
+                self.assertEqual(subprocess.check_output(["git", "rev-parse", "origin/main"], cwd=self.repo_root, text=True).strip(), commit)
+                changed = set(subprocess.check_output(["git", "diff", "--name-only", head, "HEAD"], cwd=self.repo_root, text=True).splitlines())
+                self.assertEqual(changed, {str(changed_rel), str(changed_rel.parent / "BASELINE.json"),
+                                           "patches/manifest.json", ".github/upstream-state.json"})
+                self.assertEqual({p: p.read_bytes() for p in protected}, snapshot)
+                for pid, candidate in candidates.items():
+                    self.assertEqual((self.repo_root / pipeline.TARGET_REL_PATHS[pid]).read_bytes(), candidate.read_bytes())
+                self.assertTrue(verify_patch_manifest(self.repo_root)[0])
 
     def test_13_multi_candidate_both_unchanged_noop(self):
         """Invariant: When both candidates are already up to date, clean NO_OP with 0 commits."""
@@ -433,15 +434,23 @@ class TestPipelineDelivery(unittest.TestCase):
         cand_sultan = real_root / "patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
         cand_gki = real_root / "patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch"
 
-        promoted, pushed, commit_sha, _ = deliver_multi_candidates(
-            {
-                "sultan-android14-6.1-patch51": cand_sultan,
-                "gki-android16-6.12-r38-patch51": cand_gki,
-            },
-            repo_root=self.repo_root,
-            write_back=True,
-            verify_raw_url=False,
-        )
+        protected = [p for p in (self.repo_root / "patches").rglob("*") if p.is_file()]
+        protected.append(self.repo_root / ".github/upstream-state.json")
+        before = {p: p.read_bytes() for p in protected}
+        with patch("v2.pipeline._publish_metadata", side_effect=AssertionError("no-op entered metadata publication")), \
+             patch.object(Path, "write_bytes", side_effect=AssertionError("no-op wrote bytes")), \
+             patch.object(Path, "write_text", side_effect=AssertionError("no-op wrote text")), \
+             patch("v2.pipeline.subprocess.run", side_effect=AssertionError("no-op entered Git delivery")):
+            promoted, pushed, commit_sha, _ = deliver_multi_candidates(
+                {
+                    "sultan-android14-6.1-patch51": cand_sultan,
+                    "gki-android16-6.12-r38-patch51": cand_gki,
+                },
+                repo_root=self.repo_root,
+                write_back=True,
+                verify_raw_url=False,
+            )
+        self.assertEqual({p: p.read_bytes() for p in protected}, before)
         self.assertFalse(promoted)
         self.assertFalse(pushed)
         self.assertIsNone(commit_sha)
@@ -449,6 +458,74 @@ class TestPipelineDelivery(unittest.TestCase):
                                                 text=True).strip(), self.initial_commit)
         self.assertEqual(subprocess.check_output(["git", "rev-parse", "origin/main"], cwd=self.repo_root,
                                                 text=True).strip(), self.initial_commit)
+
+    def test_metadata_only_promotion_then_full_noop(self):
+        real_root = Path(__file__).resolve().parents[4]
+        candidates = {pid: real_root / rel for pid, rel in pipeline.TARGET_REL_PATHS.items()
+                      if pid != "xxksu-patch11"}
+        # Real source tree commit, with unchanged accepted source contents.
+        for command in (
+            ["git", "init", str(self.ksu_tree)],
+            ["git", "config", "user.name", "Source Fixture"],
+            ["git", "config", "user.email", "source@example.com"],
+            ["git", "add", "."],
+            ["git", "commit", "-m", "accepted source fixture"],
+        ):
+            subprocess.run(command, cwd=self.ksu_tree, check=True, capture_output=True)
+        source_commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=self.ksu_tree, text=True).strip()
+        for mode in ("single", "multi"):
+            with self.subTest(mode=mode):
+                head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=self.repo_root, text=True).strip()
+                public = [self.repo_root / rel for rel in pipeline.TARGET_REL_PATHS.values()]
+                before = {p: p.read_bytes() for p in public}
+                baseline = "patches/xxksu/BASELINE.json" if mode == "single" else "patches/sultan-android14-6.1/BASELINE.json"
+                commits = {"sultan-android14-6.1-patch51": "a" * 40}
+
+                def guard(original):
+                    def write(path, *args, **kwargs):
+                        self.assertNotIn(path.resolve(), before, "metadata-only promotion rewrote a patch")
+                        return original(path, *args, **kwargs)
+                    return write
+
+                def publish():
+                    if mode == "single":
+                        result = run_pipeline(
+                            "xxksu-patch11", self.ksu_tree, target_tree=self.ksu_tree,
+                            repo_root=self.repo_root, promote=True, check_only=True,
+                            write_back=True, verify_raw_url=False,
+                        )
+                        return result
+                    return deliver_multi_candidates(candidates, repo_root=self.repo_root,
+                        upstream_commits=commits, write_back=True, verify_raw_url=False)
+
+                with patch.object(Path, "write_bytes", guard(Path.write_bytes)), \
+                     patch.object(Path, "write_text", guard(Path.write_text)), \
+                     patch("v2.pipeline._publish_metadata", wraps=pipeline._publish_metadata) as metadata:
+                    result = publish()
+                metadata.assert_called_once()
+                if mode == "single":
+                    self.assertEqual(result.publication_state, "METADATA_ONLY_PROMOTION")
+                    self.assertFalse(result.promoted or result.is_noop)
+                    self.assertTrue(result.committed and result.pushed)
+                else:
+                    self.assertTrue(result[0] and result[1])
+                self.assertEqual(subprocess.check_output(["git", "rev-parse", "HEAD^"], cwd=self.repo_root, text=True).strip(), head)
+                changed = set(subprocess.check_output(["git", "diff", "--name-only", head, "HEAD"], cwd=self.repo_root, text=True).splitlines())
+                self.assertEqual(changed, {baseline, "patches/manifest.json", ".github/upstream-state.json"})
+                data = json.loads((self.repo_root / baseline).read_text())
+                self.assertEqual(data["upstream" if mode == "single" else "susfs"]["resolved_commit"],
+                                 source_commit if mode == "single" else "a" * 40)
+                self.assertEqual({p: p.read_bytes() for p in public}, before)
+                self.assertTrue(verify_patch_manifest(self.repo_root)[0])
+                current = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=self.repo_root)
+                with patch("v2.pipeline._publish_metadata", side_effect=AssertionError("repeated metadata promotion")), \
+                     patch("v2.pipeline.deliver_promotion", side_effect=AssertionError("no-op delivery")):
+                    result = publish()
+                if mode == "single":
+                    self.assertEqual(result.publication_state, "FULL_STATE_NOOP")
+                else:
+                    self.assertEqual(result[:3], (False, False, None))
+                self.assertEqual(subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=self.repo_root), current)
 
     def test_14_validation_run_is_read_only(self):
         """Invariant: Validation-only run produces candidate without touching patches/ or metadata."""

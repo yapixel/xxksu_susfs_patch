@@ -3,7 +3,7 @@
 ## Correction phase
 
 Starting commit: f83efeb5ca7b9ec3ce34eb17aa2b91975004e453.
-Only tests, source-contract/reference fixtures and this report change. Production generators and published patches remain unchanged.
+The first two commits changed only tests, source-contract/reference fixtures and this report. The subsequent authorized no-op fix changes pipeline publication control, as documented below. Generators and published patch bytes remain unchanged.
 
 The lifecycle harness executes generated mnt_free_id rather than providing a guarded replacement. It executes native nameidata setup, restoration and nested filename lookup; the generated open/retry and pagemap caller paths remain covered. GKI page-size emulation is exercised separately. The rollup harness uses native iterator wrappers and requires iterator invalidation before lock release. Low-level allocator, page walker and scheduling primitives remain bounded mocks: these tests do not prove full kernel concurrency correctness.
 
@@ -272,7 +272,7 @@ Previous methods (5):
 - test_5_manifest_sha_equals_promoted_file
 - test_6_rerunning_identical_inputs_is_noop
 
-Retained owner: test_delivery.test_delivery_bytes_manifest_and_noop / test_1_failed_candidate_no_commit_or_push.
+Retained owner: test_delivery.test_delivery_bytes_manifest_and_noop / test_1_failed_candidate_no_commit_or_push; early no-op ownership is restored by test_pipeline.TestPipelineArchitecture.test_unchanged_candidate_never_enters_promotion_or_writeback.
 
 Retain the stronger real Git delivery boundary, including failure byte snapshots.
 
@@ -309,7 +309,7 @@ Previous methods (1):
 
 - test_5_normal_already_approved_regeneration_is_noop
 
-Retained owner: test_delivery.test_delivery_bytes_manifest_and_noop.
+Retained owner: test_pipeline.TestPipelineArchitecture.test_unchanged_candidate_never_enters_promotion_or_writeback (early no-op), plus test_delivery.test_delivery_bytes_manifest_and_noop (Git delivery).
 
 Duplicate invariant; retained owner exercises the same production boundary.
 
@@ -748,10 +748,97 @@ Seven required historical classes were tested; the generated free-guard class wa
 
 ## Production scope verification
 
-No production generator, policy, workflow, baseline, manifest or published patch was changed. These production patch SHA-256 values match the starting commit byte for byte:
+Through the first two commits, no production generator, policy, workflow, baseline, manifest or published patch was changed. The authorized follow-up changes only pipeline publication control on the production side. These production patch SHA-256 values match the starting commit byte for byte:
 
 - patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch: 9422b190e17145ee13cab48311110de5d76b1dc4a1518c9314dff8b16002e326
 - patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch: 3aae69eb0d4e4311276f128332a57d6a8a858b0e3ec9a5aaf28a2eb32e41fc4f
 - patches/xxksu/11_enable_susfs_for_ksu.patch: a0419c3ae48dbf93013cc56e0deb8330649b3089efb3bc711ccc7f6b772b020d
 
 Task-owned scratch root: /tmp/xxksu-oracle-correction-nMKMSUEt. The permanent working repository is /home/ezhang/xxksu_susfs_patch and is not disposable. Final cleanup and unsigned-commit bookkeeping are recorded in HANDOFF.md and the completion response.
+
+
+## Authorized full-state no-op fix
+
+The pre-push audit disproved the original no-op consolidation ownership claim.
+Forcing identical candidates through promotion passed all 237 consolidated
+methods, while the removed non-delivery pipeline test failed. The new direct
+publication-boundary test then exposed an existing production defect:
+setting is_noop=True did not skip baseline/state/manifest processing or delivery.
+
+The fix preserves the existing order: semantic/source gate, deterministic
+candidate generation, candidate syntax and required exact-target validation,
+independent reference check, then read-only publication planning. Equality is
+never used to bypass any of those gates. Optional existing-delivery/raw-byte
+verification is still read-only and retained when requested.
+
+Metadata review found a legitimate update independent of patch bytes:
+the existing writer advances xxKSU upstream.resolved_commit or a kernel target's
+susfs.resolved_commit, and the corresponding authoritative upstream-state
+commit. Manifest lineage derives from those baselines. The new planner preserves
+these fields and GKI's compatibility-patch hash; it does not invent archive,
+tree, bundle or pin changes, or replace upstream acceptance policy.
+
+- FULL_STATE_NOOP: candidate bytes and applicable baseline/provenance fields are
+  current and the existing manifest verifies. Return successfully before any
+  publication writer or delivery call. Candidate/validation artifacts may still
+  be written before that decision.
+- METADATA_ONLY_PROMOTION: validated patch bytes match, but planned provenance,
+  baseline or manifest state differs. Write only required metadata, preserve patch
+  bytes, and perform one delivery transaction when write-back is requested.
+- PATCH_PROMOTION: patch bytes differ. Write only changed targets, synchronize
+  required metadata/shared manifest, and publish once.
+
+Single-candidate PipelineResult exposes publication_state. The multi-candidate
+API retains its tuple shape; its first boolean denotes any publication state
+change, including metadata-only promotion. Both paths share read-only metadata
+planning and the actual metadata publication boundary. Unchanged targets do not
+independently trigger baseline rewrites. Multi-candidate accepted upstream commits
+now synchronize upstream-state as well as baseline lineage. Malformed state JSON
+with a supplied identity fails before publication rather than being silently
+ignored.
+
+The single-candidate early no-op regression is retained, strengthened with exact
+protected-file snapshots and fail-fast sentinels at the real metadata publisher,
+delivery, and production-file writes. The old writer helpers were replaced by a
+read-only planner and shared publisher; the regression instruments that actual
+publisher, not unused compatibility helpers.
+
+Additional focused coverage:
+- Equal bytes cannot bypass semantic/source, determinism, syntax, exact-target,
+  or reference validation failures.
+- Existing multi-no-op test traps metadata, file writes, and Git delivery.
+- Existing mixed-target test now exercises both Sultan-changed/GKI-unchanged and
+  GKI-changed/Sultan-unchanged. It verifies one commit, the exact changed-file set,
+  and no writes to the unchanged target's patch or baseline.
+- Existing both-changed test verifies one shared metadata publication.
+- One metadata-only test covers real temporary Git delivery for the single path
+  and multi path, then repeats the accepted state through FULL_STATE_NOOP.
+  It verifies baseline/manifest/state-only commits and traps patch rewrites.
+  These are publication tests; they do not replace upstream/kernel acceptance.
+
+Final discovery: 240 methods, 70.609s, 0 failures, 0 errors, 0 skips.
+The increase from 237 is the retained boundary regression, one gate-order test,
+and one metadata-only publication test. No useful test was removed for count.
+
+Mutation rerun, each restored afterward:
+- DETECTED: Sultan append arity — test_lifecycle.LifecycleTests.test_pagemap_vma_boundaries_both_targets
+- DETECTED: nd name restoration — test_lifecycle.LifecycleTests.test_nameidata_retries_and_local_lookup_ownership
+- DETECTED: mount provenance reevaluation — test_lifecycle.LifecycleTests.test_mount_provenance_transition_inheritance_and_early_failure
+- DETECTED: Sultan free guard — test_lifecycle.LifecycleTests.test_mount_provenance_transition_inheritance_and_early_failure
+- DETECTED: GKI free guard — test_lifecycle.LifecycleTests.test_mount_provenance_transition_inheritance_and_early_failure
+- DETECTED: smaps hidden guard — test_lifecycle.LifecycleTests.test_smaps_actual_rollup_reacquire_branches
+- DETECTED: pagemap caller bypass — test_lifecycle.LifecycleTests.test_pagemap_actual_read_lengths_offsets_and_partial_vmas
+- DETECTED: split generated literal — test_generator_regression.GeneratorEscapeRegressionTests.test_generated_patch51_literals_both_targets
+- DETECTED: single full-noop fallthrough — test_pipeline.TestPipelineArchitecture.test_unchanged_candidate_never_enters_promotion_or_writeback
+- DETECTED: multi full-noop fallthrough — test_delivery.TestPipelineDelivery.test_13_multi_candidate_both_unchanged_noop
+- DETECTED: ignore legitimate metadata advancement — test_delivery.TestPipelineDelivery.test_metadata_only_promotion_then_full_noop
+
+The last three mutations bypass single FULL_STATE_NOOP, bypass multi
+FULL_STATE_NOOP, and incorrectly suppress a legitimate metadata advancement.
+No permanent mutation framework was added.
+
+Pre-push scope: production changes are limited to v2/pipeline.py. Generators,
+semantic policy/gates, exact validators and Actions workflows are unchanged.
+Patch 11, both Patch 51s, all BASELINE files, manifest and upstream-state remain
+byte-identical to 0515823 and f83efeb. The source change does not regenerate or
+publish kernel patches.

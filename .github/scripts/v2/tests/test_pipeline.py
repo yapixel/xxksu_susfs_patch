@@ -15,6 +15,8 @@ Required pipeline properties tested:
 """
 
 import hashlib
+from contextlib import ExitStack
+from unittest.mock import patch
 from pathlib import Path
 import shutil
 import tempfile
@@ -84,6 +86,76 @@ class TestPipelineArchitecture(unittest.TestCase):
         cand_text = candidate_file.read_text(encoding="utf-8")
         self.assertIn("diff --git a/kernel/ksu.c b/kernel/ksu.c", cand_text)
 
+
+    def test_unchanged_candidate_never_enters_promotion_or_writeback(self):
+        public = self.repo_root / "patches/xxksu/11_enable_susfs_for_ksu.patch"
+        before = public.read_bytes()
+        state = self.repo_root / ".github/upstream-state.json"
+        state.parent.mkdir(exist_ok=True)
+        shutil.copy(Path(__file__).resolve().parents[4] / ".github/upstream-state.json", state)
+        protected = [p for p in (self.repo_root / "patches").rglob("*") if p.is_file()] + [state]
+        snapshot = {p: p.read_bytes() for p in protected}
+        candidate = run_pipeline(
+            "xxksu-patch11", self.ksu_tree, target_tree=self.ksu_tree,
+            repo_root=self.repo_root, check_only=True,
+        )
+        self.assertTrue(candidate.validated)
+        self.assertEqual(candidate.candidate_path.read_bytes(), before)
+
+        # Candidate artifacts may be written; production and metadata may not.
+        def guarded_write(original):
+            def write(path, *args, **kwargs):
+                resolved = path.resolve()
+                if (resolved.is_relative_to(self.repo_root / "patches") or
+                        resolved == self.repo_root / ".github/upstream-state.json"):
+                    self.fail(f"unchanged candidate rewrote production: {path}")
+                return original(path, *args, **kwargs)
+            return write
+
+        with ExitStack() as stack:
+            stack.enter_context(patch.object(Path, "write_bytes", guarded_write(Path.write_bytes)))
+            stack.enter_context(patch.object(Path, "write_text", guarded_write(Path.write_text)))
+            for boundary in ("_publish_metadata", "deliver_promotion"):
+                stack.enter_context(patch(
+                    f"v2.pipeline.{boundary}",
+                    side_effect=AssertionError(f"unchanged candidate entered {boundary}"),
+                ))
+            result = run_pipeline(
+                "xxksu-patch11", self.ksu_tree, target_tree=self.ksu_tree,
+                repo_root=self.repo_root, promote=True, write_back=True,
+                check_only=True, verify_raw_url=False,
+            )
+        self.assertTrue(result.validated and result.is_noop)
+        self.assertEqual(result.publication_state, "FULL_STATE_NOOP")
+        self.assertFalse(result.promoted or result.committed or result.pushed)
+        self.assertEqual({p: p.read_bytes() for p in protected}, snapshot)
+
+    def test_equal_bytes_do_not_bypass_validation_gates(self):
+        from v2.pipeline import SemanticApprovalError, CandidateValidationError, RegenerationMismatchError
+        from v2.validation.reference_cross_check import ReferenceCrossCheckError
+        text = (self.repo_root / "patches/xxksu/11_enable_susfs_for_ksu.patch").read_text()
+        for gate, options, error in (
+            ("v2.pipeline.verify_semantic_gate_for_pipeline",
+             {"side_effect": SemanticApprovalError("unapproved source")}, SemanticApprovalError),
+            ("v2.pipeline.generate_candidate_patch",
+             {"side_effect": [text, text + "\\n"]}, RegenerationMismatchError),
+            ("v2.pipeline.validate_patch_syntax",
+             {"return_value": ["invalid syntax"]}, CandidateValidationError),
+            ("v2.pipeline.validate_exact_patch_on_tree",
+             {"return_value": (False, ["wrong target"])}, CandidateValidationError),
+            ("v2.validation.reference_cross_check.run_reference_cross_check",
+             {"side_effect": ReferenceCrossCheckError("semantic conflict")}, ReferenceCrossCheckError),
+        ):
+            with self.subTest(gate=gate), patch(gate, **options), patch(
+                "v2.pipeline._plan_metadata_updates",
+                side_effect=AssertionError("publication planning reached before validation passed"),
+            ):
+                with self.assertRaises(error):
+                    run_pipeline(
+                        "xxksu-patch11", self.ksu_tree, target_tree=self.ksu_tree,
+                        repo_root=self.repo_root, promote=True, write_back=True,
+                        check_only=True, verify_raw_url=False,
+                    )
 
     def test_7_validation_does_not_mutate_tree_twice(self):
         """Invariant 7: Validation check-only leaves tree untouched; application operates once."""
