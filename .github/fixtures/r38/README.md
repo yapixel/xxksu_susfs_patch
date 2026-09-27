@@ -153,7 +153,7 @@ Actions workflow. This reconstructor never writes production.
 ## Verification ownership
 
 test_provenance removes final outputs before two independent process executions,
-then checks only final output against accepted hunks. It rejects empty/missing
+then compares full candidate bytes with accepted output. It rejects empty/missing
 Patch 50, changed retained and deinlined input, missing/changed r38 context and
 tampered source commit metadata. No golden constructs its inputs.
 test_lifecycle executes current generated GKI C against native target contracts.

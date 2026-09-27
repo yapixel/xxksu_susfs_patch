@@ -143,12 +143,9 @@ class ProvenanceTests(unittest.TestCase):
         second = self.fresh(patch_id, source.parent)
         self.assertEqual(first, second)
         self.assertEqual({f.old_path[2:] for f in parse_patch(first.decode()).files}, set(FILES))
-        # Golden is read only AFTER generation. Date/index IDs are independently
-        # regenerated metadata; all actual hunks must still equal accepted output.
+        # Golden is read only AFTER independent generation; it supplies no input.
         expected = (ROOT / TARGET_REL_PATHS[patch_id]).read_bytes()
-        def hunks(data):
-            return re.sub(rb"(?m)^(Date:|index ).*\n", b"", data)
-        self.assertEqual(hunks(first), hunks(expected))
+        self.assertEqual(first, expected)
         self.assertIn(b"Date: Fri, 25 Sep 2026 17:48:27 +0000", first)
         empty = self.root / "empty"
         empty.mkdir()
