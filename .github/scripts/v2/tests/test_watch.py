@@ -367,8 +367,8 @@ class SuSFSWatcherRegressionTests(unittest.TestCase):
         self.assertNotIn("diff --git a/include/linux/susfs.h", gki_cand)
 
         sultan_cand = deinline_patch_content(sample_patch, target="sultan-android14-6.1")
-        self.assertIn("drivers/input/input.c", sultan_cand)
-        self.assertIn("387", sultan_cand)
+        self.assertNotIn("drivers/input/input.c", sultan_cand)
+        self.assertNotIn("ksu_input_hook_key_false", sultan_cand)
         self.assertIn("diff --git a/fs/susfs.c", sultan_cand)
         self.assertIn("diff --git a/include/linux/susfs.h", sultan_cand)
 

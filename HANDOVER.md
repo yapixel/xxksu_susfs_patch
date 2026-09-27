@@ -1,103 +1,51 @@
-# xxKSU + SuSFS V2 Handover
+# xxKSU + SuSFS production handover
 
-## Repository Purpose
+## Current implementation
 
-Legacy scripts generate xxKSU/SuSFS patches (11 and target 51 artifacts). The V2 package is a deterministic, evidence-driven foundation for parsing, trusted inputs, semantic inventory, and later validation; it does not replace the legacy generators yet.
+This repository generates shared xxKSU Patch 11 and transport-neutral kernel Patch 51 artifacts. The old V2.3-only checkpoint description is historical: source bundles, semantic policy, adapters, validation, the watcher, and the production pipeline now exist under `.github/scripts/v2/`. Do not restart the phase plan from this document.
 
-## Current Status
+Production authority is `patches/manifest.json`, active `BASELINE.json` files, `.github/upstream-state.json`, and workflow pins. Public delivery is `origin/main:patches/`, not Actions artifacts. Patch 51 is generated and validated by parallel read-only workers; only the single delivery job publishes both candidates atomically.
 
-- V2.1: COMPLETE: typed patch models, unified-diff parser/emitter, 16 tests.
-- V2.2: COMPLETE: provenance, hashing, cache, fetch/prepare boundary, manifests, 16 tests.
-- V2.3: COMPLETE as a policy-neutral semantic engine; 15 tests added.
-- V2.3.1: corrective implementation COMPLETE; its independent re-audit exposed remaining role/provenance defects.
-- V2.3.2: corrective implementation and fresh adversarial re-audit COMPLETE.
-- V2.4: NOT STARTED and not authorized in this checkpoint.
-- Current complete V2 suite: 53 tests PASS.
+Read `AGENTS.md`, this file, `PATCH51_CORRECTIONS.md`, the machine records, `v2/pipeline.py`, `v2/policy/lifecycle.py`, and their tests before changing production.
 
-The V2.3 semantic gate is closed. V2.4 may be considered only after explicit human authorization; this checkpoint does not start or authorize it.
+## Active targets and profiles
 
-## Non-Negotiable Architecture
+`gki-android14-6.1` was retired by commit `6352a68`; do not restore it to satisfy historical six-profile documents. There are **two targets and four profiles**:
 
-```text
-official 10 + actual xxKSU evidence -> one shared 11
-official 50 + exact target/kernel-version evidence -> one target-specific transport-neutral 51
-```
-
-Never model old11 -> new11 or old51 -> new51. All three targets support both `manual` and `lsm_bl`; the same target-specific 51 serves both modes, and the same shared 11 serves every profile. Transport selection belongs to the profile manifest. Ownership uniqueness is per semantic path per final profile. `UNKNOWN` fails closed. `git apply` success/failure is not semantic evidence. Function names alone are not semantic classification. `MIXED` is an observation, not automatic `SPLIT` policy.
-
-Keep distinct: handler definition; Linux-side call site; runtime registration; static-key gating; LSM/security hook; kprobe/kretprobe; syscall-table hook; ARM64 branch-link; manual source hook; fixture-provided hook. `BL=y` may use xxKSU-managed internal syscall-table fallback while `CONFIG_KSU_TAMPER_SYSCALL_TABLE=n`.
-
-## Six Required Profiles
-
-- `gki-android14-6.1-manual`
-- `gki-android14-6.1-lsm_bl`
-- `gki-android16-6.12-manual`
-- `gki-android16-6.12-lsm_bl`
 - `sultan-android14-6.1-manual`
 - `sultan-android14-6.1-lsm_bl`
+- `gki-android16-6.12-manual`
+- `gki-android16-6.12-lsm_bl`
 
-All require `CONFIG_KSU=y` and `CONFIG_KSU_SUSFS=y`. Manual uses both fixtures and disables automated transport: `CONFIG_KSU_LSM_SECURITY_HOOKS=n`, `CONFIG_KSU_HACK_ARM64_BRANCH_LINK=n`, `CONFIG_KSU_TAMPER_SYSCALL_TABLE=n`, `CONFIG_KSU_KPROBES_KSUD=n`. `lsm_bl` uses no fixtures and requires ARM64, KALLSYMS, LSM and BL: `CONFIG_KSU_LSM_SECURITY_HOOKS=y`, `CONFIG_KSU_HACK_ARM64_BRANCH_LINK=y`, `CONFIG_KSU_TAMPER_SYSCALL_TABLE=n`, `CONFIG_KSU_KPROBES_KSUD=n`, with BL composite ownership and its internal syscall fallback.
+One shared 11 serves all four. Each target has one 51 for both modes. Transport selection belongs to profiles, not 11/51. Manual uses both fixtures with automated transport disabled. LSM/BL uses no manual fixtures and keeps `CONFIG_KSU_TAMPER_SYSCALL_TABLE=n`; BL's internally managed syscall fallback is a distinct mechanism.
 
-## Evidence Priority
+## Accepted identities
 
-Priority is target kernel (1), actual xxKSU (2), official 10/50 (3), fixtures (4), known-good references/workflows (5), generated artifacts (6), generators (7), documentation/other observations (8). Established identities include xxKSU `0b138d6a9cfe4dc163aa05c21b1e6a14ff868230`; official-50 Sultan `7fd1da8e0cc8d1b572c97c5fe4a27d0ec6e3e2f1`, GKI 6.1 `598370fe434a7825bfe0f41d3029d102e3cfaec4`, GKI 6.12 `698aa6a4ddca6fa5359871daf13f93583fb8282a`; and known-good workflows `eecfddfa8f036a51575804195938cd97a9fa04fc` and `7a1f69c70889b309dd96cf1a46d4555d394c5783`. Do not invent unresolved identities.
+- xxKSU: `bb0be9297da42ff3f63819125314ce0b13935a06`.
+- Sultan SuSFS: `a8324101bca5e5a2dd7d0dc82b1650e10923eec9`.
+- GKI SuSFS: `b213c54126fb243595ce7876e91d84d6e0861fec`.
+- Sultan kernel: `af5c65b9547a9f33c5f566430d0434aecab5a8b5`.
+- GKI production apply target: `android16-6.12-2025-09_r38`; archive URL and authenticated SHA-256 are in `.github/fixtures/v2/r38-sources.json` and GKI baseline compatibility metadata. The c8909f7 source bundle is historical lineage, not this archive.
+- Exact current production patch hashes: `patches/manifest.json`. Avoid duplicating changing hashes in this handover.
 
-## Completed Implementation
+## Correctness and evidence boundaries
 
-V2.1: `.github/scripts/v2/model/patch.py`, `engine/diff_parser.py`, and `engine/emitter.py` provide typed lines, state-aware boundaries, hunk validation, metadata preservation, opaque binary handling, and deterministic emission. Report: `XXKSU_SUSFS_V2_1_REPORT.md`; limitation: no semantic transformation or source mutation.
+Target kernel control flow and pinned SuSFS/xxKSU sources govern corrections. An independent audit is a defect report, not authority. Relevant UNKNOWN fails closed. Function names and `git apply` success are not semantic evidence. Ownership is per semantic path per final profile.
 
-V2.2: `model/provenance.py`, `model/manifest.py`, `source/{hashing,identity,cache,fetch,prepare}.py`, and `manifests/defaults.py` provide SHA-256 identities, atomic content-addressed cache, explicit fetch/offline preparation, and strict six-profile validation. Report: `XXKSU_SUSFS_V2_2_REPORT.md`; limitation: authoritative sources are not fully prepared.
+Keep handler definition, Linux call site, runtime registration, LSM, kprobe, syscall-table hook, ARM64 BL, manual hook and fixture hook distinct. Do not assume copying more official-KSU code is safer than retaining native xxKSU ownership. Patch 11 remains unchanged by the Patch 51 correction work.
 
-V2.3: `semantic/{model,registry,inventory,ledger}.py` provide stable IDs separate from fingerprints, traceable evidence/relationships, role-aware candidate detection/resolution, explicit mechanism taxonomy, deterministic accounting, and fatal relevant UNKNOWN. Report: `XXKSU_SUSFS_V2_3_REPORT.md`; no transformation, ABI, ownership, or complete production inventory.
+`policy/lifecycle.py` applies bounded source corrections against exact kernel preimages, then emits candidate diffs. It never reads production patches as generation inputs. `tests/test_lifecycle.py` executes corrected C with bounded API mocks. This is not a full kernel build or runtime proof. Separate build workflows own kernel compilation.
 
-V2.3.1: role-aware registry matching, relationship validation, orphan evidence serialization/identity, and explicit V2.2 evidence-kind/provenance references. Report: `XXKSU_SUSFS_V2_3_1_REPORT.md`.
+Midori is reference-only. Inputs are commit-pinned and hashed. Unreviewed differences in namei, namespace or task_mmu block promotion. Exact reviewed pairs document intentional corrections; they are not wildcard equivalence. `REFERENCE_UNAVAILABLE` is not `SEMANTIC_MATCH` and cannot authorize changes.
 
-V2.3.2: registry-wide role constraints, default-unverified observations, exact V2.2 `PreparedSource` binding, production rejection of synthetic evidence, and ledger-level trust revalidation. Report: `XXKSU_SUSFS_V2_3_2_REPORT.md`.
+## Validation and next maintenance gate
 
-## V2.3 Corrective Audit History
+Run complete discovery from a clean checkout:
 
-The first independent audit found four defects: missing source-role constraints; missing `SemanticRelationship` validation; orphan evidence omitted from serialized ledger identity; and evidence identities not bound to V2.2 provenance. V2.3.1 addressed those findings, but its re-audit found incomplete role constraints and a fail-open synthetic/aggregate provenance path.
+```sh
+PYTHONPATH=.github/scripts GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=commit.gpgsign GIT_CONFIG_VALUE_0=false GIT_CONFIG_KEY_1=tag.gpgsign GIT_CONFIG_VALUE_1=false python3 -m unittest discover -s .github/scripts/v2/tests -p 'test_*.py'
+```
 
-V2.3.2 closes both remaining defects. Every role-sensitive registry kind now requires explicit source roles. Production evidence defaults to `UNVERIFIED`, rejects synthetic completeness, and binds to one exact V2.2 `PreparedSource`; aggregate provenance and cross-source identities fail closed. The complete 53-test suite and fresh adversarial counterexample audit pass, including relationship-evidence trust checks. Historical reports remain unchanged.
+GCC is required for lifecycle regressions; absence is a failure, not a silent skip. The r38 manual-hook normalizer test reconstructs its post-Patch-51 stat.c from repository-controlled sources, without an external scratch directory.
 
-## Production Inventory Status
-
-**BLOCKED.** Authoritative official-10, all three official-50, kernel, and xxKSU inputs are not all materialized as immutable prepared sources. The engine may be complete while production inventory remains blocked; missing provenance must not be guessed or fabricated.
-
-## Agreed Source Bundle Direction - NOT IMPLEMENTED
-
-Future design may use `target + kernel_version + authoritative minimal source bundle`, with explicit supported versions, fail-closed unknown versions, exact file identity/hash checks, and no full archive download for normal static generation. Bundles describe input identity only, never transformation policy. Keep target, kernel_version, and profile independent. No source-bundle code exists.
-
-## 11 / 51 / Fixture Responsibilities
-
-Official-10 plus actual xxKSU evidence feeds shared 11. Official-50 plus target/kernel-version evidence feeds target-specific neutral 51. Manual validates 51 with both fixtures and manual config; lsm_bl validates 51 with xxKSU LSM/BL and lsm_bl config. Fixtures are evidence and constraints, never templates for a manual-specific 51.
-
-## Kernel Build Boundary
-
-Full kernel compilation is not a responsibility of this repository. Separate GitHub Actions perform build validation. V2 focuses on deterministic generation, semantic validation, ownership/ABI/static validation, applicability, and reproducible artifacts/metadata. Historical reports remain unchanged.
-
-## Future Autopilot Direction
-
-The agreed direction is continuous phased development with machine gates, critical audits for V2.3/V2.4/V2.7/V2.8, routine defect repair, stops for authoritative input or unresolved architecture/semantics/ABI/ownership/external requirements, and never automatic push. No autopilot controller is implemented here.
-
-## Next Required Action
-
-Review the V2.3.2 checkpoint. Do not start V2.4 without explicit human authorization.
-
-## Files Pi Must Read First
-
-1. `HANDOVER.md`
-2. `XXKSU_SUSFS_PHASE1_5_REPORT.md`
-3. `XXKSU_SUSFS_PHASE1_6_REPORT.md`
-4. `XXKSU_SUSFS_V2_DESIGN.md`
-5. `XXKSU_SUSFS_V2_1_REPORT.md`
-6. `XXKSU_SUSFS_V2_2_REPORT.md`
-7. `XXKSU_SUSFS_V2_3_TASK.md`
-8. `XXKSU_SUSFS_V2_3_REPORT.md`
-9. `XXKSU_SUSFS_V2_3_1_REPORT.md`
-10. `XXKSU_SUSFS_V2_3_2_REPORT.md`
-11. `.github/scripts/v2/**` and all V2 tests
-
-## Forbidden Shortcuts
-
-Do not weaken the parser for malformed legacy patches; classify semantics using `git apply`, function names alone, or ignored UNKNOWN; create profile-specific 51 or target/profile-specific 11; use fixtures as 51 templates; guess unsupported kernel versions; fabricate authoritative source; accept fuzz/three-way/reject output as release validation; or start V2.4 before the gate passes. Do not stage or push without authorization.
+New upstream/baseline identities require revalidation. Required publication evidence is candidate SHA = origin/main bytes = RAW bytes = manifest SHA, plus the delivery commit and refreshed Status Issue #5. See `PATCH51_CORRECTIONS.md` for exact results and limitations. Never publish generated patches manually, weaken exact validation, or let a reference comparison select production policy.

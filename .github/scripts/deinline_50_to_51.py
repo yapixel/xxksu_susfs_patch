@@ -28,20 +28,6 @@ def fix_hunk_line_counts(hunk_meta, hunk_body):
     return f"@@ -{old_start},{old_cnt} +{new_start},{new_cnt} @@{tail}"
 
 SULTAN_EXTRA_CHUNKS = {
-    'drivers/input/input.c': """diff --git a/drivers/input/input.c b/drivers/input/input.c
-index 78be582b5766..ca17a064ac9a 100644
---- a/drivers/input/input.c
-+++ b/drivers/input/input.c
-@@ -387,6 +387,8 @@ static void input_event_dispose(struct input_dev *dev, int disposition,
- 	}
- }
- 
-+extern struct static_key_false ksu_input_hook_key_false;
-+
- void input_handle_event(struct input_dev *dev,
- 			unsigned int type, unsigned int code, int value)
- {
-""",
     'fs/susfs.c': """diff --git a/fs/susfs.c b/fs/susfs.c
 index f0ea0561195b..4c2895f80f7d 100755
 --- a/fs/susfs.c

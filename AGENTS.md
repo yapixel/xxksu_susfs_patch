@@ -121,8 +121,8 @@ Midori sources are **REFERENCE ONLY** and never authoritative inputs:
   - Third-party reference outages (`REFERENCE_UNAVAILABLE`) do not corrupt or block authoritative releases.
 
 ### 11. Current Known Reference Differences
-- **Patch 11 vs Midori:** Reports `OUR_EXTRA` because our authoritative Simonpunk SuSFS integration retains try_umount and KSU_MARK_GET handling (`config.try_umount`, `umount.try_umount_integration`, `supercall.try_umount_cmd`, `supercall.ksu_mark_get_integration`), whereas Midori intentionally omits them. Setuid/zygote handling is verified semantically equivalent across 8 refined feature units.
-- **GKI r38 Patch 51 vs Midori Patch 51:** Reports `IMPLEMENTATION_DIFFERENCE` with equivalent deinlining semantics across identical 16 kernel files (open redirect path lookup variation in `fs/namei.c`).
+- **Patch 11 vs Midori:** Derive the current result from the pinned cross-check report. Legacy SuSFS TRY_UMOUNT glue and the Official-KSU KSU_MARK_GET override are retired; native xxKSU functionality remains. Patch 11 was not changed by the Patch 51 lifecycle correction.
+- **GKI r38 Patch 51 vs Midori Patch 51:** Unreviewed differences in `fs/namei.c`, `fs/namespace.c`, and `fs/proc/task_mmu.c` must be `REVIEW_REQUIRED` and promotion-blocking. Exact reviewed pairs may report `IMPLEMENTATION_DIFFERENCE`; identical file/symbol sets are not proof of equivalence. Intentional pagemap/smaps corrections must not be reverted for reference parity.
 These are documented reference observations, not reasons to modify production.
 
 ### 12. Patch 11 Mutation Scope Restrictions

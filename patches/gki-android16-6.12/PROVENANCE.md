@@ -1,10 +1,22 @@
 # GKI Android 16 / Linux 6.12 Provenance
 
-## 1. Authoritative Production Lineage (c8909f7)
+## 1. Current production apply target: r38
+
+The production apply target is `android16-6.12-2025-09_r38`, not the historical c8909f7 archive below. Its authoritative asset was independently re-downloaded and SHA-256 verified for the lifecycle correction:
+
+- URL: `https://github.com/yapixel/gki-build-assets/releases/download/android16-6.12-2025-09_r38/common-android16-6.12-2025-09_r38.tar.gz`
+- SHA-256: `accf8f9348280116792c9608f420f8d4554da52499119a8536883c5eefd429ff`
+- Exact retained source contents/hashes: `.github/fixtures/v2/r38-sources.json`.
+- Accepted SuSFS: `b213c54126fb243595ce7876e91d84d6e0861fec`.
+- Current generated Patch 51 hash: `patches/manifest.json` and `BASELINE.json:patch_51.patch_sha256`.
+
+The workflow verifies the downloaded file against this hash before extraction. Lifecycle corrections and publication evidence are documented in `PATCH51_CORRECTIONS.md`. Reference Midori inputs are independently pinned and never authorize production changes.
+
+## 2. Historical source-bundle lineage (c8909f7)
 
 **Status:** `VERIFIED`
 
-This lineage represents the authoritative, reproducible production baseline for `gki-android16-6.12`.
+This retained lineage supports historical source-bundle validation. It is not the current r38 apply-target archive or its hash.
 
 ### Upstream Kernel
 - **Repository:** `https://android.googlesource.com/kernel/common`
@@ -17,18 +29,18 @@ This lineage represents the authoritative, reproducible production baseline for 
 ### SuSFS Lineage
 - **Repository:** `https://gitlab.com/simonpunk/susfs4ksu`
 - **Branch:** `gki-android16-6.12`
-- **Commit:** `2528bdb0e2e76d26b9b174a8314ac115c9f00b3c`
+- **Accepted commit:** `b213c54126fb243595ce7876e91d84d6e0861fec` (historical record previously listed `2528bdb0e2e76d26b9b174a8314ac115c9f00b3c`).
 - **Upstream Patch:** `kernel_patches/50_add_susfs_in_gki-android16-6.12.patch`
 
 ### Authoritative Source Bundle
 - **Artifact:** `.github/fixtures/v2/v29-baselines/gki-android16-6.12.json`
 - **Schema:** `xxksu-susfs-source-bundle/v1`
 - **Files:** 22 retained files (20 kernel source + 2 SuSFS source)
-- **Identity:** `sha256:c021e411441ea098ff38092705e67a78c54c4908117620aa331d35a2436a20f9`
+- **Identity:** `sha256:5777d7c799707340bc0b373b9e478a484b2ba99085a438fbef1d53e1c5dbb5dc`
 
 ### Production Patch 51 (r38) & Retired Internal Lineage
 - **Production Patch:** `patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch`
-- **SHA-256:** `sha256:74bb2685f2b97caf032e638f10a0bd69fef74143a671d7c975c641a75211ec8c`
+- **SHA-256:** Read the current production manifest; the pre-correction hash was `74bb2685f2b97caf032e638f10a0bd69fef74143a671d7c975c641a75211ec8c`.
 - **Target Kernel Apply Target:** `android16-6.12-2025-09_r38`
 - **Strict Patch Application:** `PASS` (zero rejects, exact preimages, zero fuzz, offset 0)
 - **Retired Internal Patch:** `patches/gki-android16-6.12/51_deinlined_susfs_hooks_gki-android16-6.12.patch` (retired due to regex newline unescape defect in `task_mmu.c` and downstream tree offsets/fuzz; historical `c8909f7` provenance record preserved above).
@@ -43,7 +55,7 @@ This lineage represents the authoritative, reproducible production baseline for 
 
 ---
 
-## 2. Historical r58 Lineage (Permanently Non-Authoritative)
+## 3. Historical r58 Lineage (Permanently Non-Authoritative)
 
 **Status:** `PERMANENTLY NON-AUTHORITATIVE / HISTORICAL EVIDENCE ONLY`
 
