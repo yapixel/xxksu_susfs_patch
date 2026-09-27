@@ -1,30 +1,108 @@
-# xxKSU SuSFS Patches
+# xxksu_susfs_patch
 
-Deterministic SuSFS integration patches for backslashxx/KernelSU and two supported
-kernel targets. This repository reconstructs, validates, and publishes patches;
-kernel compilation, defconfig, packaging, boot testing, and device validation belong downstream.
+Deterministic SuSFS integration patches for xxKSU and supported Android kernels.
 
-[Live status](https://github.com/yapixel/xxksu_susfs_patch/issues/5) ·
-[Clean-room verification](https://github.com/yapixel/xxksu_susfs_patch/actions/workflows/clean-room.yml)
+[![Upstream Watch](https://github.com/yapixel/xxksu_susfs_patch/actions/workflows/upstream-watch.yml/badge.svg?branch=main)](https://github.com/yapixel/xxksu_susfs_patch/actions/workflows/upstream-watch.yml)
+[![Patch 11 Generation](https://github.com/yapixel/xxksu_susfs_patch/actions/workflows/generate-11-ksu-patch.yml/badge.svg?branch=main)](https://github.com/yapixel/xxksu_susfs_patch/actions/workflows/generate-11-ksu-patch.yml)
+[![Patch 51 Generation](https://github.com/yapixel/xxksu_susfs_patch/actions/workflows/generate-51-kernel-patches.yml/badge.svg?branch=main)](https://github.com/yapixel/xxksu_susfs_patch/actions/workflows/generate-51-kernel-patches.yml)
+[![Clean-Room Verification](https://github.com/yapixel/xxksu_susfs_patch/actions/workflows/clean-room.yml/badge.svg?branch=main)](https://github.com/yapixel/xxksu_susfs_patch/actions/workflows/clean-room.yml)
 
-## Production interface
+Reconstruct, validate, and publish reviewed patches while preserving native xxKSU
+ownership. Workflow badges show automation status; [Status Issue #5](https://github.com/yapixel/xxksu_susfs_patch/issues/5)
+tracks upstream identities, drift, production hashes, and validation state.
 
-The stable public interface is [patches/manifest.json](patches/manifest.json),
-with paths, accepted identities, target descriptions, and SHA-256 digests.
-Production means committed files under `patches/` on `origin/main`.
-Actions artifacts are internal transport/debug material, never downstream releases.
+## Production patches
 
-| Artifact | Supported target | Stable RAW download |
+| Artifact | Supported target | Download |
 | --- | --- | --- |
-| Shared xxKSU Patch 11 | backslashxx/KernelSU (xxKSU) | [Patch](https://raw.githubusercontent.com/yapixel/xxksu_susfs_patch/main/patches/xxksu/11_enable_susfs_for_ksu.patch) |
-| Sultan Android 14 / 6.1 Patch 51 | Pixel 8 / 8 Pro (Shiba/Husky) Tensynos 16.0.0-sultan (Android 14 6.1) | [Patch](https://raw.githubusercontent.com/yapixel/xxksu_susfs_patch/main/patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch) |
-| GKI Android 16 / 6.12 r38 Patch 51 | android16-6.12-2025-09_r38 (Pixel 9 / GKI 6.12) | [Patch](https://raw.githubusercontent.com/yapixel/xxksu_susfs_patch/main/patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch) |
+| [Patch 11 — xxKSU integration](patches/xxksu/11_enable_susfs_for_ksu.patch) | backslashxx/KernelSU (xxKSU) | [Raw](https://raw.githubusercontent.com/yapixel/xxksu_susfs_patch/main/patches/xxksu/11_enable_susfs_for_ksu.patch) |
+| [Patch 51 — Sultan hooks](patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch) | Android 14 / Linux 6.1 | [Raw](https://raw.githubusercontent.com/yapixel/xxksu_susfs_patch/main/patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch) |
+| [Patch 51 — GKI hooks](patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch) | Android 16 / Linux 6.12 r38 | [Raw](https://raw.githubusercontent.com/yapixel/xxksu_susfs_patch/main/patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch) |
 
-Download the manifest and selected patch, verify its SHA-256, and apply against the
-bound source revision. Moving RAW URLs can change during publication; retry if
-manifest and patch disagree, or fetch both at one repository commit for repeatability.
-Install the accepted SuSFS core files with the kernel integration; Patch 51 is not
-a complete kernel source distribution. Consult each target's `BASELINE.json`.
+**[patches/manifest.json](patches/manifest.json)** is the public artifact index:
+exact paths, source identities, compatibility targets, and SHA-256 digests.
+Production patches are committed under `patches/` on `main`; Actions artifacts
+are internal transport/debug material.
+
+Sultan targets Pixel 8 / 8 Pro (Shiba/Husky), Tensynos `16.0.0-sultan`.
+GKI targets `android16-6.12-2025-09_r38` (Pixel 9 / GKI 6.12).
+Use the accepted source lineage recorded in each target baseline, not an arbitrary
+kernel with the same version number.
+
+## What this project does
+
+- **Patch 11** integrates SuSFS with accepted xxKSU source using reviewed repository
+  adaptation policy. Simonpunk Patch 10 / SuSFS APIs are semantic lineage and watch
+  inputs, not inputs to byte generation.
+- **Patch 51** de-inlines accepted Simonpunk Patch 50 for each supported kernel,
+  with explicit target adaptations and reviewed corrections.
+
+xxKSU retains its native umount, try-umount, task-mark, and hosts behavior.
+Obsolete Official-KernelSU transport hooks are not blindly restored.
+Neither Patch 51 uses a previous production patch as generation input.
+
+## Verification
+
+Production validation checks:
+
+- authenticated upstream and target inputs;
+- deterministic reconstruction and exact application with zero offsets, fuzz, or rejects;
+- target API contracts and historical lifecycle regressions;
+- for Patch 51, independent source-postimage round trips, real target Kbuild
+  compilation of affected objects, and SuSFS symbol closure from real objects.
+
+[Clean-room verification](.github/workflows/clean-room.yml) repeats reconstruction
+on a fresh GitHub-hosted runner, with final outputs unavailable to generation.
+It requires generated bytes to equal production and manifest hashes, exercises
+the same Patch 51 object/closure gates, runs regressions and reference comparisons,
+and verifies checkout immutability. It is read-only: no publication or issue updates.
+
+Object compilation and symbol closure are bounded checks, not a full
+`vmlinux` link or proof of arbitrary runtime correctness. Full kernel builds,
+packaging, and device testing remain downstream acceptance responsibilities.
+
+## Real-device status
+
+**Observed on real devices/builds, as reported by the maintainer:**
+
+| Target | Full kernel build | Boot | xxKSU root | Basic SuSFS |
+| --- | --- | --- | --- | --- |
+| Sultan Android 14 / 6.1 | Succeeded | Succeeded | Works | Works |
+| GKI Android 16 / 6.12 r38 | Succeeded | ROM boot succeeded | Works | Works |
+
+These observations cover the reported configurations, not every lifecycle edge
+case or complete security verification.
+
+## How production patches are built
+
+Patch 51 follows this production path:
+
+```text
+Accepted SuSFS Patch 50 + authenticated target/core source + reviewed rules
+  → complete source postimages reconstructed by Python
+  → native Git diff and diffstat in the target tree
+  → independent reproduction, clean-tree round trip, and validation
+  → GitHub Actions publication → patches/ + manifest
+```
+
+Mail metadata is deterministic and independently derived. Both Patch 51 targets
+must validate before one atomic publication; Patch 11 and Patch 51 writers are
+serialized. GitHub Actions is the only production publisher.
+
+Midori remains an independent comparison reference, never a generation input or
+correctness oracle. Existing reviewed implementation differences are preserved.
+
+## Usage
+
+1. Select Patch 11 for the xxKSU source and the matching Patch 51 for the kernel
+   source. Check the accepted revisions and required core inputs in the
+   [xxKSU](patches/xxksu/BASELINE.json),
+   [Sultan](patches/sultan-android14-6.1/BASELINE.json), or
+   [GKI](patches/gki-android16-6.12/BASELINE.json) baseline.
+2. Download the manifest and selected patches; verify their SHA-256 digests.
+   Install the accepted SuSFS core files with the kernel integration.
+   Patch 51 is not a complete kernel source distribution.
+3. Check and apply each patch in its corresponding source tree:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/yapixel/xxksu_susfs_patch/main/patches/manifest.json -o manifest.json
@@ -33,62 +111,22 @@ git apply --check selected.patch
 git apply selected.patch
 ```
 
-## Generation and maintenance
+Moving Raw URLs may change during publication. If patch and manifest disagree,
+retry or fetch both at one repository commit for a reproducible download.
 
-- **Patch 11:** accepted xxKSU source + reviewed repository adaptation policy.
-  Simonpunk Patch 10 / SuSFS APIs are semantic lineage and watch inputs, not runtime
-  byte-generation inputs. Patch 11 owns eight files and preserves native xxKSU
-  try-umount and task-mark behavior.
-- **Sultan Patch 51:** accepted Simonpunk Sultan Patch 50 + accepted target/core
-  context + explicit transformation rules + deterministic accepted-revision metadata.
-- **GKI r38 Patch 51:** accepted Simonpunk GKI Patch 50 + authenticated clean r38
-  context + deinline/target rules + reviewed lifecycle corrections + deterministic
-  accepted-revision metadata. Neither Patch 51 consumes a previous final patch.
+## Upstream tracking and maintenance
 
-The daily [watcher](.github/workflows/upstream-watch.yml) discovers changes on
-xxKSU `master`, SuSFS `sultan-shiba-susfs-minimal`, and SuSFS `gki-android16-6.12`.
-Tracking refs discover new revisions; accepted revisions identify reproducible,
-reviewed generations and advance only after acceptance. No change needs no action.
-The watcher classifies drift and can prepare candidates; it does not publish.
-Supported changes proceed through validation and the production Actions workflows.
-Semantic, anchor, target-API, or lifecycle drift fails closed for independent
-source review before policy reconciliation and publication.
+The daily watcher monitors [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU)
+`master` and [simonpunk/susfs4ksu](https://gitlab.com/simonpunk/susfs4ksu)
+`sultan-shiba-susfs-minimal` / `gki-android16-6.12`.
 
-```text
-Tracking ref → watcher → review/acceptance boundary → authoritative inputs
-→ semantic/source gate → deterministic target-specific reconstruction
-→ exact target validation → reference review → production Actions → patches/ + manifest
-```
+Tracking refs discover changes; each generation uses exact immutable accepted
+revisions. Supported changes proceed through review, validation, and production
+Actions. Semantic, anchor, target-API, or lifecycle uncertainty fails closed for
+source review. The watcher can stage candidates but does not publish.
 
-[Patch 11 publication](.github/workflows/generate-11-ksu-patch.yml) and
-[Patch 51 publication](.github/workflows/generate-51-kernel-patches.yml) serialize
-writes; both Patch 51 targets must validate before one atomic publication.
-Midori is an independent reference/difference signal, never generation authority,
-production source, or a kernel-correctness oracle.
+The repository is in **stable maintenance mode**. See:
 
-## Verification and scope
-
-[Clean-Room Reproducibility Verification](.github/workflows/clean-room.yml) runs
-manually and weekly on a fresh GitHub-hosted Ubuntu runner with `contents: read`.
-It fetches/authenticates declared inputs, reconstructs with final outputs absent,
-checks two-process determinism and generated = production = manifest, applies
-exactly, runs target-native contracts/historical regressions and the consolidated
-suite, compares authenticated Midori references, and checks repository immutability.
-It never promotes, commits, pushes, or updates issues, and uses no developer scratch state.
-
-Patch 51 production reconstructs complete target source files, lets native Git
-produce the diff, and checks an independent clean-tree postimage round trip.
-Actions publication and clean-room require real Kbuild compilation of affected
-objects and real-object SuSFS symbol closure. These bounded gates do not claim a
-full vmlinux link, complete kernel build, boot or arbitrary runtime correctness.
-
-Historical reproducibility evidence: [run 36296083518](https://github.com/yapixel/xxksu_susfs_patch/actions/runs/36296083518)
-at `d47e2269e86848711131123f3a9afb80b106fdd0` (2026-09-27).
-
-Tests cover generator/pipeline invariants, target-native APIs, historical defects,
-structural ownership, and publication integrity. These checks prove their covered
-contracts and reproducibility, not arbitrary future kernel lifetime, concurrency,
-or all semantic behavior. Meaningful semantic drift still requires source review.
-
-The architecture is in **STABLE MAINTENANCE MODE**. See [AGENTS.md](AGENTS.md)
-for contributor rules and [HANDOVER.md](HANDOVER.md) for the closeout snapshot.
+- [Status Issue #5](https://github.com/yapixel/xxksu_susfs_patch/issues/5) — current upstream and production status.
+- [AGENTS.md](AGENTS.md) — contributor rules and authoritative maintenance contracts.
+- [HANDOVER.md](HANDOVER.md) — dated handoff snapshot; current machine-readable state takes precedence.
