@@ -976,12 +976,15 @@ def format_patch11_parity_details(rep: Mapping[str, Any]) -> str:
     if matrix.get("supercall.ksu_mark_get_integration") == "NOT_APPLICABLE":
         retired_units.append("obsolete Official-KSU KSU_MARK_GET override retired (native xxKSU ksu_get_task_mark(cmd.pid) retained)")
 
-    retired_str = f"; {'; '.join(retired_units)}" if retired_units else ""
+    retired_str = f" **OURS:** {'; '.join(retired_units)}; independently justified against Simonpunk/xxKSU semantics." if retired_units else ""
 
     if classification == ReferenceComparisonClassification.IMPLEMENTATION_DIFFERENCE.value:
         return (
-            f"Equivalent semantics (OUR_EXTRA=0, REFERENCE_EXTRA=0, SEMANTIC_CONFLICT=0); "
-            f"implementation differences in selinux & zygote batching{retired_str}."
+            f"**BOTH:** equivalent currently reviewed SuSFS/xxKSU semantics "
+            f"(OUR_EXTRA={len(our_extras)}, REFERENCE_EXTRA={len(ref_extras)}, SEMANTIC_CONFLICT={len(conflicts)}); "
+            f"native xxKSU try-umount and ksu_get_task_mark(cmd.pid) retained. "
+            f"**OURS vs REFERENCE:** SELinux SID setup/batching and zygote helper organization differ."
+            f"{retired_str}"
         )
     elif classification == ReferenceComparisonClassification.SEMANTIC_MATCH.value:
         return f"Exact semantic match across all feature units{retired_str}."
@@ -1001,7 +1004,19 @@ def format_gki_patch51_parity_details(rep: Mapping[str, Any]) -> str:
     """Derive compact reference parity details for GKI Patch 51 from machine-readable report."""
     classification = rep.get("classification", "")
     if classification == ReferenceComparisonClassification.IMPLEMENTATION_DIFFERENCE.value:
-        return str(rep.get("details", "Reviewed implementation differences; not byte parity."))
+        reviewed = rep.get("metadata", {}).get("reviewed_lifecycle_differences", {})
+        if {"fs/namei.c", "fs/namespace.c", "fs/proc/task_mmu.c"} <= reviewed.keys():
+            return (
+                "**BOTH / AGREES:** lifetime-safe filename_lookup / old_name handling; "
+                "OURS vs REFERENCE fs/super.c difference is declaration placement only. "
+                "**OURS:** mount allocation-provenance tracking, inherited-flag clearing, "
+                "early-error accounting, locked non-SuS lookup, VMA-bounded zero pagemap entries, "
+                "and shared smaps gather guard. "
+                "**REFERENCE:** uses early returns for the corresponding non-SuS lookup and "
+                "retains inherited pagemap VMA-boundary and smaps_rollup hidden-VMA gather defects "
+                "that OURS intentionally corrects. Reviewed differences, not blanket semantic equivalence."
+            )
+        return str(rep.get("details", "OURS vs REFERENCE: reviewed implementation differences; not byte parity."))
     elif classification == ReferenceComparisonClassification.SEMANTIC_MATCH.value:
         return "Exact semantic match for deinlined hooks across 16 files."
     elif classification == ReferenceComparisonClassification.SEMANTIC_CONFLICT.value:

@@ -586,7 +586,9 @@ def render_dashboard_body(
     lines.append("")
     lines.append("## Reference Parity")
     lines.append("")
-    lines.append("| Comparison Target | Reference Source | Parity Status | Details |")
+    lines.append("**OURS** = yapixel/xxksu_susfs_patch production; **REFERENCE** = corresponding Midori implementation.")
+    lines.append("")
+    lines.append("| Comparison Target | Reference Source | Parity Status | Reviewed Comparison |")
     lines.append("| :--- | :--- | :--- | :--- |")
 
     parity_badge_map = {
@@ -606,18 +608,13 @@ def render_dashboard_body(
                 "target": "xxksu-patch11",
                 "reference": "midori01/KernelSU:xx.patch",
                 "status": "IMPLEMENTATION_DIFFERENCE",
-                "details": (
-                    "Equivalent semantics (OUR_EXTRA=0, REFERENCE_EXTRA=0, SEMANTIC_CONFLICT=0); "
-                    "implementation differences in selinux & zygote batching; "
-                    "TRY_UMOUNT legacy SuSFS integration retired (native xxKSU try-umount retained); "
-                    "obsolete Official-KSU KSU_MARK_GET override retired (native xxKSU ksu_get_task_mark(cmd.pid) retained)."
-                ),
+                "details": "OURS vs REFERENCE: reviewed comparison details unavailable.",
             },
             {
                 "target": "gki-android16-6.12-r38-patch51",
                 "reference": "midori01/gki_ksu_workflow:Patch 51",
                 "status": "IMPLEMENTATION_DIFFERENCE",
-                "details": "Equivalent deinlined hooks across 16 files; open_redirect implementation variation.",
+                "details": "OURS vs REFERENCE: reviewed comparison details unavailable.",
             },
         ]
 

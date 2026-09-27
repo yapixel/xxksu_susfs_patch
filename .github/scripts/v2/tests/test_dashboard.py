@@ -434,6 +434,29 @@ class DashboardTests(unittest.TestCase):
         self.assertIn("OUR_EXTRA=0", body)
         self.assertIn("TRY_UMOUNT legacy SuSFS integration retired", body)
         self.assertIn("obsolete Official-KSU KSU_MARK_GET override retired", body)
+        self.assertIn("| Reviewed Comparison |", body)
+        self.assertNotIn("| Parity Status | Details |", body)
+        rows = [line for line in body.splitlines() if "🟢 `IMPLEMENTATION_DIFFERENCE`" in line]
+        self.assertEqual(len(rows), 2)
+        for row in rows:
+            self.assertIn("**BOTH", row)
+            self.assertIn("OURS", row)
+            self.assertIn("REFERENCE", row)
+        patch11 = next(row for row in rows if "xxksu-patch11" in row)
+        for token in ("OUR_EXTRA=0", "REFERENCE_EXTRA=0", "SEMANTIC_CONFLICT=0",
+                      "**OURS vs REFERENCE:**", "**OURS:**", "independently justified"):
+            self.assertIn(token, patch11)
+        gki = next(row for row in rows if "gki-android16" in row)
+        for token in ("**OURS:** mount allocation-provenance", "**REFERENCE:** uses early returns",
+                      "OURS intentionally corrects", "fs/super.c", "shared smaps gather guard"):
+            self.assertIn(token, gki)
+        # Rendering cached reports must not rewrite comparison results, hashes,
+        # production bytes, or the manifest.
+        paths = list((REPO_ROOT / "patches").rglob("*.patch")) + [REPO_ROOT / "patches/manifest.json"]
+        paths += list((REPO_ROOT / "candidate_patches").rglob("reference_cross_check.json"))
+        before = {p: p.read_bytes() for p in paths}
+        render_dashboard_body(report=report, repo_root=REPO_ROOT)
+        self.assertEqual({p: p.read_bytes() for p in paths}, before)
 
     # 21. sync_dashboard_issue supports extra_events
     @patch("v2.watch.dashboard.find_dashboard_issues")
