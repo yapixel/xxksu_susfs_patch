@@ -1,5 +1,5 @@
 From: yapixel <yapixel@users.noreply.github.com>
-Date: Thu, 24 Sep 2026 10:00:00 +0800
+Date: Fri, 25 Sep 2026 17:48:27 +0000
 Subject: [PATCH] SUSFS de-inlined hooks for android16-6.12-2025-09_r38
 
 ---
@@ -1846,7 +1846,7 @@ index 6d29cab8576e..77213f638951 100644
  	if (error >= 0)
  		error = buf.error;
 diff --git a/fs/stat.c b/fs/stat.c
-index adb071bc92e1..f30b435ad1fa 100644
+index adb071bc92e1..8e2cf2b05d23 100644
 --- a/fs/stat.c
 +++ b/fs/stat.c
 @@ -20,12 +20,21 @@
@@ -1955,7 +1955,7 @@ index adb071bc92e1..f30b435ad1fa 100644
  		stat->attributes |= STATX_ATTR_MOUNT_ROOT;
  	stat->attributes_mask |= STATX_ATTR_MOUNT_ROOT;
 diff --git a/fs/statfs.c b/fs/statfs.c
-index 83c5d3febbb8..6975513ebc36 100644
+index 83c5d3febbb8..aa6655c83140 100644
 --- a/fs/statfs.c
 +++ b/fs/statfs.c
 @@ -9,8 +9,20 @@
@@ -2159,7 +2159,7 @@ index a9a0ca605d4a..a6308f3f5017 100644
  }
  
 diff --git a/kernel/sys.c b/kernel/sys.c
-index 4a87dc5fa867..811b1afa2310 100644
+index 4a87dc5fa867..b3e62ed0639a 100644
 --- a/kernel/sys.c
 +++ b/kernel/sys.c
 @@ -1326,12 +1326,20 @@ static int override_release(char __user *release, size_t len)

@@ -6,7 +6,7 @@
   "kernel_version": "6.12",
   "patch_51": {
     "patch_file": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
-    "patch_sha256": "sha256:9422b190e17145ee13cab48311110de5d76b1dc4a1518c9314dff8b16002e326",
+    "patch_sha256": "sha256:d299ac9c2585a991c2a10c9b2315da35f927dd89ad2c2d47c689fb51cab0e97f",
     "retired_internal_patch": "51_deinlined_susfs_hooks_gki-android16-6.12.patch",
     "strict_apply": "PASS"
   },
@@ -65,7 +65,7 @@
         "apply_target": "android16-6.12-2025-09_r38",
         "compatibility_target": "android16-6.12-2025-09_r38 (Pixel 9 / GKI 6.12)",
         "patch_file": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
-        "patch_sha256": "sha256:9422b190e17145ee13cab48311110de5d76b1dc4a1518c9314dff8b16002e326"
+        "patch_sha256": "sha256:d299ac9c2585a991c2a10c9b2315da35f927dd89ad2c2d47c689fb51cab0e97f"
       }
     }
   },
