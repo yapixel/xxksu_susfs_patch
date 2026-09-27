@@ -3,26 +3,26 @@ Date: Fri, 25 Sep 2026 17:48:27 +0000
 Subject: [PATCH] SUSFS de-inlined hooks for android16-6.12-2025-09_r38
 
 ---
- fs/Makefile          |    2 
- fs/namei.c           |  237 ++++++++++++++++++++++++++++++++++++++++
- fs/namespace.c       |  293 ++++++++++++++++++++++++++++++++++++++++++++++++++
- fs/notify/fdinfo.c   |   78 +++++++++++++
- fs/proc/base.c       |   24 ++++
- fs/proc/bootconfig.c |   13 ++
- fs/proc/fd.c         |   70 ++++++++++++
- fs/proc/task_mmu.c   |  107 ++++++++++++++++++
- fs/proc_namespace.c  |  174 ++++++++++++++++++++++++++++++
- fs/readdir.c         |  126 ++++++++++++++++++++++
- fs/stat.c            |   67 +++++++++++
- fs/statfs.c          |   81 ++++++++++++++
- fs/super.c           |   24 ++++
- kernel/kallsyms.c    |   31 +++++
- kernel/sys.c         |    8 +
- mm/memory.c          |   14 ++
+ fs/Makefile          |   2 +
+ fs/namei.c           | 237 +++++++++++++++++++++++++++++++++++++++++
+ fs/namespace.c       | 293 ++++++++++++++++++++++++++++++++++++++++++++++++++-
+ fs/notify/fdinfo.c   |  78 ++++++++++++++
+ fs/proc/base.c       |  24 +++++
+ fs/proc/bootconfig.c |  13 +++
+ fs/proc/fd.c         |  70 ++++++++++++
+ fs/proc/task_mmu.c   | 107 +++++++++++++++++++
+ fs/proc_namespace.c  | 174 ++++++++++++++++++++++++++++++
+ fs/readdir.c         | 126 ++++++++++++++++++++++
+ fs/stat.c            |  67 ++++++++++++
+ fs/statfs.c          |  81 ++++++++++++++
+ fs/super.c           |  24 +++++
+ kernel/kallsyms.c    |  31 ++++++
+ kernel/sys.c         |   8 ++
+ mm/memory.c          |  14 +++
  16 files changed, 1348 insertions(+), 1 deletion(-)
 
 diff --git a/fs/Makefile b/fs/Makefile
-index 9f5d06f4a1a1..eeea6b70b47a 100644
+index 9f5d06f4a1a1e3c1bd418986a4e639e2be8002c2..eeea6b70b47aa4c22cfad3548205ae234664d6dc 100644
 --- a/fs/Makefile
 +++ b/fs/Makefile
 @@ -22,6 +22,8 @@ obj-y :=	open.o read_write.o file_table.o super.o \
@@ -35,9 +35,10 @@ index 9f5d06f4a1a1..eeea6b70b47a 100644
  obj-$(CONFIG_PROC_FS)		+= proc_namespace.o
  obj-$(CONFIG_LEGACY_DIRECT_IO)	+= direct-io.o
 diff --git a/fs/namei.c b/fs/namei.c
+index ce03b3d91a62abaa0a5661ac4b9c90fd3fca09a5..508b31132a1efe9bd4c1d730cc3aeb30b229684b 100644
 --- a/fs/namei.c
 +++ b/fs/namei.c
-@@ -40,9 +40,20 @@
+@@ -40,10 +40,21 @@
  #include <linux/bitops.h>
  #include <linux/init_task.h>
  #include <linux/uaccess.h>
@@ -47,7 +48,7 @@ diff --git a/fs/namei.c b/fs/namei.c
  
  #include "internal.h"
  #include "mount.h"
-+
+ 
 +#ifdef CONFIG_KSU_SUSFS_SUS_PATH
 +extern bool susfs_is_inode_sus_path(struct mnt_idmap* idmap, struct inode *inode);
 +extern const struct qstr susfs_fake_qstr_name;
@@ -55,10 +56,11 @@ diff --git a/fs/namei.c b/fs/namei.c
 +#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
 +extern struct filename *susfs_open_redirect_spoof_do_sys_openat(struct inode *inode);
 +#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
- 
++
  /* [Feb-1997 T. Schoebel-Theuer]
   * Fundamental changes in the pathname lookup mechanisms (namei)
-@@ -1601,6 +1612,14 @@
+  * were necessary because of omirr.  The reason is that omirr needs
+@@ -1601,6 +1612,14 @@ static struct dentry *lookup_dcache(const struct qstr *name,
  			return ERR_PTR(error);
  		}
  	}
@@ -73,7 +75,7 @@ diff --git a/fs/namei.c b/fs/namei.c
  	return dentry;
  }
  
-@@ -1618,6 +1637,9 @@
+@@ -1618,6 +1637,9 @@ struct dentry *lookup_one_qstr_excl(const struct qstr *name,
  	struct dentry *dentry = lookup_dcache(name, base, flags);
  	struct dentry *old;
  	struct inode *dir = base->d_inode;
@@ -83,7 +85,7 @@ diff --git a/fs/namei.c b/fs/namei.c
  
  	if (dentry)
  		return dentry;
-@@ -1627,6 +1649,9 @@
+@@ -1627,6 +1649,9 @@ struct dentry *lookup_one_qstr_excl(const struct qstr *name,
  		return ERR_PTR(-ENOENT);
  
  	dentry = d_alloc(base, name);
@@ -93,7 +95,7 @@ diff --git a/fs/namei.c b/fs/namei.c
  	if (unlikely(!dentry))
  		return ERR_PTR(-ENOMEM);
  
-@@ -1635,6 +1660,17 @@
+@@ -1635,6 +1660,17 @@ struct dentry *lookup_one_qstr_excl(const struct qstr *name,
  		dput(dentry);
  		dentry = old;
  	}
@@ -111,7 +113,7 @@ diff --git a/fs/namei.c b/fs/namei.c
  	return dentry;
  }
  EXPORT_SYMBOL(lookup_one_qstr_excl);
-@@ -1657,6 +1693,9 @@
+@@ -1657,6 +1693,9 @@ static struct dentry *lookup_fast(struct nameidata *nd)
  {
  	struct dentry *dentry, *parent = nd->path.dentry;
  	int status = 1;
@@ -121,7 +123,7 @@ diff --git a/fs/namei.c b/fs/namei.c
  
  	/*
  	 * Rename seqlock is not required here because in the off chance
-@@ -1665,6 +1704,16 @@
+@@ -1665,6 +1704,16 @@ static struct dentry *lookup_fast(struct nameidata *nd)
  	 */
  	if (nd->flags & LOOKUP_RCU) {
  		dentry = __d_lookup_rcu(parent, &nd->last, &nd->next_seq);
@@ -138,7 +140,7 @@ diff --git a/fs/namei.c b/fs/namei.c
  		if (unlikely(!dentry)) {
  			if (!try_to_unlazy(nd))
  				return ERR_PTR(-ECHILD);
-@@ -1688,6 +1737,16 @@
+@@ -1688,6 +1737,16 @@ static struct dentry *lookup_fast(struct nameidata *nd)
  			status = d_revalidate(dentry, nd->flags);
  	} else {
  		dentry = __d_lookup(parent, &nd->last);
@@ -155,7 +157,7 @@ diff --git a/fs/namei.c b/fs/namei.c
  		if (unlikely(!dentry))
  			return NULL;
  		status = d_revalidate(dentry, nd->flags);
-@@ -1709,12 +1768,19 @@
+@@ -1709,12 +1768,19 @@ static struct dentry *__lookup_slow(const struct qstr *name,
  	struct dentry *dentry, *old;
  	struct inode *inode = dir->d_inode;
  	DECLARE_WAIT_QUEUE_HEAD_ONSTACK(wq);
@@ -175,7 +177,7 @@ diff --git a/fs/namei.c b/fs/namei.c
  	if (IS_ERR(dentry))
  		return dentry;
  	if (unlikely(!d_in_lookup(dentry))) {
-@@ -1723,6 +1789,12 @@
+@@ -1723,6 +1789,12 @@ static struct dentry *__lookup_slow(const struct qstr *name,
  			if (!error) {
  				d_invalidate(dentry);
  				dput(dentry);
@@ -188,7 +190,7 @@ diff --git a/fs/namei.c b/fs/namei.c
  				goto again;
  			}
  			dput(dentry);
-@@ -1736,6 +1808,19 @@
+@@ -1736,6 +1808,19 @@ static struct dentry *__lookup_slow(const struct qstr *name,
  			dentry = old;
  		}
  	}
@@ -208,7 +210,7 @@ diff --git a/fs/namei.c b/fs/namei.c
  	return dentry;
  }
  
-@@ -2050,6 +2135,11 @@
+@@ -2050,6 +2135,11 @@ static const char *walk_component(struct nameidata *nd, int flags)
  	if (IS_ERR(dentry))
  		return ERR_CAST(dentry);
  	if (unlikely(!dentry)) {
@@ -220,7 +222,7 @@ diff --git a/fs/namei.c b/fs/namei.c
  		dentry = lookup_slow(&nd->last, nd->path.dentry, nd->flags);
  		if (IS_ERR(dentry))
  			return ERR_CAST(dentry);
-@@ -2361,6 +2451,15 @@
+@@ -2361,6 +2451,15 @@ static int link_path_walk(const char *name, struct nameidata *nd)
  		struct mnt_idmap *idmap;
  		const char *link;
  		unsigned long lastword;
@@ -236,7 +238,7 @@ diff --git a/fs/namei.c b/fs/namei.c
  
  		idmap = mnt_idmap(nd->path.mnt);
  		err = may_lookup(idmap, nd);
-@@ -2552,6 +2651,9 @@
+@@ -2552,6 +2651,9 @@ static inline const char *lookup_last(struct nameidata *nd)
  {
  	if (nd->last_type == LAST_NORM && nd->last.name[nd->last.len])
  		nd->flags |= LOOKUP_FOLLOW | LOOKUP_DIRECTORY;
@@ -246,7 +248,7 @@ diff --git a/fs/namei.c b/fs/namei.c
  
  	return walk_component(nd, WALK_TRAILING);
  }
-@@ -3506,15 +3608,39 @@
+@@ -3506,15 +3608,39 @@ static struct dentry *lookup_open(struct nameidata *nd, struct file *file,
  	int error, create_error = 0;
  	umode_t mode = op->mode;
  	DECLARE_WAIT_QUEUE_HEAD_ONSTACK(wq);
@@ -286,7 +288,7 @@ diff --git a/fs/namei.c b/fs/namei.c
  			if (IS_ERR(dentry))
  				return dentry;
  		}
-@@ -3652,6 +3778,9 @@
+@@ -3652,6 +3778,9 @@ static const char *open_last_lookups(struct nameidata *nd,
  	bool got_write = false;
  	struct dentry *dentry;
  	const char *res;
@@ -296,7 +298,7 @@ diff --git a/fs/namei.c b/fs/namei.c
  
  	nd->flags |= op->intent;
  
-@@ -3879,9 +4008,32 @@
+@@ -3879,9 +4008,32 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
  		const struct open_flags *op,
  		struct file *file)
  {
@@ -329,7 +331,7 @@ diff --git a/fs/namei.c b/fs/namei.c
  	if (unlikely(error))
  		return error;
  	error = mnt_want_write(path.mnt);
-@@ -3895,24 +4047,61 @@
+@@ -3895,24 +4047,61 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
  	mnt_drop_write(path.mnt);
  out:
  	path_put(&path);
@@ -391,7 +393,7 @@ diff --git a/fs/namei.c b/fs/namei.c
  	struct file *file;
  	int error;
  
-@@ -3929,10 +4118,33 @@
+@@ -3929,10 +4118,33 @@ static struct file *path_openat(struct nameidata *nd,
  		while (!(error = link_path_walk(s, nd)) &&
  		       (s = open_last_lookups(nd, file, op)) != NULL)
  			;
@@ -425,7 +427,7 @@ diff --git a/fs/namei.c b/fs/namei.c
  	if (likely(!error)) {
  		if (likely(file->f_mode & FMODE_OPENED))
  			return file;
-@@ -5243,6 +5455,11 @@
+@@ -5243,6 +5455,11 @@ int readlink_copy(char __user *buffer, int buflen, const char *link)
   *
   * Does not call security hook.
   */
@@ -437,7 +439,7 @@ diff --git a/fs/namei.c b/fs/namei.c
  int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
  {
  	struct inode *inode = d_inode(dentry);
-@@ -5252,7 +5469,18 @@
+@@ -5252,7 +5469,18 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
  
  	if (unlikely(!(inode->i_opflags & IOP_DEFAULT_READLINK))) {
  		if (unlikely(inode->i_op->readlink))
@@ -456,7 +458,7 @@ diff --git a/fs/namei.c b/fs/namei.c
  
  		if (!d_is_symlink(dentry))
  			return -EINVAL;
-@@ -5268,6 +5496,15 @@
+@@ -5268,6 +5496,15 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
  		if (IS_ERR(link))
  			return PTR_ERR(link);
  	}
@@ -473,9 +475,10 @@ diff --git a/fs/namei.c b/fs/namei.c
  	do_delayed_call(&done);
  	return res;
 diff --git a/fs/namespace.c b/fs/namespace.c
+index 6281247dc33b9466265ae85239b2f6f9a9534f77..c86bcf1becc7f4cd6e57cef4a0de4a1b2a9f2086 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
-@@ -33,10 +33,20 @@
+@@ -33,11 +33,21 @@
  #include <linux/shmem_fs.h>
  #include <linux/mnt_idmapping.h>
  #include <linux/nospec.h>
@@ -486,17 +489,18 @@ diff --git a/fs/namespace.c b/fs/namespace.c
  #include "pnode.h"
  #include "internal.h"
  #include <trace/hooks/blk.h>
-+
+ 
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +extern bool susfs_is_current_ksu_domain(void);
 +extern struct static_key_true susfs_is_sdcard_android_data_not_decrypted;
 +
 +#define CL_COPY_MNT_NS BIT(25) /* used by copy_mnt_ns() */
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
- 
++
  /* Maximum number of mounts in a mount namespace */
  static unsigned int sysctl_mount_max __read_mostly = 100000;
-@@ -73,6 +83,9 @@
+ 
+@@ -73,6 +83,9 @@ static DEFINE_IDA(mnt_group_ida);
  /* Don't allow confusion with old 32bit mount ID */
  #define MNT_UNIQUE_ID_OFFSET (1ULL << 31)
  static atomic64_t mnt_id_ctr = ATOMIC64_INIT(MNT_UNIQUE_ID_OFFSET);
@@ -506,7 +510,7 @@ diff --git a/fs/namespace.c b/fs/namespace.c
  
  static struct hlist_head *mount_hashtable __ro_after_init;
  static struct hlist_head *mountpoint_hashtable __ro_after_init;
-@@ -248,6 +261,10 @@
+@@ -248,6 +261,10 @@ static int mnt_alloc_id(struct mount *mnt)
  
  static void mnt_free_id(struct mount *mnt)
  {
@@ -517,7 +521,7 @@ diff --git a/fs/namespace.c b/fs/namespace.c
  	ida_free(&mnt_id_ida, mnt->mnt_id);
  }
  
-@@ -256,7 +273,25 @@
+@@ -256,7 +273,25 @@ static void mnt_free_id(struct mount *mnt)
   */
  static int mnt_alloc_group_id(struct mount *mnt)
  {
@@ -543,11 +547,10 @@ diff --git a/fs/namespace.c b/fs/namespace.c
  
  	if (res < 0)
  		return res;
-@@ -305,6 +340,131 @@
- 	return mnt->mnt_count;
+@@ -306,6 +341,131 @@ int mnt_get_count(struct mount *mnt)
  #endif
  }
-+
+ 
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +/* A copy of alloc_vfsmnt() but allocates the fake mnt_id for mounts
 + * that are unshared by ksu process
@@ -672,10 +675,11 @@ diff --git a/fs/namespace.c b/fs/namespace.c
 +	return NULL;
 +}
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
- 
++
  static struct mount *alloc_vfsmnt(const char *name)
  {
-@@ -801,6 +961,20 @@
+ 	struct mount *mnt = kmem_cache_zalloc(mnt_cache, GFP_KERNEL);
+@@ -801,6 +961,20 @@ struct mount *__lookup_mnt(struct vfsmount *mnt, struct dentry *dentry)
  	struct hlist_head *head = m_hash(mnt, dentry);
  	struct mount *p;
  
@@ -696,7 +700,7 @@ diff --git a/fs/namespace.c b/fs/namespace.c
  	hlist_for_each_entry_rcu(p, head, mnt_hash)
  		if (&p->mnt_parent->mnt == mnt && p->mnt_mountpoint == dentry)
  			return p;
-@@ -1203,7 +1377,21 @@
+@@ -1203,7 +1377,21 @@ struct vfsmount *vfs_create_mount(struct fs_context *fc)
  	if (!fc->root)
  		return ERR_PTR(-EINVAL);
  
@@ -718,7 +722,7 @@ diff --git a/fs/namespace.c b/fs/namespace.c
  	if (!mnt)
  		return ERR_PTR(-ENOMEM);
  
-@@ -1285,8 +1473,44 @@
+@@ -1285,8 +1473,44 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
  	struct super_block *sb = old->mnt.mnt_sb;
  	struct mount *mnt;
  	int err;
@@ -763,20 +767,20 @@ diff --git a/fs/namespace.c b/fs/namespace.c
  	if (!mnt)
  		return ERR_PTR(-ENOMEM);
  
-@@ -1303,6 +1527,12 @@
- 
+@@ -1304,6 +1528,12 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
  	mnt->mnt.mnt_flags = old->mnt.mnt_flags;
  	mnt->mnt.mnt_flags &= ~(MNT_WRITE_HOLD|MNT_MARKED|MNT_INTERNAL);
-+
+ 
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +	mnt->mnt.mnt_flags &= ~VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;
 +	if (unlikely(is_mnt_ksu_unshared))
 +		mnt->mnt.mnt_flags |= VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
- 
++
  	atomic_inc(&sb->s_active);
  	mnt->mnt.mnt_idmap = mnt_idmap_get(mnt_idmap(&old->mnt));
-@@ -1342,7 +1572,10 @@
+ 
+@@ -1342,7 +1572,10 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
  	return mnt;
  
   out_free:
@@ -788,7 +792,7 @@ diff --git a/fs/namespace.c b/fs/namespace.c
  	free_vfsmnt(mnt);
  	return ERR_PTR(err);
  }
-@@ -1548,6 +1781,12 @@
+@@ -1548,6 +1781,12 @@ static struct mount *mnt_find_id_at(struct mnt_namespace *ns, u64 mnt_id)
  			node = node->rb_right;
  		}
  	}
@@ -801,7 +805,7 @@ diff --git a/fs/namespace.c b/fs/namespace.c
  	return ret;
  }
  
-@@ -3960,6 +4199,9 @@
+@@ -3960,6 +4199,9 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
  	copy_flags = CL_COPY_UNBINDABLE | CL_EXPIRE;
  	if (user_ns != ns->user_ns)
  		copy_flags |= CL_SHARED_TO_SLAVE;
@@ -811,7 +815,7 @@ diff --git a/fs/namespace.c b/fs/namespace.c
  	new = copy_tree(old, old->mnt.mnt_root, copy_flags);
  	if (IS_ERR(new)) {
  		namespace_unlock();
-@@ -5446,6 +5688,12 @@
+@@ -5446,6 +5688,12 @@ static ssize_t do_listmount(struct mnt_namespace *ns, u64 mnt_parent_id,
  			continue;
  		if (!is_path_reachable(r, r->mnt.mnt_root, &orig))
  			continue;
@@ -824,7 +828,7 @@ diff --git a/fs/namespace.c b/fs/namespace.c
  		*mnt_ids = r->mnt_id_unique;
  		mnt_ids++;
  		nr_mnt_ids--;
-@@ -5852,3 +6100,46 @@
+@@ -5852,3 +6100,46 @@ static int __init init_fs_namespace_sysctls(void)
  fs_initcall(init_fs_namespace_sysctls);
  
  #endif /* CONFIG_SYSCTL */
@@ -872,7 +876,7 @@ diff --git a/fs/namespace.c b/fs/namespace.c
 +}
 +#endif // #ifdef CONFIG_KSU_SUSFS
 diff --git a/fs/notify/fdinfo.c b/fs/notify/fdinfo.c
-index e933f9c65d90..44880b8813d4 100644
+index e933f9c65d904af6a37ab0c418df2bb14d76f32d..44880b8813d4b011938e85a7c5273335e9801eed 100644
 --- a/fs/notify/fdinfo.c
 +++ b/fs/notify/fdinfo.c
 @@ -12,6 +12,9 @@
@@ -993,7 +997,7 @@ index e933f9c65d90..44880b8813d4 100644
  			   inode_mark->wd, inode->i_ino, inode->i_sb->s_dev,
  			   inotify_mark_user_mask(mark));
 diff --git a/fs/proc/base.c b/fs/proc/base.c
-index 26abf573e615..de467386bd9f 100644
+index 26abf573e6150968471135a2e998422fc849e5d2..de467386bd9f0dbe344801ac174b186f3bd0d4a5 100644
 --- a/fs/proc/base.c
 +++ b/fs/proc/base.c
 @@ -100,6 +100,10 @@
@@ -1049,7 +1053,7 @@ index 26abf573e615..de467386bd9f 100644
  			continue;
  
 diff --git a/fs/proc/bootconfig.c b/fs/proc/bootconfig.c
-index 87dcaae32ff8..431965c17a3f 100644
+index 87dcaae32ff87b40c3d65a0d2463a6e60cdc0dbc..431965c17a3fbe0c34ef3ac48491def949ebe3c8 100644
 --- a/fs/proc/bootconfig.c
 +++ b/fs/proc/bootconfig.c
 @@ -12,8 +12,21 @@
@@ -1075,7 +1079,7 @@ index 87dcaae32ff8..431965c17a3f 100644
  		seq_puts(m, saved_boot_config);
  	return 0;
 diff --git a/fs/proc/fd.c b/fs/proc/fd.c
-index 5e391cbca7a3..b6d2e1628396 100644
+index 5e391cbca7a3be0cb02f55e96d6728ad98e3ea16..b6d2e16283963e3cabd98e3aba3cc76d0ac042ae 100644
 --- a/fs/proc/fd.c
 +++ b/fs/proc/fd.c
 @@ -15,11 +15,22 @@
@@ -1173,6 +1177,7 @@ index 5e391cbca7a3..b6d2e1628396 100644
  	show_fd_locks(m, file, files);
  	if (seq_has_overflowed(m))
 diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
+index 71acc984fac225ac1d659a1bfd5cfe0044cadf76..a115b02cdc888e1652650aa99662b31b9e0b0a33 100644
 --- a/fs/proc/task_mmu.c
 +++ b/fs/proc/task_mmu.c
 @@ -26,6 +26,9 @@
@@ -1185,7 +1190,7 @@ diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
  
  #include <asm/elf.h>
  #include <asm/tlb.h>
-@@ -452,6 +455,14 @@
+@@ -452,6 +455,14 @@ static void show_vma_header_prefix(struct seq_file *m,
  	seq_putc(m, ' ');
  }
  
@@ -1200,7 +1205,7 @@ diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
  static void
  show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
  {
-@@ -465,10 +476,42 @@
+@@ -465,10 +476,42 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
  
  	if (vma->vm_file) {
  		const struct inode *inode = file_user_inode(vma->vm_file);
@@ -1243,7 +1248,7 @@ diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
  	}
  
  	start = vma->vm_start;
-@@ -1213,6 +1256,11 @@
+@@ -1213,6 +1256,11 @@ static void smap_gather_stats(struct vm_area_struct *vma,
  	const struct mm_walk_ops *ops = &smaps_walk_ops;
  	unsigned long end = VMA_PAD_START(vma);
  
@@ -1255,7 +1260,7 @@ diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
  	/* Invalid start */
  	if (start >= end)
  		return;
-@@ -1304,6 +1352,13 @@
+@@ -1304,6 +1352,13 @@ static int show_smap(struct seq_file *m, void *v)
  	struct vm_area_struct *vma = v;
  	struct mem_size_stats mss = {};
  
@@ -1269,7 +1274,7 @@ diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
  	if (!vma_pages(vma))
  		goto show_pad;
  
-@@ -1363,7 +1418,14 @@
+@@ -1363,7 +1418,14 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
  
  	vma_start = vma->vm_start;
  	do {
@@ -1284,7 +1289,7 @@ diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
  		last_vma_end = vma->vm_end;
  
  		/*
-@@ -1429,8 +1491,15 @@
+@@ -1429,8 +1491,15 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
  
  			/* Case 4 above */
  			if (vma->vm_end > last_vma_end) {
@@ -1300,7 +1305,7 @@ diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
  			}
  		}
  	} for_each_vma(vmi, vma);
-@@ -2144,6 +2213,40 @@
+@@ -2144,6 +2213,40 @@ static inline void __collapse_pagemap_result(pagemap_entry_t *src_vec,
   * determine which areas of memory are actually mapped and llseek to
   * skip over unmapped regions.
   */
@@ -1341,7 +1346,7 @@ diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
  static ssize_t pagemap_read(struct file *file, char __user *buf,
  			    size_t count, loff_t *ppos)
  {
-@@ -2230,7 +2333,11 @@
+@@ -2230,7 +2333,11 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
  		ret = mmap_read_lock_killable(mm);
  		if (ret)
  			goto out_free;
@@ -1354,7 +1359,7 @@ diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
  		start_vaddr = end;
  
 diff --git a/fs/proc_namespace.c b/fs/proc_namespace.c
-index e133b507ddf3..3dc4bfc563f1 100644
+index e133b507ddf3941525c1a2b70cd82846569dfa20..3dc4bfc563f1a8b48f3a2f13af6061c03138b3c2 100644
 --- a/fs/proc_namespace.c
 +++ b/fs/proc_namespace.c
 @@ -12,12 +12,20 @@
@@ -1569,7 +1574,7 @@ index e133b507ddf3..3dc4bfc563f1 100644
  }
  
 diff --git a/fs/readdir.c b/fs/readdir.c
-index 6d29cab8576e..77213f638951 100644
+index 6d29cab8576e6411a81bdc060cc6af252bbf50de..77213f638951bc9c0766f1172e2800e0836d22b1 100644
 --- a/fs/readdir.c
 +++ b/fs/readdir.c
 @@ -22,6 +22,10 @@
@@ -1846,7 +1851,7 @@ index 6d29cab8576e..77213f638951 100644
  	if (error >= 0)
  		error = buf.error;
 diff --git a/fs/stat.c b/fs/stat.c
-index adb071bc92e1..8e2cf2b05d23 100644
+index adb071bc92e145e12cff4f7a9ba695104497d90c..8e2cf2b05d23870c7839cabbd559dae4af2bb691 100644
 --- a/fs/stat.c
 +++ b/fs/stat.c
 @@ -20,12 +20,21 @@
@@ -1955,7 +1960,7 @@ index adb071bc92e1..8e2cf2b05d23 100644
  		stat->attributes |= STATX_ATTR_MOUNT_ROOT;
  	stat->attributes_mask |= STATX_ATTR_MOUNT_ROOT;
 diff --git a/fs/statfs.c b/fs/statfs.c
-index 83c5d3febbb8..aa6655c83140 100644
+index 83c5d3febbb809f2e53659d7113d23766e286ba4..aa6655c83140cbfe452f0beaa4d802a9bca1b895 100644
 --- a/fs/statfs.c
 +++ b/fs/statfs.c
 @@ -9,8 +9,20 @@
@@ -2063,7 +2068,7 @@ index 83c5d3febbb8..aa6655c83140 100644
  	if (!error)
  		buf->f_flags = calculate_f_flags(path->mnt);
 diff --git a/fs/super.c b/fs/super.c
-index 6a8a1b67a35a..cecc61130f5d 100644
+index 6a8a1b67a35a11041f229a20e9a63e082eb192d3..cecc61130f5d24e0cef3941781a414889c3085d2 100644
 --- a/fs/super.c
 +++ b/fs/super.c
 @@ -37,9 +37,17 @@
@@ -2108,7 +2113,7 @@ index 6a8a1b67a35a..cecc61130f5d 100644
  	 * Many userspace utilities consider an FSID of 0 invalid.
  	 * Always return at least 1 from get_anon_bdev.
 diff --git a/kernel/kallsyms.c b/kernel/kallsyms.c
-index a9a0ca605d4a..a6308f3f5017 100644
+index a9a0ca605d4a8c82c5575706443287120ee6edc4..a6308f3f5017df134d568a2c2435f9aef028f064 100644
 --- a/kernel/kallsyms.c
 +++ b/kernel/kallsyms.c
 @@ -31,6 +31,9 @@
@@ -2159,7 +2164,7 @@ index a9a0ca605d4a..a6308f3f5017 100644
  }
  
 diff --git a/kernel/sys.c b/kernel/sys.c
-index 4a87dc5fa867..b3e62ed0639a 100644
+index 4a87dc5fa8679d5e0e37ca1e746f2abe2369c6b6..b3e62ed0639a9ac3c18498a9905952447fda0b71 100644
 --- a/kernel/sys.c
 +++ b/kernel/sys.c
 @@ -1326,12 +1326,20 @@ static int override_release(char __user *release, size_t len)
@@ -2184,7 +2189,7 @@ index 4a87dc5fa867..b3e62ed0639a 100644
  	if (copy_to_user(name, &tmp, sizeof(tmp)))
  		return -EFAULT;
 diff --git a/mm/memory.c b/mm/memory.c
-index dfcefce759a3..3c5140e893eb 100644
+index dfcefce759a3345eec723fedb3b0d6e5503e0f91..3c5140e893ebb7a79d4f7dd88c30bddcae12364b 100644
 --- a/mm/memory.c
 +++ b/mm/memory.c
 @@ -79,6 +79,9 @@
