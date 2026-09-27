@@ -3,40 +3,7 @@ Date: Fri, 25 Sep 2026 22:14:22 +0000
 Subject: [PATCH] SUSFS de-inlined hooks for sultan-android14-6.1
 
 ---
- drivers/input/input.c |    2 
- fs/Makefile           |    2 
- fs/namei.c            |  238 +++++++++++++++++++++++++++++++++++++++++++++++++
- fs/namespace.c        |  215 ++++++++++++++++++++++++++++++++++++++++++++
- fs/notify/fdinfo.c    |   78 ++++++++++++++++
- fs/proc/base.c        |   24 +++++
- fs/proc/bootconfig.c  |   43 +++++++++
- fs/proc/fd.c          |   70 ++++++++++++++
- fs/proc/task_mmu.c    |   76 ++++++++++++++++
- fs/proc_namespace.c   |  178 +++++++++++++++++++++++++++++++++++++
- fs/readdir.c          |  197 +++++++++++++++++++++++++++++++++++++++++
- fs/stat.c             |   52 +++++++++++
- fs/statfs.c           |   81 +++++++++++++++++
- fs/super.c            |   24 +++++
- fs/susfs.c            |   64 +++++++++++++
- include/linux/susfs.h |   20 ++++
- kernel/kallsyms.c     |   31 ++++++
- kernel/sys.c          |   26 ++---
- mm/memory.c           |    8 ++
- 19 files changed, 1411 insertions(+), 18 deletions(-)
-
-diff --git a/drivers/input/input.c b/drivers/input/input.c
-index 78be582b5766..ca17a064ac9a 100644
---- a/drivers/input/input.c
-+++ b/drivers/input/input.c
-@@ -387,6 +387,8 @@ static void input_event_dispose(struct input_dev *dev, int disposition,
- 	}
- }
- 
-+extern struct static_key_false ksu_input_hook_key_false;
-+
- void input_handle_event(struct input_dev *dev,
- 			unsigned int type, unsigned int code, int value)
- {
+ 18 files changed, 1441 insertions(+), 19 deletions(-)
 
 diff --git a/fs/Makefile b/fs/Makefile
 index 469ce6ec1..6e3c743e5 100644
@@ -496,10 +463,9 @@ index 1fa36df7b..cb4497481 100644
  	return res;
 
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 67d89ebb5..d4e7882ce 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
-@@ -32,10 +32,20 @@
+@@ -32,9 +32,19 @@
  #include <linux/fs_context.h>
  #include <linux/shmem_fs.h>
  #include <linux/mnt_idmapping.h>
@@ -509,18 +475,17 @@ index 67d89ebb5..d4e7882ce 100644
  
  #include "pnode.h"
  #include "internal.h"
- 
++
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +extern bool susfs_is_current_ksu_domain(void);
 +extern struct static_key_true susfs_is_sdcard_android_data_not_decrypted;
 +
 +#define CL_COPY_MNT_NS BIT(25) /* used by copy_mnt_ns() */
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+
+ 
  /* Maximum number of mounts in a mount namespace */
  static unsigned int sysctl_mount_max __read_mostly = 100000;
- 
-@@ -135,6 +145,10 @@ static int mnt_alloc_id(struct mount *mnt)
+@@ -135,6 +145,10 @@
  
  static void mnt_free_id(struct mount *mnt)
  {
@@ -531,7 +496,7 @@ index 67d89ebb5..d4e7882ce 100644
  	ida_free(&mnt_id_ida, mnt->mnt_id);
  }
  
-@@ -143,7 +157,25 @@ static void mnt_free_id(struct mount *mnt)
+@@ -143,7 +157,25 @@
   */
  static int mnt_alloc_group_id(struct mount *mnt)
  {
@@ -557,10 +522,11 @@ index 67d89ebb5..d4e7882ce 100644
  
  	if (res < 0)
  		return res;
-@@ -193,6 +225,119 @@ int mnt_get_count(struct mount *mnt)
+@@ -192,6 +224,119 @@
+ 	return mnt->mnt_count;
  #endif
  }
- 
++
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +/* A copy of alloc_vfsmnt() but allocates the fake mnt_id for mounts
 + * that are unshared by ksu process
@@ -673,11 +639,10 @@ index 67d89ebb5..d4e7882ce 100644
 +	return NULL;
 +}
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+
+ 
  static struct mount *alloc_vfsmnt(const char *name)
  {
- 	struct mount *mnt = kmem_cache_zalloc(mnt_cache, GFP_KERNEL);
-@@ -666,6 +811,20 @@ struct mount *__lookup_mnt(struct vfsmount *mnt, struct dentry *dentry)
+@@ -666,6 +811,20 @@
  	struct hlist_head *head = m_hash(mnt, dentry);
  	struct mount *p;
  
@@ -698,7 +663,7 @@ index 67d89ebb5..d4e7882ce 100644
  	hlist_for_each_entry_rcu(p, head, mnt_hash)
  		if (&p->mnt_parent->mnt == mnt && p->mnt_mountpoint == dentry)
  			return p;
-@@ -1010,7 +1169,21 @@ struct vfsmount *vfs_create_mount(struct fs_context *fc)
+@@ -1010,7 +1169,21 @@
  	if (!fc->root)
  		return ERR_PTR(-EINVAL);
  
@@ -720,7 +685,7 @@ index 67d89ebb5..d4e7882ce 100644
  	if (!mnt)
  		return ERR_PTR(-ENOMEM);
  
-@@ -1096,8 +1269,42 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
+@@ -1096,8 +1269,42 @@
  	struct super_block *sb = old->mnt.mnt_sb;
  	struct mount *mnt;
  	int err;
@@ -763,19 +728,32 @@ index 67d89ebb5..d4e7882ce 100644
  	if (!mnt)
  		return ERR_PTR(-ENOMEM);
  
-@@ -1115,6 +1322,11 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
+@@ -1114,6 +1321,12 @@
+ 
  	mnt->mnt.mnt_flags = old->mnt.mnt_flags;
  	mnt->mnt.mnt_flags &= ~(MNT_WRITE_HOLD|MNT_MARKED|MNT_INTERNAL);
- 
++
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++	mnt->mnt.mnt_flags &= ~VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;
 +	if (unlikely(is_mnt_ksu_unshared))
 +		mnt->mnt.mnt_flags |= VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+
+ 
  	atomic_inc(&sb->s_active);
  	mnt->mnt.mnt_userns = mnt_user_ns(&old->mnt);
- 	if (!initial_idmapping(mnt->mnt.mnt_userns))
-@@ -3495,6 +3707,9 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
+@@ -1154,7 +1367,10 @@
+ 	return mnt;
+ 
+  out_free:
+-	mnt_free_id(mnt);
++#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++	if (!is_mnt_ksu_unshared)
++#endif
++		mnt_free_id(mnt);
+ 	free_vfsmnt(mnt);
+ 	return ERR_PTR(err);
+ }
+@@ -3495,6 +3711,9 @@
  	copy_flags = CL_COPY_UNBINDABLE | CL_EXPIRE;
  	if (user_ns != ns->user_ns)
  		copy_flags |= CL_SHARED_TO_SLAVE;
@@ -785,7 +763,6 @@ index 67d89ebb5..d4e7882ce 100644
  	new = copy_tree(old, old->mnt.mnt_root, copy_flags);
  	if (IS_ERR(new)) {
  		namespace_unlock();
-
 diff --git a/fs/notify/fdinfo.c b/fs/notify/fdinfo.c
 index 55081ae3a..3865780f8 100644
 --- a/fs/notify/fdinfo.c
@@ -963,7 +940,7 @@ index b0ec673a2..27bc58fc2 100644
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
  		if (++pos <= ctx->pos)
  			continue;
-
+ 
 diff --git a/fs/proc/bootconfig.c b/fs/proc/bootconfig.c
 index 5a33ebd07..5c01bbcac 100644
 --- a/fs/proc/bootconfig.c
@@ -1137,7 +1114,6 @@ index 913bef0d2..b293de8fa 100644
  	if (seq_has_overflowed(m))
 
 diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
-index 0544c1f58..dcd705101 100644
 --- a/fs/proc/task_mmu.c
 +++ b/fs/proc/task_mmu.c
 @@ -21,6 +21,9 @@
@@ -1150,7 +1126,7 @@ index 0544c1f58..dcd705101 100644
  
  #include <asm/elf.h>
  #include <asm/tlb.h>
-@@ -416,6 +419,17 @@ static int show_vma_header_prefix(struct seq_file *m, unsigned long start,
+@@ -416,6 +419,17 @@
  	return 0;
  }
  
@@ -1168,7 +1144,7 @@ index 0544c1f58..dcd705101 100644
  static void
  show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
  {
-@@ -430,9 +444,39 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
+@@ -430,9 +444,39 @@
  
  	if (file) {
  		struct inode *inode = file_inode(vma->vm_file);
@@ -1208,7 +1184,7 @@ index 0544c1f58..dcd705101 100644
  	}
  
  	start = vma->vm_start;
-@@ -1055,6 +1099,13 @@ static int show_smap(struct seq_file *m, void *v)
+@@ -1055,6 +1099,13 @@
  	struct vm_area_struct *vma = v;
  	struct mem_size_stats mss;
  
@@ -1222,7 +1198,7 @@ index 0544c1f58..dcd705101 100644
  	memset(&mss, 0, sizeof(mss));
  
  	if (!vma_pages(vma))
-@@ -1117,7 +1168,14 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
+@@ -1117,7 +1168,14 @@
  
  	vma_start = vma->vm_start;
  	do {
@@ -1237,7 +1213,7 @@ index 0544c1f58..dcd705101 100644
  		last_vma_end = vma->vm_end;
  
  		/*
-@@ -1180,7 +1238,14 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
+@@ -1180,7 +1238,14 @@
  
  			/* Case 4 above */
  			if (vma->vm_end > last_vma_end)
@@ -1252,32 +1228,59 @@ index 0544c1f58..dcd705101 100644
  		}
  		/* Case 2 above */
  	} while ((vma = mas_find(&mas, ULONG_MAX)) != NULL);
-@@ -1913,6 +1978,9 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
- 	while (count && (start_vaddr < end_vaddr)) {
- 		int len;
- 		unsigned long end;
+@@ -1858,6 +1923,40 @@
+  * determine which areas of memory are actually mapped and llseek to
+  * skip over unmapped regions.
+  */
 +#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-+		struct vm_area_struct *vma;
-+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
- 
- 		pm.pos = 0;
- 		end = (start_vaddr + PAGEMAP_WALK_SIZE) & PAGEMAP_WALK_MASK;
-@@ -1922,7 +1990,15 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
++/* Caller holds mmap_lock. Hidden pages have the same zero representation as
++ * unmapped holes, including read length and position; never skip a walk chunk.
++ */
++static int susfs_pagemap_walk(struct mm_struct *mm, unsigned long start,
++                            unsigned long end, struct pagemapread *pm)
++{
++	while (start < end) {
++		struct vm_area_struct *vma = find_vma(mm, start);
++		unsigned long next = end;
++		int ret;
++
++		if (vma)
++			next = min(end, start < vma->vm_start ? vma->vm_start : vma->vm_end);
++		if (vma && start >= vma->vm_start && vma->vm_file &&
++		    SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file))) {
++			pagemap_entry_t pme = make_pme(0, 0);
++
++			for (; start < next; start += PAGE_SIZE) {
++				ret = add_to_pagemap(&pme, pm);
++				if (ret)
++					return ret;
++			}
++		} else {
++			ret = walk_page_range(mm, start, next, &pagemap_ops, pm);
++			if (ret)
++				return ret;
++		}
++		start = next;
++	}
++	return 0;
++}
++#endif
++
+ static ssize_t pagemap_read(struct file *file, char __user *buf,
+ 			    size_t count, loff_t *ppos)
+ {
+@@ -1922,7 +2021,11 @@
  		ret = mmap_read_lock_killable(mm);
  		if (ret)
  			goto out_free;
 +#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-+		vma = vma_lookup(mm, start_vaddr);
-+		if (vma && vma->vm_file && SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))
-+			goto bypass_orig_flow;
-+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
++		ret = susfs_pagemap_walk(mm, start_vaddr, end, &pm);
++#else
  		ret = walk_page_range(mm, start_vaddr, end, &pagemap_ops, &pm);
-+#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-+bypass_orig_flow:
-+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
++#endif
  		mmap_read_unlock(mm);
  		start_vaddr = end;
-
+ 
 diff --git a/fs/proc_namespace.c b/fs/proc_namespace.c
 index 846f9455a..9f56335e1 100644
 --- a/fs/proc_namespace.c
@@ -1496,7 +1499,7 @@ index 846f9455a..9f56335e1 100644
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
  	return mounts_open_common(inode, file, show_vfsstat);
  }
-
+ 
 diff --git a/fs/readdir.c b/fs/readdir.c
 index c44e1afe1..f62b8da75 100644
 --- a/fs/readdir.c
@@ -2319,7 +2322,7 @@ index 824bcc7b5..99c753390 100644
 +#endif
  	return 0;
  }
-
+ 
 diff --git a/kernel/sys.c b/kernel/sys.c
 index 7595dc25d..9a704f3ec 100644
 --- a/kernel/sys.c

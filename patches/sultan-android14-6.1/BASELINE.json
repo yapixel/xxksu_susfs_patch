@@ -6,7 +6,7 @@
   "kernel_version": "6.1",
   "patch_51": {
     "patch_file": "patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch",
-    "patch_sha256": "sha256:275372ecc7e802f94e02c10bc37346a8a44bed16a53369114d3a5aaa85b703c6",
+    "patch_sha256": "sha256:0166fc3c1e522aaa511dd85ed5fff712f36290543de0bb4f5a9bf9c2fe36d01e",
     "strict_apply": "PASS"
   },
   "retained_file_hashes": {
