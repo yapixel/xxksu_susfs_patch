@@ -1,6 +1,6 @@
-From 37eee69d83424bba4b2ae3d3dd38cbbbb1ef9824 Mon Sep 17 00:00:00 2001
+From b670f2ba5c232d9b6f52c151390d024d4b04ee73 Mon Sep 17 00:00:00 2001
 From: yapixel <yapixel@users.noreply.github.com>
-Date: Thu, 27 Aug 2026 14:43:32 +0000
+Date: Sat, 26 Sep 2026 15:37:34 +0000
 Subject: [PATCH] Enable SUSFS for backslashxx KernelSU
 
 ---
