@@ -1,232 +1,142 @@
-# Developer & Agent Guidelines (AGENTS.md)
+# Contributor and Agent Contract
 
-## Canonical Promotion Pipeline (`v2.pipeline`)
+## Stable maintenance
 
-Every production patch follows this strict unidirectional pipeline:
+The repository is in **STABLE MAINTENANCE MODE**. Future work normally consists of
+upstream drift reconciliation, demonstrated correctness defects, target compatibility,
+and necessary maintenance of existing automation. Do not proactively add milestone
+subsystems, abstraction layers, semantic frameworks, gates, generic validators,
+build systems, or kernel compilation orchestration. Require a concrete observed
+failure and prefer the smallest correction supported by evidence.
 
-```
-Authoritative Upstream Inputs
-  │
-  ▼
-Shared Authoritative Semantic Gate (`v2.semantic.gate`)
-  (Strict Fail-Closed: no UNKNOWN semantics, no anchor drift, verified source identity)
-  │
-  ▼
-Deterministic Candidate Generation
-  (Pass 1 & Pass 2 equality verification)
-  │
-  ▼
-Candidate Artifact (`candidate_patches/<patch-id>/<patch-filename>`)
-  │
-  ▼
-Exact Target Validation against Bound Target Source Tree (`exact_patch`)
-  (Strict Gate: 0 offsets, 0 fuzz, 0 rejects, valid syntax, deterministic postimage)
-  │
-  ▼
-Independent Midori Reference Cross-Check (`reference_cross_check`)
-  (Reference-only cross-check; blocks only on SEMANTIC_CONFLICT; never modifies production)
-  │
-  ▼
-Single-Writer Promotion Gate
-  (Write-back authorized only after all gates pass; no-op if candidate matches production)
-  │
-  ▼
-origin/main:patches/ (Tracked Stable Path)
-  │
-  ▼
-Synchronize Metadata, BASELINE records, and `patches/manifest.json`
-  │
-  ▼
-Public Delivery Verification
-  (Candidate SHA == Committed origin/main SHA == RAW URL SHA == manifest.json SHA)
-```
+Machine-readable authority is `patches/manifest.json`, active `BASELINE.json`
+records, `.github/upstream-state.json`, and accepted workflow/input bindings.
+Read these before editing. Do not turn historical prose or a passing test count
+into correctness evidence. Keep README downstream-facing and HANDOVER a dated snapshot.
 
----
+## Environment, commits, and cleanup
 
-## Generation Provenance
+- On Windows Codex hosts use local WSL for repository work, audits, Git, and tests.
+  Do not rely on VPS, AGY/Pi, or developer scratch state.
+- Keep the actual working repository persistent. Put all disposable clones,
+  archives, extracted kernels, candidates, comparisons, and temporary caches under
+  one explicitly tracked task-owned `/tmp/<project>-<task>-<unique>/` root.
+- Before completion permanently remove only that root, verify it is absent, and
+  report remaining task-created clones/trees/archives. Never clean unrelated data,
+  shared caches, or system files. Report cleanup failures without killing unrelated processes.
+- Verify working-tree status before and after work. Read-only audits leave it unchanged.
+- Follow the user's signing instruction. Otherwise interactive development commits
+  use GPG key `56BBBCE870EF17D9`; unattended passphrase-blocked commits may use
+  `--no-gpg-sign`, recording hashes in `.codex/HANDOFF.md`. Never change GPG configuration
+  or rewrite commits solely to sign them later.
+- Documentation-only closeouts may use `[skip ci]`; do not dispatch production
+  publication or expensive reconstruction merely for prose changes.
 
-- **Generation input — Patch 11:** accepted xxKSU source revision plus the reviewed
-  repository adaptation policy in v2/adapters/xxksu.py → Patch 11. Its bytes do
-  not depend on Simonpunk Patch 10 or a previous/golden Patch 11.
+## Input roles and generation
+
+- **Generation input — Patch 11:** accepted xxKSU source + reviewed repository
+  policy (`v2.adapters.xxksu.get_patch11_operation_specs`) → Patch 11.
 - **Semantic lineage / watch input:** Simonpunk Patch 10 and SuSFS APIs inform
-  Patch 11 policy review. The SuSFS watcher tracks Patch 10 changes and submits
-  them to semantic review; this is distinct from runtime byte generation.
-  Native xxKSU ownership and the retired TRY_UMOUNT/KSU_MARK_GET adaptations remain.
-- **Generation input — Sultan:** accepted Simonpunk Patch 50 plus reviewed
-  de-inlining/correction rules and authenticated target preimages → Patch 51.
-  No previous Patch 51 supplies content or metadata. Its mail Date is the accepted
-  Simonpunk revision's committer timestamp, formatted in UTC. The raw Git object
-  sultan/susfs-source-commit.txt is verified against the baseline's accepted
-  commit ID before its timestamp is used; advance it with an accepted source pin.
-- **Target source:** authenticated kernel/xxKSU preimages, including the retained
-  source bundles, supply context and API definitions; they are not final outputs.
-- **Reference input:** Midori artifacts are comparison-only and never generation
-  inputs. **Production output:** the three public patches/ artifacts.
-- **Test golden / historical output:** the Sultan Patch 51 fixture is a historical
-  correction-test input, not a production generation input. Patch 11 production
-  equality is an output assertion only.
-- **Generation input — GKI r38:** accepted Simonpunk Patch 50 plus authenticated
-  clean r38 source excerpts and reviewed r38 transformation rules → Patch 51.
-  The byte generator rejects missing/changed authoritative inputs. The accepted
-  Git commit object supplies UTC Date; real pre/postimages supply index IDs and
-  diffstat. No Patch 51 supplies bytes or metadata. The retained r38 Patch 51 is
-  a historical negative-test golden only. See .github/fixtures/r38/README.md for
-  the complete hunk provenance and metadata migration review.
-- **Development environment:** local WSL is the default for development and audits
-  on Windows hosts.
-- **Clean-room verification:** GitHub Actions clean-room.yml is the authoritative
-  fresh-environment reproducibility check. It independently fetches accepted
-  inputs, reconstructs without final-output copies, and verifies all three
-  production artifacts. It is read-only and never publishes patches; publication
-  remains exclusively owned by the production update workflows. Local validation
-  alone must not be reported as CLEAN_ROOM_VERIFIED.
+  Patch 11 review. Patch 10 is watched, but is not a runtime byte-generation input.
+- **Generation input — Sultan:** accepted Simonpunk Sultan Patch 50 + accepted
+  Sultan target/core context + explicit deinline/correction rules + deterministic
+  accepted-revision metadata → Sultan Patch 51.
+- **Generation input — GKI r38:** accepted Simonpunk GKI Patch 50 + authenticated
+  clean r38 source/context + explicit deinline/target adaptations + reviewed
+  lifecycle corrections + deterministic accepted-revision metadata → GKI Patch 51.
+- Both Patch 51 mail Dates derive from the accepted Simonpunk commit's committer
+  timestamp in UTC; authenticate the retained raw commit object. Never use a final
+  patch, wall clock, filesystem mtime, or local timezone as metadata input.
+- **Target source:** authenticated source bundles/excerpts supply preimages and APIs.
+  They must agree with the bound real target. Authenticate the r38 archive file's
+  declared SHA before extraction. The historical c8909f7 bundle is lineage, not
+  the actual r38 apply target.
+- **Production output:** exactly the three artifacts in `patches/manifest.json`.
+  Final patches under `patches/` or elsewhere never supply generation bytes/metadata.
+  Baseline metadata under `patches/` may identify inputs.
+- **Test golden:** historical/final outputs may support final assertions or negative
+  regressions, never construct generation inputs. Output-hidden reconstruction and
+  required-input rejection must remain possible.
+- **Reference input:** authenticated Midori artifacts are comparison-only.
 
-## 15 Hard Repository Invariants
+Preserve target-native API differences; never replace Sultan/GKI contracts with a
+fake common mock. Preserve reviewed nameidata retry ownership, mount-ID allocation
+and free provenance, pagemap VMA/caller behavior, smaps lock-reacquire guards, and C
+literal integrity. A source/API change needs focused source review.
 
-### 1. Product / Publication Contract
-- This repository automatically generates, validates, and maintains production patches.
-- `origin/main:patches/` is the **ONLY** public production distribution channel.
-- Downstream users consume patches via stable `raw.githubusercontent.com` URLs (e.g. via direct `curl`).
-- A successful update is **NOT complete** until the verified bytes are committed and pushed to `origin/main` and the public raw URL serves the exact same SHA-256 as the validated candidate and manifest.
-- Runner-local files or temporary candidate files are not publication.
-- `patches/` must **NEVER** be read as generator input.
+Patch 11 modifies exactly: `kernel/Kconfig`, `kernel/hook/setuid_hook.c`,
+`kernel/ksu.c`, `kernel/selinux/rules.c`, `kernel/selinux/selinux.c`,
+`kernel/selinux/selinux.h`, `kernel/supercall/dispatch.c`, and
+`kernel/supercall/supercall.c`. Do not modify `kernel/feature/kernel_umount.c` or
+`kernel/downstream/ksu_hostsredirect.h`; native try-umount/task-mark ownership remains.
 
-### 2. Actions Artifact Distinction
-- GitHub Actions workflow artifacts are strictly diagnostic and ephemeral; they are **NEVER** public production outputs.
-- Artifacts MAY be used only as ephemeral intra-workflow transport (`retention-days: 1`) between read-only validation jobs and the single promotion job.
-- Downstream users must never be instructed or directed to download Actions artifacts.
+## Watch, acceptance, and publication
 
-### 3. Authoritative Pipeline
-Promotion entry paths must follow the authoritative sequence:
-`authoritative upstream` → `shared semantic gate` → `deterministic candidate generation` → `exact target validation` → `Midori reference cross-check` → `single-writer promotion` → `origin/main:patches/` → `manifest/baseline/state synchronization` → `RAW URL SHA verification`.
+Tracking refs discover upstream state; accepted revisions are immutable identities
+for individual reviewed generations, not permanent historical pins. Discovered
+revision != accepted revision triggers classification/review; accepted revisions
+advance after supported change validation or justified semantic reconciliation.
 
-### 4. Shared Authoritative Semantic Gate
-- Every promotion entry path (scheduled watcher, GitHub Actions CI, `workflow_dispatch`, CLI, AGY/manual invocations) uses the identical `v2.semantic.gate`.
-- Strict fail-closed policy: `UNKNOWN` unapproved semantics, semantic drift, anchor drift, or invalid source identity immediately fail closed and block promotion until the semantic model/policy (`v2/semantic/registry.py`) is explicitly reconciled.
+No relevant change → no action. Supported/mechanical change → reconstruct and
+validate → production Actions publication. Semantic/anchor/target-API/lifecycle
+uncertainty → fail closed → escalation and independent source review → smallest
+justified policy correction → revalidation → production Actions publication.
+The watcher classifies changes and stages candidates; it does not itself publish.
 
-### 5. Exact Single-Pass Target Validation
-- Production-bound candidates require:
-  - **0 offsets**
-  - **0 fuzz**
-  - **0 rejects**
-  - Valid deterministic postimage / syntax
-  - Deterministic regeneration (byte-identical content across two independent generation passes)
-- Validation must be single-pass against clean target trees: never validate by applying to a tree and then running a second `patch -p1` on the same tree.
+Production uses the existing shared semantic/source gate before deterministic
+reconstruction, exact target validation, reference review, and publication.
+Require zero offsets/fuzz/rejects and valid deterministic postimages. Apply once
+per clean target; never validate by reapplying to an already patched tree.
 
-### 6. Patch 51 Atomic Publication Topology
-- Multi-kernel Patch 51 execution splits validation and promotion:
-  ```
-  validate_sultan (contents: read) ────────┐
-                                           ├── promote_and_deliver (contents: write)
-  validate_gki_r38 (contents: read) ───────┘
-  ```
-- `validate_sultan` and `validate_gki_r38` run in parallel with read-only permissions (`contents: read`). They must never commit or push.
-- Exactly one promotion/delivery job (`promote_and_deliver`) holds `contents: write`.
-- Promotion executes strictly after **BOTH** validation jobs succeed (`needs: [validate_sultan, validate_gki_r38]`).
-- If either validation fails, promotion does not execute (zero partial publication).
-- Changed Patch 51 outputs, BASELINEs, upstream state, and `patches/manifest.json` are committed and pushed in exactly one serialized repository write transaction.
+Production publication belongs exclusively to the existing update Actions workflows.
+Patch 11 and Patch 51 share `production-promotion` writer serialization. Patch 51
+has two read-only validators and one writer dependent on both; publish changed
+patches and required shared baseline/state/manifest metadata atomically.
 
-### 7. Patch 11 / Patch 51 Writer Serialization
-- Patch 11 and Patch 51 production workflows share the repository-wide `concurrency: group: "production-promotion"`.
-- They can never execute concurrent write-backs to `origin/main`.
+After required validation, FULL_STATE_NOOP means no publication/metadata/delivery
+activity. A legitimate authoritative provenance advancement with identical patch
+bytes is METADATA_ONLY_PROMOTION; changed bytes are PATCH_PROMOTION. Do not suppress
+legitimate metadata advancement or skip safety validation through byte equality.
 
-### 8. Promotion Byte & SHA Equality Requirement
-For every updated public patch:
+Publication requires candidate SHA = origin/main bytes = stable RAW bytes = manifest.
+`origin/main:patches/` is the public interface; Actions artifacts are transport/debug
+only. Never manually publish local candidates.
+
+## References, tests, and clean-room
+
+Midori is a reference/difference signal, not an authority or correctness oracle.
+Compare Patch 11 with pinned Midori xx.patch; reproduce GKI reference from Midori's
+own authenticated Patch 50 and converter. Never feed our inputs to that converter.
+`SEMANTIC_CONFLICT` and unreviewed lifecycle-sensitive `REVIEW_REQUIRED` differences
+block promotion. Explicitly reviewed pairs may be `IMPLEMENTATION_DIFFERENCE`.
+`REFERENCE_UNAVAILABLE` is never `SEMANTIC_MATCH`; production policy tolerates reference
+outages, while complete clean-room acceptance requires available reference evidence.
+
+Tests cover generator/pipeline invariants, native APIs, historical regressions,
+ownership, and publication integrity. They do not prove arbitrary kernel lifetime,
+concurrency, or complete semantics; meaningful drift requires targeted source review.
+Kernel compilation, toolchain/defconfig management, packaging, and device testing
+remain downstream responsibilities.
+
+GitHub Actions `clean-room.yml` is the authoritative fresh-environment reproducibility
+check: fresh Ubuntu, `contents: read`, independent input authentication, outputs
+unavailable to generation, two-process determinism, exact application, native
+contracts/lifecycle regressions, consolidated tests, reference comparison, and
+checkout immutability. It is read-only: no promotion, commits, pushes, or issue
+updates. Its concurrency is separate from publication. Local WSL checks do not
+substitute for a successful real Actions run.
+
+Issue #5 is the compact current-state dashboard. Update only through the existing
+watcher/renderer, preserving bounded events; machine-readable records remain truth.
+Use supported extra events for verified operational evidence, never fabricate results.
+
+Useful local checks (Python 3.11; GCC required by C regressions):
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.github/scripts python3 -m v2.manifests.patch_manifest --check
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.github/scripts:.github/scripts/v2/tests python3 -m unittest discover -s .github/scripts/v2/tests
 ```
-candidate SHA-256
-  == committed origin/main patch SHA-256
-  == raw.githubusercontent.com SHA-256
-  == patches/manifest.json SHA-256
-```
-If any of these hashes differ, publication is **FAILED** even if GitHub Actions marks the run green.
 
-### 9. Canonical Public Outputs Only
-The repository produces exactly three public production patches:
-1. `patches/xxksu/11_enable_susfs_for_ksu.patch` (`xxksu-patch11`)
-2. `patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch` (`sultan-android14-6.1-patch51`)
-3. `patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch` (`gki-android16-6.12-r38-patch51`, bound to `android16-6.12-2025-09_r38`)
-*(Historical commit `c8909f7` is retained solely for internal provenance/baseline records; it is NOT a second public Patch 51).*
-
-### 10. Midori Reference Cross-Check
-Midori sources are **REFERENCE ONLY** and never authoritative inputs:
-- **Patch 11:** Compare candidate against `midori01/KernelSU:xx.patch`.
-- **GKI Patch 51:** Fetch Midori's own Patch 50 and Midori's own `susfs_deinlined.sh` conversion script from `midori01/gki_ksu_workflow`, independently generate Midori's Patch 51, and semantically cross-check against our candidate.
-- **Rules:**
-  - Never feed our Patch 50 into Midori's converter.
-  - Never modify authoritative production code/patches merely to match Midori.
-  - Comparison classifications: `SEMANTIC_MATCH`, `IMPLEMENTATION_DIFFERENCE`, `OUR_EXTRA`, `REFERENCE_EXTRA`, `SEMANTIC_CONFLICT`, `REFERENCE_UNAVAILABLE`.
-  - Only genuine semantic conflicts (`SEMANTIC_CONFLICT`) block promotion for review. Reference differences never authorize production changes.
-  - Third-party reference outages (`REFERENCE_UNAVAILABLE`) do not corrupt or block authoritative releases.
-
-### 11. Current Known Reference Differences
-- **Patch 11 vs Midori:** Derive the current result from the pinned cross-check report. Legacy SuSFS TRY_UMOUNT glue and the Official-KSU KSU_MARK_GET override are retired; native xxKSU functionality remains. Patch 11 was not changed by the Patch 51 lifecycle correction.
-- **GKI r38 Patch 51 vs Midori Patch 51:** Unreviewed differences in `fs/namei.c`, `fs/namespace.c`, and `fs/proc/task_mmu.c` must be `REVIEW_REQUIRED` and promotion-blocking. Exact reviewed pairs may report `IMPLEMENTATION_DIFFERENCE`; identical file/symbol sets are not proof of equivalence. Intentional pagemap/smaps corrections must not be reverted for reference parity.
-These are documented reference observations, not reasons to modify production.
-
-### 12. Patch 11 Mutation Scope Restrictions
-- Under current policy, Patch 11 modifies exactly the canonical 8 files in `backslashxx/KernelSU`:
-  1. `kernel/Kconfig`
-  2. `kernel/hook/setuid_hook.c`
-  3. `kernel/ksu.c`
-  4. `kernel/selinux/rules.c`
-  5. `kernel/selinux/selinux.c`
-  6. `kernel/selinux/selinux.h`
-  7. `kernel/supercall/dispatch.c`
-  8. `kernel/supercall/supercall.c`
-- `kernel/feature/kernel_umount.c` and `kernel/downstream/ksu_hostsredirect.h` are **NOT** Patch 11 mutation targets.
-
-### 13. Repository Scope & Downstream Boundaries
-This repository owns:
-- Upstream monitoring and change detection
-- Patch candidate generation
-- Shared semantic validation
-- Exact source target application validation (0 offsets, 0 fuzz, 0 rejects)
-- Verified automated publication to `origin/main:patches/`
-
-This repository does **NOT** own:
-- Kernel compilation or build verification
-- Defconfig policy or modifications
-- Compiler toolchains or environments
-- Kernel packaging (AnyKernel3, boot image generation)
-- Device runtime testing or booting
-
-### 14. Watcher & AGY Escalation Policy
-- Normal upstream updates detected by the watcher pass through the shared semantic gate.
-- If upstream introduces unapproved semantic drift, anchor drift, or unknown semantics, the system fails closed:
-  - No candidate is promoted.
-  - Production patches, baselines, and manifest remain untouched.
-  - The watcher creates/uses a dedicated `[AGY-REQUIRED]` GitHub issue for explicit developer/AGY semantic review and model reconciliation.
-
-### 15. Status Dashboard Contract
-- The permanent upstream-status Issue (#5) is a bounded current-state dashboard (`render_dashboard_body`).
-- It is updated in-place via issue edit, not as an append-only log.
-- It provides a human-readable operational overview (authoritative pins, reference parity, escalations) and does not replace machine-readable truth (`patches/manifest.json`, `BASELINE.json`, `.github/upstream-state.json`).
-
----
-
-## Operational Verification Commands
-
-```bash
-# 1. Authoritative Promotion Pipeline (CLI)
-PYTHONPATH=.github/scripts python3 -m v2.pipeline \
-  --patch-id <xxksu-patch11 | sultan-android14-6.1-patch51 | gki-android16-6.12-r38-patch51> \
-  --upstream-input <path-to-source-or-patch> \
-  --target-tree <path-to-clean-target-tree> \
-  --promote \
-  --write-back
-
-# 2. Check Manifest Consistency
-PYTHONPATH=.github/scripts python3 -m v2.manifests.patch_manifest --check
-
-# 3. Run Upstream Watcher
-PYTHONPATH=.github/scripts python3 -m v2.watch.cli
-
-# 4. Run Independent Midori Reference Cross-Check (CLI)
-PYTHONPATH=.github/scripts python3 -m v2.validation.reference_cross_check \
-  --patch-id <xxksu-patch11 | gki-android16-6.12-r38-patch51> \
-  --candidate <path-to-candidate-patch>
-
-# 5. Focused Unit & Regression Test Suites
-PYTHONPATH=.github/scripts:.github/scripts/v2/tests python3 -m unittest \
-  test_delivery test_semantic_gate test_pipeline test_watch test_baseline test_patch_manifest test_reference_cross_check
-```
+Run tests in a disposable checkout: existing dashboard tests may write diagnostics.
+For prose changes use manifest, path/link, diff, and status checks; add no tests solely
+for documentation.

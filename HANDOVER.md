@@ -1,51 +1,82 @@
-# xxKSU + SuSFS production handover
+# Stable maintenance handover
 
-## Current implementation
+Snapshot established 2026-09-27 from origin/main
+`eeadeb8b62508ba8fb9e088f6fad8a7e8542383a`, before this documentation-only closeout.
+For the subsequent live HEAD use `git rev-parse origin/main`; embedding this file's
+own commit ID would be self-referential. Machine records override this dated snapshot.
 
-This repository generates shared xxKSU Patch 11 and transport-neutral kernel Patch 51 artifacts. The old V2.3-only checkpoint description is historical: source bundles, semantic policy, adapters, validation, the watcher, and the production pipeline now exist under `.github/scripts/v2/`. Do not restart the phase plan from this document.
+The repository is in **STABLE MAINTENANCE MODE**: upstream drift reconciliation,
+demonstrated correctness defects, target compatibility, and necessary upkeep of
+existing automation only. No further architecture/milestone development is planned.
+No new abstraction layers, generic frameworks, gates, build systems, or kernel
+compilation orchestration without a concrete observed requirement.
 
-Production authority is `patches/manifest.json`, active `BASELINE.json` files, `.github/upstream-state.json`, and workflow pins. Public delivery is `origin/main:patches/`, not Actions artifacts. Patch 51 is generated and validated by parallel read-only workers; only the single delivery job publishes both candidates atomically.
+## Production snapshot
 
-Read `AGENTS.md`, this file, `PATCH51_CORRECTIONS.md`, the machine records, `v2/pipeline.py`, `v2/policy/lifecycle.py`, and their tests before changing production.
+Purpose: reconstruct, validate, and publish xxKSU/SuSFS patches. Kernel builds and
+packaging belong downstream. The public interface is `patches/manifest.json` and
+its three stable RAW paths; Actions artifacts are internal only.
 
-## Active targets and profiles
+- **Shared xxKSU Patch 11**: `patches/xxksu/11_enable_susfs_for_ksu.patch`
+  SHA-256: `a0419c3ae48dbf93013cc56e0deb8330649b3089efb3bc711ccc7f6b772b020d`.
+- **Sultan Android 14 / 6.1 Patch 51**: `patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch`
+  SHA-256: `67cc15066921d8cd0e235e45486b5421c02239b91bc997d911c33d7a5de4fe63`.
+- **GKI Android 16 / 6.12 r38 Patch 51**: `patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch`
+  SHA-256: `d299ac9c2585a991c2a10c9b2315da35f927dd89ad2c2d47c689fb51cab0e97f`.
 
-`gki-android14-6.1` was retired by commit `6352a68`; do not restore it to satisfy historical six-profile documents. There are **two targets and four profiles**:
+Accepted identities:
 
-- `sultan-android14-6.1-manual`
-- `sultan-android14-6.1-lsm_bl`
-- `gki-android16-6.12-manual`
-- `gki-android16-6.12-lsm_bl`
+- xxKSU: `bb0be9297da42ff3f63819125314ce0b13935a06` (watch ref `master`).
+- Simonpunk Sultan: `a8324101bca5e5a2dd7d0dc82b1650e10923eec9` (`sultan-shiba-susfs-minimal`).
+- Simonpunk GKI: `b213c54126fb243595ce7876e91d84d6e0861fec` (`gki-android16-6.12`).
+- Sultan target: `af5c65b9547a9f33c5f566430d0434aecab5a8b5` (`16.0.0-sultan`).
+- GKI target: `android16-6.12-2025-09_r38`; archive SHA-256
+  `accf8f9348280116792c9608f420f8d4554da52499119a8536883c5eefd429ff`.
+  URL/bindings are in `.github/fixtures/v2/r38-sources.json` and the GKI baseline.
+  c8909f7 is internal lineage, not the r38 apply target.
+- Patch 11's recorded Patch 10 lineage remains `c8f64e41e3dea2cd44754d7472d3cd0bc0b40784`;
+  current SuSFS GKI watch state is separate. Neither supplies Patch 11 generation bytes.
 
-One shared 11 serves all four. Each target has one 51 for both modes. Transport selection belongs to profiles, not 11/51. Manual uses both fixtures with automated transport disabled. LSM/BL uses no manual fixtures and keeps `CONFIG_KSU_TAMPER_SYSCALL_TABLE=n`; BL's internally managed syscall fallback is a distinct mechanism.
+## Contracts and operation
 
-## Accepted identities
+Patch 11 = accepted xxKSU source + reviewed repository adaptation policy.
+Simonpunk Patch 10/APIs are semantic lineage/watch input only.
+Sultan Patch 51 = accepted Patch 50 + target/core context + target rules + accepted
+revision metadata. GKI Patch 51 = accepted Patch 50 + authenticated r38 context +
+deinline/adaptation rules + reviewed lifecycle corrections + accepted revision metadata.
+Neither Patch 51 reads a previous final patch. Mail Date uses accepted commit time in UTC.
 
-- xxKSU: `bb0be9297da42ff3f63819125314ce0b13935a06`.
-- Sultan SuSFS: `a8324101bca5e5a2dd7d0dc82b1650e10923eec9`.
-- GKI SuSFS: `b213c54126fb243595ce7876e91d84d6e0861fec`.
-- Sultan kernel: `af5c65b9547a9f33c5f566430d0434aecab5a8b5`.
-- GKI production apply target: `android16-6.12-2025-09_r38`; archive URL and authenticated SHA-256 are in `.github/fixtures/v2/r38-sources.json` and GKI baseline compatibility metadata. The c8909f7 source bundle is historical lineage, not this archive.
-- Exact current production patch hashes: `patches/manifest.json`. Avoid duplicating changing hashes in this handover.
+The daily watcher discovers tracking-ref changes and classifies/escalates them;
+it may stage candidates but does not publish. Accepted immutable revisions advance
+through review/validation, not arbitrary ref movement. Supported changes use the
+existing production Actions; sensitive drift fails closed for independent source review.
+Both Patch 51 validators must pass before one atomic writer publishes. Patch 11/51
+writers serialize. Full-state no-op performs no writes; legitimate metadata-only
+advancement remains distinct. Delivery verifies candidate/origin/RAW/manifest equality.
 
-## Correctness and evidence boundaries
+Midori is reference-only: pinned xx.patch and independently reproduced GKI Patch 51
+from Midori's own Patch 50/converter. Reviewed implementation differences are retained;
+unreviewed sensitive differences block. Reference parity is not kernel correctness.
 
-Target kernel control flow and pinned SuSFS/xxKSU sources govern corrections. An independent audit is a defect report, not authority. Relevant UNKNOWN fails closed. Function names and `git apply` success are not semantic evidence. Ownership is per semantic path per final profile.
+## Verification evidence and remaining work
 
-Keep handler definition, Linux call site, runtime registration, LSM, kprobe, syscall-table hook, ARM64 BL, manual hook and fixture hook distinct. Do not assume copying more official-KSU code is safer than retaining native xxKSU ownership. Patch 11 remains unchanged by the Patch 51 correction work.
+[Clean-room run 36296083518](https://github.com/yapixel/xxksu_susfs_patch/actions/runs/36296083518)
+passed at `d47e2269e86848711131123f3a9afb80b106fdd0` on a fresh GitHub-hosted runner.
+It independently fetched/authenticated inputs, reconstructed all outputs without final
+copies, proved two-process determinism and generated/production/manifest equality,
+passed exact apply/native lifecycle/API checks, and left the checkout unchanged.
+247 tests passed in 134.562s with zero failures/errors/skips: dated evidence, not a
+quality metric. Both Midori comparisons were reviewed IMPLEMENTATION_DIFFERENCE.
+Clean-room is read-only and never publishes or updates issues.
 
-`policy/lifecycle.py` applies bounded source corrections against exact kernel preimages, then emits candidate diffs. It never reads production patches as generation inputs. `tests/test_lifecycle.py` executes corrected C with bounded API mocks. This is not a full kernel build or runtime proof. Separate build workflows own kernel compilation.
+Latest successful production workflow evidence at closeout: Patch 11 run
+36283493358; Patch 51 run 36294761634. No production bytes changed in this closeout.
+There are no open agy-required escalations at the initial live check. The watcher
+still reports informational Midori GKI reference drift relative to its watch snapshot;
+this is separate from the accepted, passing pinned reference comparison. Do not
+advance watch acceptance merely to make the dashboard green.
 
-Midori is reference-only. Inputs are commit-pinned and hashed. Unreviewed differences in namei, namespace or task_mmu block promotion. Exact reviewed pairs document intentional corrections; they are not wildcard equivalence. `REFERENCE_UNAVAILABLE` is not `SEMANTIC_MATCH` and cannot authorize changes.
-
-## Validation and next maintenance gate
-
-Run complete discovery from a clean checkout:
-
-```sh
-PYTHONPATH=.github/scripts GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=commit.gpgsign GIT_CONFIG_VALUE_0=false GIT_CONFIG_KEY_1=tag.gpgsign GIT_CONFIG_VALUE_1=false python3 -m unittest discover -s .github/scripts/v2/tests -p 'test_*.py'
-```
-
-GCC is required for lifecycle regressions; absence is a failure, not a silent skip. The r38 manual-hook normalizer test reconstructs its post-Patch-51 stat.c from repository-controlled sources, without an external scratch directory.
-
-New upstream/baseline identities require revalidation. Required publication evidence is candidate SHA = origin/main bytes = RAW bytes = manifest SHA, plus the delivery commit and refreshed Status Issue #5. See `PATCH51_CORRECTIONS.md` for exact results and limitations. Never publish generated patches manually, weaken exact validation, or let a reference comparison select production policy.
+No known production/reconstruction blocker remains. Refresh Issue #5 through its
+existing renderer during closeout; thereafter normal scheduled watch and clean-room
+checks are the next activity. Meaningful future drift requires focused source review,
+not proactive architecture work. See AGENTS.md for execution and mandatory cleanup rules.
