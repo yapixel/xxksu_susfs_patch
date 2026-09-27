@@ -61,6 +61,7 @@ def generation_environment(root, dest, baselines):
     paths = [".github/upstream-state.json", ".github/fixtures/v2/r38-sources.json"]
     for target, baseline in baselines.items():
         paths += [f"patches/{target}/BASELINE.json", baseline["source_bundle"]["artifact_path"]]
+    paths.append(baselines["xxksu"]["policy"]["reviewed_revision"]["commit_object"])
     for folder, target in (("sultan", "sultan-android14-6.1"), ("r38", "gki-android16-6.12")):
         paths += [f".github/fixtures/{folder}/susfs-source-commit.txt",
                   f".github/fixtures/{folder}/{baselines[target]['susfs']['patch_50']}"]

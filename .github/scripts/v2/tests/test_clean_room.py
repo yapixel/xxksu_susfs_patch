@@ -8,7 +8,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from v2.clean_room import authenticated_archive, generation_environment, repository_state
+from v2.clean_room import authenticated_archive, generation_environment, generate_process, repository_state
+from v2.source.baseline import load_authoritative_bundle
 
 ROOT = Path(__file__).resolve().parents[4]
 
@@ -24,6 +25,15 @@ class CleanRoomTests(unittest.TestCase):
             self.assertEqual(len(patches), 2)
             self.assertTrue(all(p.name.startswith("50_") for p in patches))
             self.assertFalse(list((dest / "patches").rglob("*.patch")))
+            # Exercise the real generator with all declared inputs allowlisted,
+            # final outputs absent and checkout reads blocked.
+            source = Path(tmp) / "xxksu"
+            for entry in load_authoritative_bundle("xxksu", dest).files:
+                path = source / entry.path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(entry.content)
+            candidate = generate_process(dest, "xxksu-patch11", source)
+            self.assertEqual(candidate, (ROOT / "patches/xxksu/11_enable_susfs_for_ksu.patch").read_bytes())
             # Simulate an accidental fallback in a separate process so the audit
             # hook cannot affect the test runner. It must block before file I/O.
             code = """
