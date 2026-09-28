@@ -53,11 +53,11 @@
   "status": "VERIFIED",
   "target_id": "xxksu",
   "upstream": {
-    "archive_sha256": "a5370222083677f4e024f98bacebcf0b3793aedced6ee4012f436f40e4739710",
+    "archive_sha256": "b4a01e1a264701f346c6f890685639b627b41b02e38f318fb8d8c413417b4692",
     "ref": "master",
     "repository": "https://github.com/backslashxx/KernelSU",
-    "resolved_commit": "ae81a610ef8c481b9a73e48a962f8eee910b619e",
-    "tree": "2bd80756d153fa1aecca6518b7b57e781a953a3b",
-    "archive_url": "https://codeload.github.com/backslashxx/KernelSU/tar.gz/ae81a610ef8c481b9a73e48a962f8eee910b619e"
+    "resolved_commit": "f263bdb97a4e336f2bcc7e6dc7661c0fa576c05f",
+    "tree": "a3afb26ba5c1802bae239d22bc163065576db5f9",
+    "archive_url": "https://codeload.github.com/backslashxx/KernelSU/tar.gz/f263bdb97a4e336f2bcc7e6dc7661c0fa576c05f"
   }
 }
