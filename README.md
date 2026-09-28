@@ -32,10 +32,11 @@ A source-driven system that publishes reviewed Patch 11 / Patch 51 artifacts for
 
 Complete artifact checksums, source identities, and compatibility targets are maintained in [patches/manifest.json](patches/manifest.json).
 
-**Sultan target note:** the current manifest binds Tensynos `16.0.0-sultan` to
-Pixel 8 / 8 Pro (Shiba/Husky), while the runtime report below identifies Pixel 7 Pro
-(gs201/Cheetah). That discrepancy needs source/baseline reconciliation; this README
-update does not establish Cheetah/Panther compatibility for the published artifact.
+**Sultan target note:** the maintainer confirms that `sultan-shiba-susfs-minimal`
+supports Pixel 7 Pro (gs201/Cheetah), alongside the existing Pixel 8 / 8 Pro
+(Shiba/Husky) target description. The accepted Tensynos `16.0.0-sultan` source
+identity is unchanged. Device-specific runtime evidence is listed below; this is
+not a blanket compatibility claim for all gs201 devices.
 
 ## Why this project exists
 
@@ -82,8 +83,7 @@ Maintainer-reported observations, not exhaustive runtime certification:
 
 Full kernel build, boot, xxKSU root, and basic SuSFS operation were also reported
 for both target families. Warnings remain part of these observations, not a clean
-runtime certification. The Sultan device/production-binding distinction above
-still applies; reported `ADD_TRY_UMOUNT` behavior does not change the repository's
+runtime certification. Reported `ADD_TRY_UMOUNT` behavior does not change the repository's
 native xxKSU ownership policy or restore retired legacy glue.
 
 ## Design principles

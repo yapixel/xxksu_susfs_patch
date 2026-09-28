@@ -516,12 +516,43 @@ class DashboardTests(unittest.TestCase):
         with patch("v2.watch.dashboard.load_runtime_validation", return_value=reversed_state):
             self.assertEqual(render_dashboard_body(report, repo_root=REPO_ROOT, recent_events=old), body)
         events = parse_dashboard_events(body)
-        self.assertEqual(len(events), 3)
+        self.assertEqual(len(events), len(state["recent_events"]))
         self.assertEqual(render_dashboard_body(report, repo_root=REPO_ROOT, recent_events=events), body)
         with patch("v2.watch.dashboard.load_runtime_validation", return_value={"targets": [], "recent_events": []}):
             missing = render_dashboard_body(report, repo_root=REPO_ROOT)
         self.assertIn("No runtime validation recorded", missing)
         self.assertIn("**Overall Status:** " + OverallStatus.UPDATE_AVAILABLE.value, missing)
+
+    def test_runtime_historical_followups_preserve_binding_and_events(self):
+        from dataclasses import replace
+        from v2.watch.dashboard import load_runtime_validation
+        state = load_runtime_validation(REPO_ROOT)
+        corrected = [e for e in state["recent_events"] if "replaces_text" in e]
+        self.assertEqual(len(corrected), 2)
+        originals = [dict(e, text=e["replaces_text"]) for e in corrected]
+        # Another event from the same source/day must not disappear.
+        unrelated = {"timestamp": "2026-09-27", "source_id": "susfs_sultan", "text": "Other historical event"}
+        report = make_clean_report()
+        report = replace(report, results=(replace(report.results[0],
+                         classification=WatchClassification.SAFE_REGEN_CANDIDATE),))
+        body = render_dashboard_body(report, repo_root=REPO_ROOT, recent_events=originals + [unrelated])
+        events = parse_dashboard_events(body)
+        for event in corrected:
+            self.assertEqual(event["timestamp"], "2026-09-27")
+            self.assertTrue(event["text"].startswith(event["replaces_text"] + " "))
+            self.assertIn("Subsequent Sultan runtime validation completed on 2026-09-28", event["text"])
+            self.assertEqual(sum(e["text"] == event["text"] for e in events), 1)
+            self.assertFalse(any(e["text"] == event["replaces_text"] for e in events))
+        self.assertIn(unrelated, events)
+        self.assertEqual(body, render_dashboard_body(report, repo_root=REPO_ROOT, recent_events=events))
+        production = body.split("## Production Patches", 1)[1].split("## Reference Parity", 1)[0]
+        runtime = body.split("## Runtime Validation", 1)[1].split("## Open Escalations", 1)[0]
+        self.assertIn("Pixel 8 / 8 Pro (Shiba/Husky)", production)
+        self.assertIn("Pixel 7 Pro (cheetah)", runtime)
+        self.assertIn("Pixel 7 Pro (Cheetah)", production)
+        self.assertIn("Maintainer-confirmed Cheetah support", runtime)
+        self.assertIn("**Overall Status:** " + OverallStatus.UPDATE_AVAILABLE.value, body)
+        self.assertLessEqual(len(events), MAX_RECENT_EVENTS)
 
     def test_runtime_state_missing_and_malformed(self):
         import copy
@@ -539,6 +570,9 @@ class DashboardTests(unittest.TestCase):
                 changed = copy.deepcopy(valid)
                 changed["targets"][0][key] = value
                 invalid.append(json.dumps(changed))
+            changed = copy.deepcopy(valid)
+            changed["recent_events"][-1]["replaces_text"] = ""
+            invalid.append(json.dumps(changed))
             invalid.append(json.dumps(dict(valid, targets=valid["targets"] * 2)))
             invalid.append(json.dumps(dict(valid, recent_events=[{"timestamp": "invalid"}])))
             for raw in invalid:

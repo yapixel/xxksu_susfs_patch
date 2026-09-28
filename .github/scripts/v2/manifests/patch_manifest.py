@@ -85,7 +85,7 @@ def generate_patch_manifest(repo_root: Optional[Path] = None) -> dict[str, Any]:
 
     sultan_entry = {
         "apply_target": sultan_baseline.upstream["ref"],
-        "compatibility_target": "Pixel 8 / 8 Pro (Shiba/Husky) Tensynos 16.0.0-sultan (Android 14 6.1)",
+        "compatibility_target": "Pixel 7 Pro (Cheetah) and Pixel 8 / 8 Pro (Shiba/Husky), Sultan Android 14 / Linux 6.1 (Tensynos 16.0.0-sultan lineage)",
         "id": "sultan-android14-6.1-patch51",
         "kernel_version": sultan_baseline.kernel_version,
         "name": "Sultan Android 14 / 6.1 Patch 51",

@@ -37,7 +37,7 @@
         "SuSFS open redirect paths registered",
         "no Oops/BUG/panic/unresolved symbols/duplicate hook registration"
       ],
-      "note": "Reported device differs from the current Shiba/Husky production binding; runtime evidence does not change accepted target identities."
+      "note": "Maintainer-confirmed Cheetah support in sultan-shiba-susfs-minimal; this runtime record covers Pixel 7 Pro with manual hooks, not every supported device."
     }
   ],
   "recent_events": [
@@ -55,6 +55,18 @@
       "timestamp": "2026-09-27",
       "source_id": "patch51-validation",
       "text": "Sultan/GKI migration: authenticated reconstruction, native Git diff, independent round-trip, determinism, exact apply, real Kbuild objects and SuSFS symbol closure PASS; 18/16 postimages unchanged. Production 36321543464 and clean-room 36321767452 PASS. Runtime follow-ups completed 2026-09-28: GKI Android 16 / 6.12 LSM+BL and Pixel 7 Pro Sultan 6.1 manual hooks both runtime healthy with warnings. No final vmlinux link claimed by these gates."
+    },
+    {
+      "timestamp": "2026-09-27",
+      "source_id": "susfs_sultan",
+      "text": "REAL_BUILD_LINK_DEFECT_CORRECTED: restored required SuSFS mount-helper definitions discarded by Patch 50-to-51 CONFIG-only hunk filtering. Real ARM64 object/link regression and mutations pass; production 36317132871 and clean-room 36317521764 pass. Full user vmlinux/boot and GOT/PLT/ID-map diagnostics await rebuild. Subsequent Sultan runtime validation completed on 2026-09-28 (Pixel 7 Pro/cheetah, manual hooks; healthy with warnings).",
+      "replaces_text": "REAL_BUILD_LINK_DEFECT_CORRECTED: restored required SuSFS mount-helper definitions discarded by Patch 50-to-51 CONFIG-only hunk filtering. Real ARM64 object/link regression and mutations pass; production 36317132871 and clean-room 36317521764 pass. Full user vmlinux/boot and GOT/PLT/ID-map diagnostics await rebuild."
+    },
+    {
+      "timestamp": "2026-09-27",
+      "source_id": "susfs_sultan",
+      "text": "REAL_BUILD_COMPILE_DEFECT_CORRECTED: restored SUS_KSTAT fs/stat.c header/local declarations omitted by Patch 51 adaptation. ARM64 stat.o and target-backed compile regression pass; production run 36313866775 and clean-room 36313946809 pass. Full device kernel rebuild/boot pending user. Subsequent Sultan runtime validation completed on 2026-09-28 (Pixel 7 Pro/cheetah, manual hooks; healthy with warnings).",
+      "replaces_text": "REAL_BUILD_COMPILE_DEFECT_CORRECTED: restored SUS_KSTAT fs/stat.c header/local declarations omitted by Patch 51 adaptation. ARM64 stat.o and target-backed compile regression pass; production run 36313866775 and clean-room 36313946809 pass. Full device kernel rebuild/boot pending user."
     }
   ]
 }

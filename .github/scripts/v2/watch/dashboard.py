@@ -192,7 +192,9 @@ def load_runtime_validation(repo_root: Path) -> dict:
         if not isinstance(event, dict) or not all(text(event.get(k)) for k in ("timestamp", "source_id", "text")):
             raise ValueError("Invalid runtime event")
         datetime.strptime(event["timestamp"], "%Y-%m-%d")
-        key = (event["timestamp"], event["source_id"])
+        if "replaces_text" in event and not text(event["replaces_text"]):
+            raise ValueError("Invalid runtime event replacement")
+        key = (event["timestamp"], event["source_id"], event.get("replaces_text", ""))
         if key in seen:
             raise ValueError("Duplicate runtime event")
         seen.add(key)
@@ -514,11 +516,14 @@ def render_dashboard_body(
     root = get_repo_root(repo_root)
     overall_status = calculate_overall_status(report, open_escalations)
     runtime = load_runtime_validation(root)
-    persistent = sorted(runtime["recent_events"], key=lambda e: (-int(e["timestamp"].replace("-", "")), e["source_id"]))
-    keys = {(e["timestamp"], e["source_id"]) for e in persistent}
+    persistent = sorted(runtime["recent_events"], key=lambda e: (-int(e["timestamp"].replace("-", "")), e["source_id"], e["text"]))
+    keys = {(e["timestamp"], e["source_id"]) for e in persistent if "replaces_text" not in e}
+    replacements = {(e["timestamp"], e["source_id"], value) for e in persistent
+                    for value in (e["text"], e.get("replaces_text", e["text"]))}
     # State-backed events replace stale copies from the previous issue body.
     recent_events = (persistent + [e for e in recent_events
-                     if (e.get("timestamp"), e.get("source_id")) not in keys])[:MAX_RECENT_EVENTS]
+                     if (e.get("timestamp"), e.get("source_id")) not in keys
+                     and (e.get("timestamp"), e.get("source_id"), e.get("text")) not in replacements])[:MAX_RECENT_EVENTS]
 
     if revision is None or branch is None:
         rev_val, branch_val = get_git_revision(root)
