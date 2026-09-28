@@ -10,7 +10,7 @@ The production apply target is `android16-6.12-2025-09_r38`, not the historical 
 - Accepted SuSFS: `b213c54126fb243595ce7876e91d84d6e0861fec`.
 - Current generated Patch 51 hash: `patches/manifest.json` and `BASELINE.json:patch_51.patch_sha256`.
 
-The workflow verifies the downloaded file against this hash before extraction. Lifecycle corrections and publication evidence are documented in `PATCH51_CORRECTIONS.md`. Reference Midori inputs are independently pinned and never authorize production changes.
+The workflow verifies the downloaded file against this hash before extraction. Lifecycle corrections and publication evidence are documented in `PATCH51_CORRECTIONS.md`.
 
 ## 2. Historical source-bundle lineage (c8909f7)
 

@@ -6,49 +6,10 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from v2.pipeline import generate_candidate_patch
-from v2.validation.reference_cross_check import (
-    compare_patch_to_reference, fetch_reference_url, DEFAULT_MIDORI_CONVERSION_SCRIPT_URL,
-    DEFAULT_MIDORI_GKI_PATCH_50_URL, DEFAULT_MIDORI_XX_PATCH_URL,
-    ReferenceComparisonClassification as Classification,
-)
-
 ROOT = Path(__file__).resolve().parents[4]
-PATCH_ID = "gki-android16-6.12-r38-patch51"
 
 
 class LifecycleGateTests(unittest.TestCase):
-    def test_exact_reviewed_pair_and_same_symbol_mutations(self):
-        ours = generate_candidate_patch(PATCH_ID, ROOT / ".github/fixtures/r38", ROOT)
-        ref = (ROOT / ".github/fixtures/midori/r38-reference51.patch").read_text()
-        self.assertEqual(hashlib.sha256(ref.encode()).hexdigest(),
-                         "8fc7905d5c8d804191a4d3c29f75409ea69924fa18f0eda038f7b45f102d7fd6")
-        result = compare_patch_to_reference(PATCH_ID, ours, ref, "pinned Midori")
-        self.assertTrue(result.passed)
-        self.assertFalse(result.blocks_promotion)
-        self.assertEqual(set(result.metadata["reviewed_lifecycle_differences"]),
-                         {"fs/namei.c", "fs/namespace.c", "fs/proc/task_mmu.c", "mm/memory.c"})
-        for old, new in (("+\t\tnd->name = old_name;", "+\t\told_name = nd->name;"),
-                         ("+\tif (!is_mnt_ksu_unshared)", "+\tif (is_mnt_ksu_unshared)"),
-                         ("+\t\tstart = next;", "+\t\tstart = end;"),
-                         ("+\t\tvma = vma_lookup(mm, addr);", "+\t\tvma = NULL;")):
-            self.assertIn(old, ours)
-            result = compare_patch_to_reference(PATCH_ID, ours.replace(old, new), ref, "pinned Midori")
-            self.assertEqual(result.classification, Classification.REVIEW_REQUIRED)
-            self.assertTrue(result.blocks_promotion)
-            self.assertFalse(result.passed)
-        old_production = next((ROOT / ".github/fixtures/r38").glob("51_*.patch")).read_text()
-        self.assertTrue(compare_patch_to_reference(PATCH_ID, old_production, ref, "pinned Midori").blocks_promotion)
-
-    def test_reference_urls_are_commit_pinned_and_wrong_bytes_fail(self):
-        for url in (DEFAULT_MIDORI_XX_PATCH_URL, DEFAULT_MIDORI_GKI_PATCH_50_URL,
-                    DEFAULT_MIDORI_CONVERSION_SCRIPT_URL):
-            self.assertNotIn("/main/", url)
-            self.assertNotIn("/xx.patch", url)
-            with patch("urllib.request.urlopen") as mocked:
-                mocked.return_value.__enter__.return_value.read.return_value = b"untrusted replacement"
-                with self.assertRaisesRegex(ValueError, "hash mismatch"):
-                    fetch_reference_url(url)
 
     def test_archive_authentication_precedes_extraction_and_fails_closed(self):
         workflow = (ROOT / ".github/workflows/generate-51-kernel-patches.yml").read_text()

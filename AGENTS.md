@@ -68,7 +68,6 @@ into correctness evidence. Keep README downstream-facing and HANDOVER a dated sn
 - **Test golden:** historical/final outputs may support final assertions or negative
   regressions, never construct generation inputs. Output-hidden reconstruction and
   required-input rejection must remain possible.
-- **Reference input:** authenticated Midori artifacts are comparison-only.
 
 Preserve target-native API differences; never replace Sultan/GKI contracts with a
 fake common mock. Preserve reviewed nameidata retry ownership, mount-ID allocation
@@ -146,15 +145,7 @@ Publication requires candidate SHA = origin/main bytes = stable RAW bytes = mani
 `origin/main:patches/` is the public interface; Actions artifacts are transport/debug
 only. Never manually publish local candidates.
 
-## References, tests, and clean-room
-
-Midori is a reference/difference signal, not an authority or correctness oracle.
-Compare Patch 11 with pinned Midori xx.patch; reproduce GKI reference from Midori's
-own authenticated Patch 50 and converter. Never feed our inputs to that converter.
-`SEMANTIC_CONFLICT` and unreviewed lifecycle-sensitive `REVIEW_REQUIRED` differences
-block promotion. Explicitly reviewed pairs may be `IMPLEMENTATION_DIFFERENCE`.
-`REFERENCE_UNAVAILABLE` is never `SEMANTIC_MATCH`; production policy tolerates reference
-outages, while complete clean-room acceptance requires available reference evidence.
+## Tests and clean-room
 
 Tests cover generator/pipeline invariants, native APIs, historical regressions,
 ownership, and publication integrity. They do not prove arbitrary kernel lifetime,
@@ -166,7 +157,7 @@ and device testing remain separate downstream acceptance responsibilities.
 GitHub Actions `clean-room.yml` is the authoritative fresh-environment reproducibility
 check: fresh Ubuntu, `contents: read`, independent input authentication, outputs
 unavailable to generation, two-process determinism, exact application, native
-contracts/lifecycle regressions, consolidated tests, reference comparison, and
+contracts/lifecycle regressions, consolidated tests, and
 checkout immutability. It is read-only: no promotion, commits, pushes, or issue
 updates. Its concurrency is separate from publication. Local WSL checks do not
 substitute for a successful real Actions run.

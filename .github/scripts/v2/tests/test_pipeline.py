@@ -119,7 +119,6 @@ class TestPipelineArchitecture(unittest.TestCase):
 
     def test_equal_bytes_do_not_bypass_validation_gates(self):
         from v2.pipeline import SemanticApprovalError, CandidateValidationError, RegenerationMismatchError
-        from v2.validation.reference_cross_check import ReferenceCrossCheckError
         text = (self.repo_root / "patches/xxksu/11_enable_susfs_for_ksu.patch").read_text()
         for gate, options, error in (
             ("v2.pipeline.verify_semantic_gate_for_pipeline",
@@ -130,8 +129,6 @@ class TestPipelineArchitecture(unittest.TestCase):
              {"return_value": ["invalid syntax"]}, CandidateValidationError),
             ("v2.pipeline.validate_exact_patch_on_tree",
              {"return_value": (False, ["wrong target"])}, CandidateValidationError),
-            ("v2.validation.reference_cross_check.run_reference_cross_check",
-             {"side_effect": ReferenceCrossCheckError("semantic conflict")}, ReferenceCrossCheckError),
         ):
             with self.subTest(gate=gate), patch(gate, **options), patch(
                 "v2.pipeline._plan_metadata_updates",

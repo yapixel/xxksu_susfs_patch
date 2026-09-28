@@ -101,7 +101,7 @@ contexts match at their unchanged declared positions.
 
 Evidence: accepted Patch 50 hunks, authenticated r38 full file preimages, and
 existing fix_namespace/fix_task_mmu rules. The locked-helper policy is also
-explicit in REVIEWED_LIFECYCLE_DIFFERENCES in reference_cross_check.py. Current
+explicit in PATCH51_CORRECTIONS.md. Current
 production is used only to compare the independently constructed postimages.
 
 Excluded upstream files are drivers/input/input.c, fs/exec.c, fs/open.c,

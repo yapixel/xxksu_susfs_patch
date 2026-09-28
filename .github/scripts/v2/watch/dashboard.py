@@ -34,8 +34,6 @@ SOURCE_DISPLAY_NAMES = {
     "backslashxx_kernelsu": "xxKSU",
     "susfs_sultan": "SuSFS Sultan 6.1",
     "susfs_gki": "SuSFS GKI 6.12",
-    "midori_kernelsu_xx_patch": "Midori xx.patch",
-    "midori_gki_patch_50": "Midori GKI 50 Patch",
 }
 
 DEFAULT_INITIAL_EVENTS: Tuple[Mapping[str, str], ...] = (
@@ -569,51 +567,6 @@ def render_dashboard_body(
         sha_abbr = p.get("sha256", "")[:12]
         compat = p.get("compatibility_target") or p.get("patch_apply_target") or p.get("apply_target") or "—"
         lines.append(f"| `{pid}` | `{rel_path}` | `{sha_abbr}` | {compat} |")
-
-    # 3. Reference Parity (Independent Midori Cross-Check)
-    lines.append("")
-    lines.append("## Reference Parity")
-    lines.append("")
-    lines.append("**OURS** = yapixel/xxksu_susfs_patch production; **REFERENCE** = corresponding Midori implementation.")
-    lines.append("")
-    lines.append("| Comparison Target | Reference Source | Parity Status | Reviewed Comparison |")
-    lines.append("| :--- | :--- | :--- | :--- |")
-
-    parity_badge_map = {
-        "SEMANTIC_MATCH": "🟢 `SEMANTIC_MATCH`",
-        "IMPLEMENTATION_DIFFERENCE": "🟢 `IMPLEMENTATION_DIFFERENCE`",
-        "OUR_EXTRA": "🔵 `OUR_EXTRA`",
-        "REFERENCE_EXTRA": "🟠 `REFERENCE_EXTRA`",
-        "SEMANTIC_CONFLICT": "🔴 `SEMANTIC_CONFLICT`",
-        "REFERENCE_UNAVAILABLE": "⚪ `REFERENCE_UNAVAILABLE`",
-    }
-    try:
-        from ..validation.reference_cross_check import get_reference_parity_summary
-        parity_items = get_reference_parity_summary(root)
-    except Exception:
-        parity_items = [
-            {
-                "target": "xxksu-patch11",
-                "reference": "midori01/KernelSU:xx.patch",
-                "status": "IMPLEMENTATION_DIFFERENCE",
-                "details": "OURS vs REFERENCE: reviewed comparison details unavailable.",
-            },
-            {
-                "target": "gki-android16-6.12-r38-patch51",
-                "reference": "midori01/gki_ksu_workflow:Patch 51",
-                "status": "IMPLEMENTATION_DIFFERENCE",
-                "details": "OURS vs REFERENCE: reviewed comparison details unavailable.",
-            },
-        ]
-
-    for item in parity_items:
-        t_name = item.get("target", "—")
-        r_src = item.get("reference", "—")
-        s_val = item.get("status", "—")
-        badge = parity_badge_map.get(s_val, f"`{s_val}`")
-        dtls = item.get("details", "—")
-        lines.append(f"| `{t_name}` | `{r_src}` | {badge} | {dtls} |")
-
     lines.extend(["", "## Runtime Validation", ""])
     if not runtime["targets"]:
         lines.append("*No runtime validation recorded.*")

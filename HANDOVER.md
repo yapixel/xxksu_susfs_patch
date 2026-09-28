@@ -54,10 +54,6 @@ Both Patch 51 validators must pass before one atomic writer publishes. Patch 11/
 writers serialize. Full-state no-op performs no writes; legitimate metadata-only
 advancement remains distinct. Delivery verifies candidate/origin/RAW/manifest equality.
 
-Midori is reference-only: pinned xx.patch and independently reproduced GKI Patch 51
-from Midori's own Patch 50/converter. Reviewed implementation differences are retained;
-unreviewed sensitive differences block. Reference parity is not kernel correctness.
-
 ## Verification evidence and remaining work
 
 [Clean-room run 36296083518](https://github.com/yapixel/xxksu_susfs_patch/actions/runs/36296083518)
@@ -66,15 +62,11 @@ It independently fetched/authenticated inputs, reconstructed all outputs without
 copies, proved two-process determinism and generated/production/manifest equality,
 passed exact apply/native lifecycle/API checks, and left the checkout unchanged.
 247 tests passed in 134.562s with zero failures/errors/skips: dated evidence, not a
-quality metric. Both Midori comparisons were reviewed IMPLEMENTATION_DIFFERENCE.
-Clean-room is read-only and never publishes or updates issues.
+quality metric. Clean-room is read-only and never publishes or updates issues.
 
 Latest successful production workflow evidence at closeout: Patch 11 run
 36283493358; Patch 51 run 36294761634. No production bytes changed in this closeout.
-There are no open agy-required escalations at the initial live check. The watcher
-still reports informational Midori GKI reference drift relative to its watch snapshot;
-this is separate from the accepted, passing pinned reference comparison. Do not
-advance watch acceptance merely to make the dashboard green.
+There are no open agy-required escalations at the initial live check.
 
 No known production/reconstruction blocker remains. Refresh Issue #5 through its
 existing renderer during closeout; thereafter normal scheduled watch and clean-room

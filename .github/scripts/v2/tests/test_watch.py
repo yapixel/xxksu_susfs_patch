@@ -98,9 +98,7 @@ class WatchStateTests(unittest.TestCase):
         self.assertIn("susfs_sultan", auth)
         self.assertIn("susfs_gki", auth)
 
-        ref = sources.get("reference", {})
-        self.assertIn("midori_kernelsu_xx_patch", ref)
-        self.assertIn("midori_gki_patch_50", ref)
+        self.assertNotIn("reference", sources)
 
     @patch("subprocess.run")
     def test_fetch_remote_commit_resolves_exact_ref(self, mock_run):
@@ -126,7 +124,7 @@ class WatchClassificationTests(unittest.TestCase):
 
     def test_dry_run_all_no_change(self):
         report = self.watcher.run_all(fetch_remote=False)
-        self.assertEqual(len(report.results), 5)
+        self.assertEqual(len(report.results), 3)
         for r in report.results:
             self.assertEqual(r.classification, WatchClassification.NO_CHANGE)
         self.assertFalse(report.has_failures)

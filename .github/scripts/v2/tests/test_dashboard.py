@@ -59,24 +59,6 @@ def make_clean_report(timestamp: str = "2026-09-24T22:00:00Z") -> WatchReport:
             old_content_hash="sha256:016434f1d970",
             new_content_hash="sha256:016434f1d970",
         ),
-        SourceResult(
-            source_id="midori_kernelsu_xx_patch",
-            source_type="reference",
-            classification=WatchClassification.NO_CHANGE,
-            old_identity="bc1b8e371d80fb8dbed5ac10096e39f9cf864d56",
-            new_identity="aaaaaaaaaaaaa0f9f3819125314ce0b13935a06",
-            old_content_hash="sha256:6d0a6b64ffcc",
-            new_content_hash="sha256:6d0a6b64ffcc",
-        ),
-        SourceResult(
-            source_id="midori_gki_patch_50",
-            source_type="reference",
-            classification=WatchClassification.NO_CHANGE,
-            old_identity="https://raw.githubusercontent.com/.../50.patch",
-            new_identity="https://raw.githubusercontent.com/.../50.patch",
-            old_content_hash="sha256:4bb0e351558c",
-            new_content_hash="sha256:4bb0e351558c",
-        ),
     )
     return WatchReport(results=results, timestamp=timestamp)
 
@@ -370,31 +352,19 @@ class DashboardTests(unittest.TestCase):
                 self.assertNotIn("**:**", entry)
                 self.assertNotIn("``", entry)
                 self.assertIn("`NO_CHANGE`", entry)
-                if result.source_type == "authoritative":
-                    repo = info["repository"].removesuffix(".git")
-                    separator = "/-/commit/" if "gitlab.com" in repo else "/commit/"
-                    self.assertIn(f"]({repo})", entry)
-                    self.assertIn(f"- Tracking ref: `{info['ref']}`", entry)
-                    self.assertIn(f"- Accepted commit: [`{result.old_identity[:12]}`]({repo}{separator}{result.old_identity})", entry)
-                    drift = replace(result, new_identity="f" * 40, classification=WatchClassification.SEMANTIC_DRIFT)
-                    changed = render_source_identity(drift, info)
-                    self.assertIn(f"- Discovered commit: [`{'f' * 12}`]({repo}{separator}{'f' * 40})", changed)
-                    self.assertIn("`SEMANTIC_DRIFT`", changed)
-                else:
-                    self.assertIn("- Reference ref/path:", entry)
-                    self.assertNotIn("Accepted commit", entry)
+                repo = info["repository"].removesuffix(".git")
+                separator = "/-/commit/" if "gitlab.com" in repo else "/commit/"
+                self.assertIn(f"]({repo})", entry)
+                self.assertIn(f"- Tracking ref: `{info['ref']}`", entry)
+                self.assertIn(f"- Accepted commit: [`{result.old_identity[:12]}`]({repo}{separator}{result.old_identity})", entry)
+                drift = replace(result, new_identity="f" * 40, classification=WatchClassification.SEMANTIC_DRIFT)
+                changed = render_source_identity(drift, info)
+                self.assertIn(f"- Discovered commit: [`{'f' * 12}`]({repo}{separator}{'f' * 40})", changed)
+                self.assertIn("`SEMANTIC_DRIFT`", changed)
         for body in (issue, summary):
             self.assertNotIn("Old Content Hash", body)
             self.assertNotIn("New Content Hash", body)
             self.assertNotIn("normalized", body)
-        midori = render_source_identity(replace(report.results[3], new_identity="a" * 40), sources["reference"]["midori_kernelsu_xx_patch"])
-        self.assertIn("**[midori01/KernelSU](https://github.com/midori01/KernelSU)**", midori)
-        self.assertIn("- Resolved patch commit: [`aaaaaaaaaaaa`]", midori)
-        file_result = replace(report.results[4], classification=WatchClassification.REFERENCE_DRIFT,
-                              new_content_hash="sha256:" + "f" * 64)
-        file_entry = render_source_identity(file_result, sources["reference"]["midori_gki_patch_50"])
-        self.assertIn("Resolved commit: not provided", file_entry)
-        self.assertIn("Content drift:", file_entry)
         self.assertEqual(report.to_dict(), before)
 
     # 15. rendered body stays below 30 KiB
@@ -447,43 +417,13 @@ class DashboardTests(unittest.TestCase):
         self.assertFalse(any("SOURCE_IDENTITY_ERROR" in t for t in texts))
         self.assertTrue(any("resolved Issue #4" in t for t in texts))
 
-    # 19. reference patch primary identity is normalized content
-    # 20. reference parity derived from machine-readable cross-check report
-    def test_20_reference_parity_derived_from_machine_readable_cross_check(self):
+    # 20. reference parity retired from dashboard
+    def test_20_reference_parity_retired_from_dashboard(self):
         report = make_clean_report()
         body = render_dashboard_body(report=report, repo_root=REPO_ROOT)
-        self.assertIn("`xxksu-patch11`", body)
-        self.assertIn("`midori01/KernelSU:xx.patch`", body)
-        self.assertIn("🟢 `IMPLEMENTATION_DIFFERENCE`", body)
-        self.assertIn("OUR_EXTRA=0", body)
-        self.assertIn("legacy SuSFS TRY_UMOUNT glue retired", body)
-        self.assertIn("obsolete Official-KSU KSU_MARK_GET override independently", body)
-        self.assertIn("| Reviewed Comparison |", body)
-        self.assertNotIn("| Parity Status | Details |", body)
-        rows = [line for line in body.splitlines() if "🟢 `IMPLEMENTATION_DIFFERENCE`" in line]
-        self.assertEqual(len(rows), 2)
-        for row in rows:
-            self.assertIn("**AGREES:**", row)
-            self.assertIn("**RESULT:**", row)
-            self.assertIn("OURS", row)
-            self.assertIn("REFERENCE", row)
-        patch11 = next(row for row in rows if "xxksu-patch11" in row)
-        for token in ("OUR_EXTRA=0", "REFERENCE_EXTRA=0", "SEMANTIC_CONFLICT=0",
-                      "**OURS:** explicit/separate SID", "**REFERENCE:** batched SID",
-                      "canonical 8-file", "SuSFS initialization", "no_su / proc_umounted",
-                      "isolated/app UID", "WebView zygote and zygote_next", "ksu_handle_umount",
-                      "SuSFS supercall dispatch", "sdcard monitor startup", "ksu_get_task_mark(cmd.pid)",
-                      "kernel/feature/kernel_umount.c", "kernel/downstream/ksu_hostsredirect.h",
-                      "helper decomposition", "grouped/inlined", "not authorized by Midori"):
-            self.assertIn(token, patch11)
-        gki = next(row for row in rows if "gki-android16" in row)
-        for token in ("**OURS:** mount allocation-provenance", "**REFERENCE:** uses early returns",
-                      "OURS intentionally corrects", "fs/super.c", "shared smaps gather guard"):
-            self.assertIn(token, gki)
-        # Rendering cached reports must not rewrite comparison results, hashes,
-        # production bytes, or the manifest.
+        self.assertNotIn("## Reference Parity", body)
+        self.assertNotIn("midori", body.lower())
         paths = list((REPO_ROOT / "patches").rglob("*.patch")) + [REPO_ROOT / "patches/manifest.json"]
-        paths += list((REPO_ROOT / "candidate_patches").rglob("reference_cross_check.json"))
         before = {p: p.read_bytes() for p in paths}
         render_dashboard_body(report=report, repo_root=REPO_ROOT)
         self.assertEqual({p: p.read_bytes() for p in paths}, before)
@@ -499,7 +439,7 @@ class DashboardTests(unittest.TestCase):
                 "text": "Sultan full build PASS (boot/runtime unreported)"}]
         body = render_dashboard_body(report, repo_root=REPO_ROOT, recent_events=old)
         section = body.split("## Runtime Validation", 1)[1].split("## Open Escalations", 1)[0]
-        self.assertLess(body.index("## Reference Parity"), body.index("## Runtime Validation"))
+        self.assertLess(body.index("## Production Patches"), body.index("## Runtime Validation"))
         self.assertIn("| Target | Mode | Device | Status | Evidence |", section)
         for row in state["targets"]:
             for key in ("target", "mode", "device", "status", "susfs"):

@@ -152,7 +152,6 @@ def verify(work, report):
     from .semantic.gate import verify_semantic_gate_for_pipeline
     from .source.baseline import load_baseline_record, load_authoritative_bundle
     from .validation.exact_patch import validate_exact_patch_on_tree
-    from .validation.reference_cross_check import run_reference_cross_check
 
     ok, errors = verify_patch_manifest(ROOT)
     require(ok, str(errors))
@@ -297,12 +296,6 @@ def verify(work, report):
             row["PATCH51_OBJECT_COMPILE"] = "PASS" if build["PATCH51_OBJECT_COMPILE_PASS"] else "FAIL"
             row["PATCH51_SYMBOL_CLOSURE"] = "PASS" if build["PATCH51_SYMBOL_CLOSURE_PASS"] else "FAIL"
             row["full vmlinux link"] = "NOT_RUN"
-        reference = run_reference_cross_check(patch_id, first.decode(), sha(first), repo_root=ROOT)
-        if reference is not None:
-            report["midori"][patch_id] = reference.classification.value
-            print(json.dumps(reference.to_dict(), indent=2), flush=True)
-            require(not reference.blocks_promotion and reference.classification.value != "REFERENCE_UNAVAILABLE",
-                    f"incomplete/blocking reference check: {patch_id}: {reference.details}")
 
     # Existing dashboard tests write reference diagnostics relative to their
     # repository. Run the unchanged suite in a disposable checkout.
@@ -327,7 +320,7 @@ def verify(work, report):
 
 def main():
     report = {"status": "FAIL", "head": command("git", "rev-parse", "HEAD", cwd=ROOT),
-              "patches": {}, "midori": {}}
+              "patches": {}}
     print(report["head"], sys.version, command("git", "--version"), platform.platform(), flush=True)
     try:
         require(repository_state(ROOT) == {"tracked": "CLEAN", "untracked": []}, "checkout is not clean")

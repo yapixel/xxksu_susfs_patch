@@ -108,15 +108,14 @@ Check [patches/manifest.json](patches/manifest.json) or each target's `BASELINE.
 **[Issue #5 — authoritative live upstream-status dashboard](https://github.com/yapixel/xxksu_susfs_patch/issues/5)**
 
 README documents stable architecture and support. Issue #5 tracks KernelSU and
-Simonpunk SuSFS drift, Midori reference drift, production Patch 11 / Patch 51 hashes,
-parity reviews, validation events, and open escalations.
+Simonpunk SuSFS drift, production Patch 11 / Patch 51 hashes,
+validation events, and open escalations.
 
 - [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU) — upstream xxKSU.
 - [simonpunk/susfs4ksu](https://gitlab.com/simonpunk/susfs4ksu) — upstream SuSFS.
 
 Tracking refs discover changes; each generation uses immutable accepted revisions.
 Sensitive drift fails closed for source review before acceptance and publication.
-Midori remains reference-only, never a production generation input.
 
 ## Maintenance & Documentation
 

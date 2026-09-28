@@ -213,12 +213,11 @@ class TestPipelineDelivery(unittest.TestCase):
         self.assertEqual(head_after_second, head_after_first, "HEAD must not move on clean no-op rerun")
 
 
-    def test_7_reference_only_midori_does_not_trigger_write_back(self):
-        """Invariant 7: Reference-only tracker modifications do not trigger production write-back."""
-        # Simulate modified reference tracker in upstream-state.json
+    def test_7_metadata_modifications_do_not_trigger_unpromoted_write_back(self):
+        """Invariant 7: Arbitrary non-production modifications do not trigger production write-back."""
         state_file = self.repo_root / ".github" / "upstream-state.json"
         state_data = json.loads(state_file.read_text(encoding="utf-8"))
-        state_data["sources"]["reference"]["midori_gki_patch_50"]["sha256"] = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+        state_data["comment"] = "non_authoritative_metadata"
         state_file.write_text(json.dumps(state_data, indent=2) + "\n", encoding="utf-8")
 
         res = run_pipeline(
