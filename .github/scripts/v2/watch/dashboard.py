@@ -161,6 +161,52 @@ def load_manifest_patches(repo_root: Optional[Path] = None) -> list[dict[str, An
     return list(patches)
 
 
+def load_runtime_validation(repo_root: Path) -> dict:
+    """Optional runtime observations; malformed present state must not claim health."""
+    path = repo_root / ".github/runtime-validation.json"
+    if not path.exists():
+        return {"targets": [], "recent_events": []}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict) or data.get("schema") != "xxksu-susfs-runtime-validation/v1":
+        raise ValueError("Invalid runtime validation schema")
+    def text(value):
+        return isinstance(value, str) and bool(value.strip())
+    if not text(data.get("evidence_source")):
+        raise ValueError("Runtime validation requires evidence_source")
+    for key in ("targets", "recent_events"):
+        if not isinstance(data.get(key), list):
+            raise ValueError(f"Runtime validation requires {key} list")
+    seen = set()
+    for row in data["targets"]:
+        if not isinstance(row, dict) or not all(text(row.get(k)) for k in ("target", "mode", "device", "status", "susfs", "note")):
+            raise ValueError("Invalid runtime target fields")
+        if row["mode"] not in ("manual", "lsm_bl") or row["target"] in seen:
+            raise ValueError("Invalid runtime mode or duplicate target")
+        seen.add(row["target"])
+        if not isinstance(row.get("evidence"), list) or not row["evidence"] or not all(text(v) for v in row["evidence"]):
+            raise ValueError("Invalid runtime evidence")
+        if any(k in row and not text(row[k]) for k in ("kernel", "kernelsu")):
+            raise ValueError("Invalid runtime version")
+    seen = set()
+    for event in data["recent_events"]:
+        if not isinstance(event, dict) or not all(text(event.get(k)) for k in ("timestamp", "source_id", "text")):
+            raise ValueError("Invalid runtime event")
+        datetime.strptime(event["timestamp"], "%Y-%m-%d")
+        key = (event["timestamp"], event["source_id"])
+        if key in seen:
+            raise ValueError("Duplicate runtime event")
+        seen.add(key)
+    if len(data["recent_events"]) > MAX_RECENT_EVENTS:
+        raise ValueError("Too many persistent runtime events")
+    return data
+
+
+def runtime_cell(value: str) -> str:
+    """Keep recorded evidence inside one Markdown table cell."""
+    from html import escape
+    return escape(value).replace("|", "&#124;").replace("\n", "<br>")
+
+
 def parse_dashboard_events(body: str) -> list[dict[str, str]]:
     """Extract stored recent events from previous issue body."""
     if not body:
@@ -467,6 +513,12 @@ def render_dashboard_body(
     """Render the complete Markdown dashboard body."""
     root = get_repo_root(repo_root)
     overall_status = calculate_overall_status(report, open_escalations)
+    runtime = load_runtime_validation(root)
+    persistent = sorted(runtime["recent_events"], key=lambda e: (-int(e["timestamp"].replace("-", "")), e["source_id"]))
+    keys = {(e["timestamp"], e["source_id"]) for e in persistent}
+    # State-backed events replace stale copies from the previous issue body.
+    recent_events = (persistent + [e for e in recent_events
+                     if (e.get("timestamp"), e.get("source_id")) not in keys])[:MAX_RECENT_EVENTS]
 
     if revision is None or branch is None:
         rev_val, branch_val = get_git_revision(root)
@@ -556,6 +608,20 @@ def render_dashboard_body(
         badge = parity_badge_map.get(s_val, f"`{s_val}`")
         dtls = item.get("details", "—")
         lines.append(f"| `{t_name}` | `{r_src}` | {badge} | {dtls} |")
+
+    lines.extend(["", "## Runtime Validation", ""])
+    if not runtime["targets"]:
+        lines.append("*No runtime validation recorded.*")
+    else:
+        lines.extend([runtime_cell(runtime["evidence_source"]), "",
+                      "| Target | Mode | Device | Status | Evidence |",
+                      "| --- | --- | --- | --- | --- |"])
+        for row in sorted(runtime["targets"], key=lambda r: (r["target"], r["mode"])):
+            versions = [f"{label}: {row[key]}" for key, label in
+                        (("kernel", "Kernel"), ("kernelsu", "KernelSU"), ("susfs", "SuSFS")) if key in row]
+            evidence = "<br>".join(runtime_cell(v) for v in versions + row["evidence"] + [row["note"]])
+            cells = [runtime_cell(row[k]) for k in ("target", "mode", "device", "status")]
+            lines.append("| " + " | ".join(cells + [evidence]) + " |")
 
     # 4. Open Escalations
     lines.append("")

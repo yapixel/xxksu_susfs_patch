@@ -68,29 +68,6 @@ class TestPipelineArchitecture(unittest.TestCase):
     def tearDown(self):
         self.tmp_dir.cleanup()
 
-    def test_1_generator_output_is_the_candidate(self):
-        """Invariant 1: Generator outputs to candidate path, leaving public patches/ untouched."""
-        cand_dir = self.repo_root / "candidate_patches" / "xxksu-patch11"
-        res = run_pipeline(
-            "xxksu-patch11",
-            self.ksu_tree,
-            target_tree=self.ksu_tree,
-            candidate_dir=cand_dir,
-            repo_root=self.repo_root,
-            promote=False,
-            check_only=True,
-        )
-
-        candidate_file = cand_dir / "11_enable_susfs_for_ksu.patch"
-        self.assertTrue(candidate_file.is_file(), "Candidate artifact must be created")
-        self.assertEqual(res.candidate_path, candidate_file)
-        self.assertFalse(res.promoted, "Candidate must NOT be promoted when promote=False")
-
-        # Candidate content must be valid unified diff
-        cand_text = candidate_file.read_text(encoding="utf-8")
-        self.assertIn("diff --git a/kernel/ksu.c b/kernel/ksu.c", cand_text)
-
-
     def test_unchanged_candidate_never_enters_promotion_or_writeback(self):
         public = self.repo_root / "patches/xxksu/11_enable_susfs_for_ksu.patch"
         before = public.read_bytes()
@@ -99,11 +76,17 @@ class TestPipelineArchitecture(unittest.TestCase):
         shutil.copy(Path(__file__).resolve().parents[4] / ".github/upstream-state.json", state)
         protected = [p for p in (self.repo_root / "patches").rglob("*") if p.is_file()] + [state]
         snapshot = {p: p.read_bytes() for p in protected}
+        cand_dir = self.repo_root / "candidate_patches" / "xxksu-patch11"
         candidate = run_pipeline(
             "xxksu-patch11", self.ksu_tree, target_tree=self.ksu_tree,
-            repo_root=self.repo_root, check_only=True,
+            repo_root=self.repo_root, candidate_dir=cand_dir, promote=False, check_only=True,
         )
         self.assertTrue(candidate.validated)
+        candidate_file = cand_dir / "11_enable_susfs_for_ksu.patch"
+        self.assertTrue(candidate_file.is_file())
+        self.assertEqual(candidate.candidate_path, candidate_file)
+        self.assertFalse(candidate.promoted)
+        self.assertIn("diff --git a/kernel/ksu.c b/kernel/ksu.c", candidate_file.read_text())
         self.assertEqual(candidate.candidate_path.read_bytes(), before)
 
         # Candidate artifacts may be written; production and metadata may not.

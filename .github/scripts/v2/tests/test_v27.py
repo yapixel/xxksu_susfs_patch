@@ -376,56 +376,35 @@ class XxksuAdapterTests(unittest.TestCase):
                 self.adapter.build_adaptation_plan(self.clean_bundle)
 
     def test_generate_patch11_independent_of_golden(self):
-        with self.subTest(case='generate_patch11_does_not_read_golden_file'):
-            import builtins
-            real_open = builtins.open
-            real_read_text = Path.read_text
-            real_read_bytes = Path.read_bytes
+        import builtins
+        import os
+        import tempfile
+        from v2.source.baseline import load_authoritative_bundle
 
-            def trapper(func):
-                def wrapper(self_obj, *args, **kwargs):
-                    path_str = str(self_obj)
-                    if "11_enable_susfs_for_ksu.patch" in path_str:
-                        raise AssertionError(f"Production code attempted to access golden patch: {path_str}")
-                    return func(self_obj, *args, **kwargs)
-                return wrapper
+        # Exercise both adapter fixtures and authenticated source with one setup.
+        bundles = (self.clean_bundle, load_authoritative_bundle("xxksu", _PATCH11_PATH.parents[2]))
+        def without_golden(func):
+            def read(path, *args, **kwargs):
+                if str(path).endswith(".patch"):
+                    raise AssertionError(f"Generation read final patch: {path}")
+                return func(path, *args, **kwargs)
+            return read
 
+        with tempfile.TemporaryDirectory() as td:
+            previous = Path.cwd()
             try:
-                Path.read_text = trapper(real_read_text)
-                Path.read_bytes = trapper(real_read_bytes)
-                # generate_patch11 must run cleanly without attempting to read the golden patch
-                generated = generate_patch11(self.clean_bundle)
-                self.assertTrue(len(generated) > 0)
+                os.chdir(td)
+                self.assertFalse(Path("patches/xxksu/11_enable_susfs_for_ksu.patch").exists())
+                # Authenticated policy commit metadata remains available.
+                with patch.object(Path, "read_text", without_golden(Path.read_text)), \
+                     patch.object(Path, "read_bytes", without_golden(Path.read_bytes)), \
+                     patch("builtins.open", without_golden(builtins.open)):
+                    for bundle in bundles:
+                        with self.subTest(identity=bundle.identity):
+                            generated = generate_patch11(bundle)
+                            self.assertIn("diff --git a/kernel/ksu.c", generated)
             finally:
-                Path.read_text = real_read_text
-                Path.read_bytes = real_read_bytes
-        with self.subTest(case='generate_patch11_succeeds_when_golden_patch_unavailable'):
-            import tempfile
-            from v2.source.baseline import load_authoritative_bundle
-            # Start from the authenticated source fixture, not reconstructed patch context.
-            bundle = load_authoritative_bundle("xxksu", _PATCH11_PATH.parents[2])
-            with tempfile.TemporaryDirectory() as td:
-                # Generation runs with a physically absent golden in its working directory.
-                import os
-                previous = Path.cwd()
-                try:
-                    os.chdir(td)
-                    self.assertFalse(Path("patches/xxksu/11_enable_susfs_for_ksu.patch").exists())
-                    def without_golden(func):
-                        def read(path, *args, **kwargs):
-                            if str(path).endswith(".patch"):
-                                raise FileNotFoundError("golden unavailable")
-                            return func(path, *args, **kwargs)
-                        return read
-                    # Policy commit metadata is a legitimate input; final patches are not.
-                    with patch.object(Path, "read_text", without_golden(real_read_text)), \
-                         patch.object(Path, "read_bytes", without_golden(real_read_bytes)), \
-                         patch("builtins.open", without_golden(real_open)):
-                        generated = generate_patch11(bundle)
-                finally:
-                    os.chdir(previous)
-            self.assertIn("diff --git a/kernel/ksu.c", generated)
-
+                os.chdir(previous)
 
     def test_changing_mutation_payload_changes_patch(self):
         """Modifying an operation payload produces a correspondingly changed patch."""

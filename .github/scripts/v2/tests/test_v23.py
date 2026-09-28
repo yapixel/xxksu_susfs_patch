@@ -186,11 +186,6 @@ class SemanticInventoryTests(unittest.TestCase):
         self.assertEqual(first.identity, second.identity)
         self.assertEqual(first.canonical_json(), second.canonical_json())
         self.assertNotEqual(first.identity, inventory_from_observations([observation(text="changed();")], provenance_identity="p").identity)
-        with tempfile.TemporaryDirectory() as one, tempfile.TemporaryDirectory() as two:
-            Path(one, "ignored").write_text("one")
-            Path(two, "ignored").write_text("two")
-            self.assertEqual(inventory_from_observations([observation()], provenance_identity="p").identity,
-                             inventory_from_observations([observation()], provenance_identity="p").identity)
 
 
 class SemanticRealEvidenceTests(unittest.TestCase):

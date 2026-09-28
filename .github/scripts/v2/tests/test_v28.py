@@ -128,17 +128,16 @@ class V28PositiveValidationTests(unittest.TestCase):
 
     def test_generated_symbol_report_and_determinism(self):
         with self.subTest(case='1_mutated_bundle_passes_symbol_validation'):
-            results = validate_symbols(bundle=self.mutated_bundle)
-            self.assertTrue(all(r.status == ValidationStatus.PASS for r in results))
-            targets = {r.target for r in results}
+            bundle_results = validate_symbols(bundle=self.mutated_bundle)
+            self.assertTrue(all(r.status == ValidationStatus.PASS for r in bundle_results))
+            targets = {r.target for r in bundle_results}
             self.assertIn("bundle:xxksu", targets)
         with self.subTest(case='2_generated_patch11_zero_official_leaks'):
             results = validate_symbols(patch=self.patch11_diff)
             self.assertTrue(all(r.status == ValidationStatus.PASS for r in results))
             self.assertTrue(any("Zero official-only symbols detected in patch" in r.details for r in results))
         with self.subTest(case='3_all_required_replacement_symbols_present'):
-            results = validate_symbols(bundle=self.mutated_bundle)
-            presence_results = [r for r in results if r.validator_id == "validation.symbols.presence"]
+            presence_results = [r for r in bundle_results if r.validator_id == "validation.symbols.presence"]
             found_symbols = {r.target for r in presence_results if r.status == ValidationStatus.PASS}
 
             # Verify xxKSU replacements

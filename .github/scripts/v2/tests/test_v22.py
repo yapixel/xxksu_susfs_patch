@@ -100,6 +100,10 @@ class V22ManifestTests(unittest.TestCase):
                 for profile in manifest_set.profiles:
                     profile.validate(manifest_set.target)
                     self.assertEqual(profile.patch_51_id, manifest_set.target.patch_51_id)
+        with self.subTest(case='deterministic_manifest_serialization'):
+            first = manifests[0].canonical_json()
+            second = load_manifest_set(json.loads(first)).canonical_json()
+            self.assertEqual(first, second)
         with self.subTest(case='shared_11_and_transport_neutral_51'):
             raw = build_manifest_sets()[0].to_dict()
             raw["profiles"][1]["patch_11_id"] = "11-lsm"
@@ -109,11 +113,6 @@ class V22ManifestTests(unittest.TestCase):
             raw["profiles"][1]["patch_51_id"] = "51-lsm_bl"
             with self.assertRaises(ManifestError):
                 load_manifest_set(raw)
-
-    def test_deterministic_manifest_serialization(self):
-        first = build_manifest_sets()[0].canonical_json()
-        second = load_manifest_set(json.loads(first)).canonical_json()
-        self.assertEqual(first, second)
 
     def test_manifest_rejects_unknowns_and_mismatch(self):
         raw = build_manifest_sets()[0].to_dict()

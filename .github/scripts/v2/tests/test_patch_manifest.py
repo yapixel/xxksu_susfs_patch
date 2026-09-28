@@ -24,11 +24,11 @@ class PatchManifestTests(unittest.TestCase):
     def setUp(self) -> None:
         self.manifest_path = REPO_ROOT / MANIFEST_RELATIVE_PATH
         self.assertTrue(self.manifest_path.is_file(), f"Manifest file missing at {self.manifest_path}")
-        self.raw_manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
+        self.manifest_text = self.manifest_path.read_text(encoding="utf-8")
+        self.raw_manifest = json.loads(self.manifest_text)
 
     def test_manifest_integrity_and_canonical_bytes(self):
         with self.subTest(case='manifest_file_exists_and_valid_json'):
-            self.assertTrue(self.manifest_path.is_file())
             self.assertIsInstance(self.raw_manifest, dict)
         with self.subTest(case='manifest_schema_and_entries_count'):
             self.assertEqual(self.raw_manifest.get("schema"), MANIFEST_SCHEMA)
@@ -60,26 +60,15 @@ class PatchManifestTests(unittest.TestCase):
                 self.assertIn("commit", lineage)
 
             self.assertEqual(actual_ids, expected_ids)
-        with self.subTest(case='every_manifest_path_exists_on_disk'):
+        with self.subTest(case='manifest_paths_and_hashes'):
             for entry in self.raw_manifest["patches"]:
-                rel_path = entry["relative_path"]
-                abs_path = REPO_ROOT / rel_path
-                self.assertTrue(abs_path.is_file(), f"Patch path does not exist on disk: {rel_path}")
-        with self.subTest(case='every_manifest_sha256_matches'):
-            for entry in self.raw_manifest["patches"]:
-                rel_path = entry["relative_path"]
-                expected_sha = entry["sha256"]
-                abs_path = REPO_ROOT / rel_path
-                actual_sha = compute_file_sha256(abs_path)
-                self.assertEqual(
-                    actual_sha,
-                    expected_sha,
-                    f"SHA-256 mismatch for {rel_path}: expected {expected_sha}, got {actual_sha}",
-                )
+                abs_path = REPO_ROOT / entry["relative_path"]
+                self.assertTrue(abs_path.is_file(), f"Patch path does not exist on disk: {abs_path}")
+                self.assertEqual(compute_file_sha256(abs_path), entry["sha256"], str(abs_path))
         with self.subTest(case='manifest_deterministic_match_with_generator'):
             expected_manifest = generate_patch_manifest(REPO_ROOT)
             expected_json = json.dumps(expected_manifest, indent=2, sort_keys=True) + "\n"
-            on_disk_json = self.manifest_path.read_text(encoding="utf-8")
+            on_disk_json = self.manifest_text
             self.assertEqual(
                 on_disk_json,
                 expected_json,

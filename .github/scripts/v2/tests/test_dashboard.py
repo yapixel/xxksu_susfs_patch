@@ -279,8 +279,11 @@ class DashboardTests(unittest.TestCase):
 
             report = make_clean_report()
             body = render_dashboard_body(report=report, repo_root=REPO_ROOT, recent_events=combined)
-            for i in range(10):
-                self.assertIn(f"Event {i}", body)
+            rendered = parse_dashboard_events(body)
+            self.assertEqual(len(rendered), MAX_RECENT_EVENTS)
+            self.assertTrue(any(e["source_id"] == "runtime-gki-6.12" for e in rendered))
+            self.assertTrue(any(e["source_id"] == "runtime-sultan-6.1" for e in rendered))
+            self.assertIn("Event 0", body)
             self.assertNotIn("Event 10", body)
 
     # 11. maximum 10 Recent Events
@@ -484,6 +487,67 @@ class DashboardTests(unittest.TestCase):
         before = {p: p.read_bytes() for p in paths}
         render_dashboard_body(report=report, repo_root=REPO_ROOT)
         self.assertEqual({p: p.read_bytes() for p in paths}, before)
+
+    def test_runtime_state_rendering_order_events_and_status_independence(self):
+        from dataclasses import replace
+        from v2.watch.dashboard import load_runtime_validation
+        state = load_runtime_validation(REPO_ROOT)
+        report = make_clean_report()
+        report = replace(report, results=(replace(report.results[0],
+                         classification=WatchClassification.SAFE_REGEN_CANDIDATE),))
+        old = [{"timestamp": "2026-09-27", "source_id": "patch51-validation",
+                "text": "Sultan full build PASS (boot/runtime unreported)"}]
+        body = render_dashboard_body(report, repo_root=REPO_ROOT, recent_events=old)
+        section = body.split("## Runtime Validation", 1)[1].split("## Open Escalations", 1)[0]
+        self.assertLess(body.index("## Reference Parity"), body.index("## Runtime Validation"))
+        self.assertIn("| Target | Mode | Device | Status | Evidence |", section)
+        for row in state["targets"]:
+            for key in ("target", "mode", "device", "status", "susfs"):
+                self.assertIn(row[key], section)
+            for evidence in row["evidence"]:
+                self.assertIn(evidence, section)
+        self.assertIn("unrelated vendor userspace", section)
+        self.assertIn("not provable from runtime evidence alone", section)
+        self.assertNotIn("boot/runtime unreported", body)
+        self.assertEqual(calculate_overall_status(report), OverallStatus.UPDATE_AVAILABLE)
+        self.assertIn("**Overall Status:** " + OverallStatus.UPDATE_AVAILABLE.value, body)
+        reversed_state = dict(state, targets=list(reversed(state["targets"])),
+                              recent_events=list(reversed(state["recent_events"])))
+        with patch("v2.watch.dashboard.load_runtime_validation", return_value=reversed_state):
+            self.assertEqual(render_dashboard_body(report, repo_root=REPO_ROOT, recent_events=old), body)
+        events = parse_dashboard_events(body)
+        self.assertEqual(len(events), 3)
+        self.assertEqual(render_dashboard_body(report, repo_root=REPO_ROOT, recent_events=events), body)
+        with patch("v2.watch.dashboard.load_runtime_validation", return_value={"targets": [], "recent_events": []}):
+            missing = render_dashboard_body(report, repo_root=REPO_ROOT)
+        self.assertIn("No runtime validation recorded", missing)
+        self.assertIn("**Overall Status:** " + OverallStatus.UPDATE_AVAILABLE.value, missing)
+
+    def test_runtime_state_missing_and_malformed(self):
+        import copy
+        import tempfile
+        from v2.watch.dashboard import load_runtime_validation
+        valid = json.loads((REPO_ROOT / ".github/runtime-validation.json").read_text())
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self.assertEqual(load_runtime_validation(root), {"targets": [], "recent_events": []})
+            path = root / ".github/runtime-validation.json"
+            path.parent.mkdir()
+            invalid = ["{", "[]", json.dumps(dict(valid, schema="wrong")),
+                       json.dumps(dict(valid, targets={}))]
+            for key, value in (("mode", "unknown"), ("evidence", []), ("status", "")):
+                changed = copy.deepcopy(valid)
+                changed["targets"][0][key] = value
+                invalid.append(json.dumps(changed))
+            invalid.append(json.dumps(dict(valid, targets=valid["targets"] * 2)))
+            invalid.append(json.dumps(dict(valid, recent_events=[{"timestamp": "invalid"}])))
+            for raw in invalid:
+                with self.subTest(raw=raw[:80]):
+                    path.write_text(raw)
+                    with self.assertRaises(ValueError):
+                        load_runtime_validation(root)
+                    with self.assertRaises(ValueError):
+                        render_dashboard_body(make_clean_report(), repo_root=root)
 
     # 21. sync_dashboard_issue supports extra_events
     @patch("v2.watch.dashboard.find_dashboard_issues")

@@ -1,0 +1,60 @@
+{
+  "schema": "xxksu-susfs-runtime-validation/v1",
+  "evidence_source": "Maintainer-reported runtime observations; not exhaustive certification.",
+  "targets": [
+    {
+      "target": "gki-android16-6.12",
+      "mode": "lsm_bl",
+      "device": "Not specified",
+      "susfs": "v2.3.0",
+      "status": "RUNTIME_HEALTHY_WITH_WARNINGS",
+      "evidence": [
+        "CONFIG_KSU_LSM_SECURITY_HOOKS=y",
+        "CONFIG_KSU_HACK_ARM64_BRANCH_LINK=y",
+        "CONFIG_KSU_TAMPER_SYSCALL_TABLE=n",
+        "KernelSU initialized with +arm64_branch_link",
+        "9 expected SuSFS features available",
+        "no KSU/SuSFS Oops/BUG/panic",
+        "no duplicate legacy data-path transport observed"
+      ],
+      "note": "Strict static transport exclusivity is not provable from runtime evidence alone. Qualcomm qti-testscripts SIGABRT is unrelated vendor userspace evidence, not a kernel/KSU/SuSFS failure."
+    },
+    {
+      "target": "sultan-android14-6.1",
+      "mode": "manual",
+      "device": "Pixel 7 Pro (cheetah)",
+      "kernel": "6.1.145-android14-11-gfa1d6308d1fe-ab14691759",
+      "kernelsu": "3.3.0-52",
+      "susfs": "v2.3.0",
+      "status": "RUNTIME_HEALTHY_WITH_WARNINGS",
+      "evidence": [
+        "Automated LSM hooking disabled",
+        "manual newfstatat/faccessat/execveat hooks active",
+        "ADD_TRY_UMOUNT verified",
+        "successful ksu_handle_umount activity",
+        "zygote_next resolved",
+        "WebView zygote preload completed",
+        "SuSFS open redirect paths registered",
+        "no Oops/BUG/panic/unresolved symbols/duplicate hook registration"
+      ],
+      "note": "Reported device differs from the current Shiba/Husky production binding; runtime evidence does not change accepted target identities."
+    }
+  ],
+  "recent_events": [
+    {
+      "timestamp": "2026-09-28",
+      "source_id": "runtime-gki-6.12",
+      "text": "GKI Android 16 / 6.12 LSM+BL: runtime healthy with warnings; SuSFS v2.3.0. No observed KSU/SuSFS Oops/BUG/panic or duplicate legacy transport. Runtime evidence alone does not prove strict static transport exclusivity."
+    },
+    {
+      "timestamp": "2026-09-28",
+      "source_id": "runtime-sultan-6.1",
+      "text": "Pixel 7 Pro Sultan 6.1 manual hooks: runtime healthy with warnings; KernelSU 3.3.0-52, SuSFS v2.3.0. Manual paths, ADD_TRY_UMOUNT, umount, zygote/WebView and open redirect verified."
+    },
+    {
+      "timestamp": "2026-09-27",
+      "source_id": "patch51-validation",
+      "text": "Sultan/GKI migration: authenticated reconstruction, native Git diff, independent round-trip, determinism, exact apply, real Kbuild objects and SuSFS symbol closure PASS; 18/16 postimages unchanged. Production 36321543464 and clean-room 36321767452 PASS. Runtime follow-ups completed 2026-09-28: GKI Android 16 / 6.12 LSM+BL and Pixel 7 Pro Sultan 6.1 manual hooks both runtime healthy with warnings. No final vmlinux link claimed by these gates."
+    }
+  ]
+}

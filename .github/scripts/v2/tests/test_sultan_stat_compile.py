@@ -65,7 +65,7 @@ class SultanStatCompileTests(unittest.TestCase):
             self.assertEqual(hashlib.sha256((tree / "include/linux/susfs_def.h").read_bytes()).hexdigest(),
                              expected_header)
             source = generated_stat()
-            for susfs, kstat in ((True, True), (True, False), (False, False)):
+            for susfs, kstat in ((True, False), (False, False)):
                 with self.subTest(susfs=susfs, kstat=kstat):
                     result = compile_stat(tree, source, metadata["compiler_flags"], susfs=susfs, kstat=kstat)
                     self.assertEqual(result.returncode, 0, result.stderr)

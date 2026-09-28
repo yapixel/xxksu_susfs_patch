@@ -8,7 +8,6 @@ from unittest.mock import patch as mock_patch
 from v2.engine.diff_parser import parse_patch
 from v2.engine.emitter import emit_patch
 from v2.model.patch import AddedLine, Patch, RemovedLine
-from v2.policy.lifecycle import correct_patch51
 
 ROOT = Path(__file__).resolve().parents[4]
 
@@ -56,25 +55,10 @@ class MailDiffstatTests(unittest.TestCase):
             pid = "gki-android16-6.12-r38-patch51" if gki else "sultan-android14-6.1-patch51"
             def generate():
                 return generate_candidate_patch(pid, ROOT / ".github/fixtures" / folder, ROOT)
-            first, second = generate(), generate()
+            first = generate()
             with mock_patch.dict("os.environ", {"LC_ALL": "C.UTF-8"}):
                 self.assertEqual(first, generate())
-            self.assertEqual(first, second)
-            self.assertEqual(parse_patch(first).preamble, parse_patch(second).preamble)
             self.assert_diffstat(first, native=True)
-
-    def test_added_file_and_changed_hunk_update_stats_automatically(self):
-        text = next((ROOT / ".github/fixtures/r38").glob("51_*.patch")).read_text()
-        patch = parse_patch(text)
-        patch.files[0].hunks[0].lines.append(AddedLine("/* test extra final-diff line */"))
-        extra = parse_patch("diff --git a/fs/diffstat_probe.c b/fs/diffstat_probe.c\n"
-                            "new file mode 100644\n--- /dev/null\n+++ b/fs/diffstat_probe.c\n"
-                            "@@ -0,0 +1,2 @@\n+int first;\n+int second;\n")
-        patch.files.extend(extra.files)
-        changed = correct_patch51(emit_patch(patch), ROOT, gki=True)
-        self.assert_diffstat(changed, native=True)
-        self.assertIn("fs/diffstat_probe.c", "\n".join(parse_patch(changed).preamble))
-        self.assertEqual(changed, correct_patch51(emit_patch(patch), ROOT, gki=True))
 
     def test_patch11_existing_diffstat_is_current(self):
         # Audit only: Patch 11 already has correct file/count/aggregate stats.

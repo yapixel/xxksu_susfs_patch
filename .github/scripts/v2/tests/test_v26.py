@@ -159,8 +159,9 @@ class TestV26FixtureAdaptation(unittest.TestCase):
             with self.subTest(target=bundle.target_id):
                 plan = adapter.adapt_fixtures(bundle)
                 self.assertEqual({op.operation_id for op in plan.operations}, expected_ids)
-                self.assertEqual(plan.canonical_json(), adapter.adapt_fixtures(bundle).canonical_json())
-                self.assertEqual(plan.identity, adapter.adapt_fixtures(bundle).identity)
+                repeated = adapter.adapt_fixtures(bundle)
+                self.assertEqual(plan.canonical_json(), repeated.canonical_json())
+                self.assertEqual(plan.identity, repeated.identity)
                 for fixture, count in zip(FIXED_FIXTURES, (7, 6)):
                     partial = adapter.adapt_fixture(bundle, fixture)
                     self.assertEqual(len(partial), count)
