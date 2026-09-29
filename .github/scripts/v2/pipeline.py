@@ -45,6 +45,7 @@ from .validation.exact_patch import (
     validate_exact_patch_on_tree,
     validate_patch_syntax,
     verify_postimage_integrity,
+    substantive_patch_text,
 )
 
 logger = logging.getLogger(__name__)
@@ -830,6 +831,10 @@ def run_pipeline(
             {patch_id: upstream_commit} if upstream_commit else {}, repo_root,
         )
         patch_changed = public_bytes_before != candidate_bytes
+        old_substantive = (substantive_patch_text(public_bytes_before.decode("utf-8"))
+                           if public_bytes_before is not None else None)
+        new_substantive = substantive_patch_text(candidate_text_1)
+        substantive_changed = old_substantive != new_substantive
         if not patch_changed and not metadata_updates and _manifest_is_current(repo_root):
             if write_back and verify_raw_url:
                 _verify_existing_delivery(patch_id, candidate_sha, candidate_bytes,
@@ -840,7 +845,7 @@ def run_pipeline(
                 is_noop=True, publication_state="FULL_STATE_NOOP",
                 details="Validated candidate and authoritative metadata already current",
             )
-        publication_state = "PATCH_PROMOTION" if patch_changed else "METADATA_ONLY_PROMOTION"
+        publication_state = "PATCH_PROMOTION" if substantive_changed else "METADATA_ONLY_PROMOTION"
         if patch_changed:
             public_path.parent.mkdir(parents=True, exist_ok=True)
             public_path.write_bytes(candidate_bytes)

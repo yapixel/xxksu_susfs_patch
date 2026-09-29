@@ -25,6 +25,25 @@ from ..source.bundle import SourceBundle
 from ..source.patch_apply import SourceBundlePatchError, apply_patch_to_bundle
 
 
+def substantive_patch_text(patch_text: str) -> str:
+    """Return the source diff, excluding mail metadata, indexes, and footer."""
+    lines = patch_text.splitlines()
+    body: list[str] = []
+    in_diff = False
+    for line in lines:
+        if line.startswith("diff --git "):
+            in_diff = True
+        if in_diff:
+            if line.startswith("index ") and ".." in line:
+                continue
+            body.append(line)
+    while body and not body[-1].strip():
+        body.pop()
+    if len(body) >= 2 and body[-2].strip() == "--":
+        body = body[:-2]
+    return "\n".join(body).strip()
+
+
 class PatchValidationError(ValueError):
     """Raised when a patch violates strict exact application or syntax invariants."""
     pass
@@ -193,67 +212,85 @@ def validate_exact_patch_on_tree(
     *,
     dry_run: bool = True,
 ) -> Tuple[bool, list[str]]:
-    """Validate patch application against a real kernel tree with 0 fuzz, 0 offsets, and 0 rejects."""
+    """Validate patch application against a real kernel tree."""
+    evidence = collect_patch_cleanliness_evidence(tree_dir, patch_path, dry_run=dry_run)
+    return not evidence["errors"], evidence["errors"]
+
+
+def collect_patch_cleanliness_evidence(
+    tree_dir: Path,
+    patch_path: Path,
+    *,
+    dry_run: bool = True,
+) -> dict:
+    """Run the three exact-application checks and return machine-readable evidence."""
     errors: list[str] = []
+    evidence = {
+        "gnu_patch": "FAIL", "git_apply_check": "FAIL", "real_apply": "SKIPPED",
+        "offset": 0, "fuzz": 0, "rejects": 0, "modified_files": [],
+        "postimage_sha256": {}, "errors": errors,
+    }
 
     if not tree_dir.is_dir():
-        return False, [f"Target tree directory not found: {tree_dir}"]
+        errors.append(f"Target tree directory not found: {tree_dir}")
+        return evidence
     if not patch_path.is_file():
-        return False, [f"Patch file not found: {patch_path}"]
-
-    # 1. Validate patch syntax
+        errors.append(f"Patch file not found: {patch_path}")
+        return evidence
     patch_text = patch_path.read_text(encoding="utf-8")
     syntax_errors = validate_patch_syntax(patch_text)
     if syntax_errors:
         errors.extend(syntax_errors)
-        return False, errors
+        return evidence
 
-    # 2. Run patch tool with --fuzz=0
-    cmd = ["patch", "-p1", "--fuzz=0"]
-    if dry_run:
-        cmd.append("--dry-run")
+    git_check = None
+    if (tree_dir / ".git").exists():
+        git_check = subprocess.run(["git", "apply", "--check"],
+                                   input=patch_text, text=True, capture_output=True, cwd=tree_dir)
+        if git_check.returncode == 0:
+            evidence["git_apply_check"] = "PASS"
+        else:
+            errors.append(f"git apply --check failed: {(git_check.stderr or git_check.stdout).strip()}")
+    else:
+        evidence["git_apply_check"] = "SKIPPED"
 
-    try:
-        proc = subprocess.run(
-            cmd,
-            input=patch_text,
-            text=True,
-            capture_output=True,
-            cwd=tree_dir,
-        )
-    except Exception as exc:
-        return False, [f"Failed to execute patch tool: {exc}"]
-
-    # Check tool output for offsets or fuzz
+    cmd = ["patch", "-p1", "--fuzz=0"] + (["--dry-run"] if dry_run else [])
+    proc = subprocess.run(cmd, input=patch_text, text=True, capture_output=True, cwd=tree_dir)
     tool_output = proc.stdout + "\n" + proc.stderr
     tool_errors = parse_patch_tool_output(tool_output)
     if tool_errors:
         errors.extend(tool_errors)
-
     if proc.returncode != 0:
         errors.append(f"patch command exited with non-zero status {proc.returncode}")
+    else:
+        evidence["gnu_patch"] = "PASS"
+    if any("offset" in e.lower() for e in tool_errors):
+        evidence["offset"] = 1
+    if any("fuzz" in e.lower() for e in tool_errors):
+        evidence["fuzz"] = 1
 
-    # Check for any .rej files
-    rej_files = list(tree_dir.glob("**/*.rej"))
-    if rej_files:
-        errors.append(f"Reject files found: {', '.join(str(p) for p in rej_files)}")
-
-    # 3. Postimage syntax verification on patched files
-    if not dry_run and proc.returncode == 0 and not errors:
+    # GNU patch is the authoritative real application; git --check above is advisory
+    # only when the target is a Git checkout with a usable index.
+    if not dry_run and not errors:
+        evidence["real_apply"] = "PASS"
         parsed = parse_patch(patch_text)
+        evidence["modified_files"] = [
+            (fp.new_path or fp.old_path or "").removeprefix("a/").removeprefix("b/")
+            for fp in parsed.files
+        ]
         for fp in parsed.files:
-            rel = fp.new_path or fp.old_path
-            if rel and rel.startswith(("a/", "b/")):
-                rel = rel[2:]
-            if rel and rel != "/dev/null":
-                fpath = tree_dir / rel
-                if fpath.is_file():
-                    content = fpath.read_text(encoding="utf-8", errors="ignore")
-                    post_errs = verify_postimage_integrity(content, rel)
-                    if post_errs:
-                        errors.extend(post_errs)
-
-    return len(errors) == 0, errors
+            rel = (fp.new_path or fp.old_path or "").removeprefix("a/").removeprefix("b/")
+            path = tree_dir / rel
+            if rel and path.is_file():
+                content = path.read_text(encoding="utf-8", errors="ignore")
+                post_errors = verify_postimage_integrity(content, rel)
+                if post_errors:
+                    errors.extend(post_errors)
+                evidence["postimage_sha256"][rel] = hashlib.sha256(path.read_bytes()).hexdigest()
+    evidence["rejects"] = len(list(tree_dir.glob("**/*.rej")))
+    if evidence["rejects"]:
+        errors.append(f"Reject files found: {evidence['rejects']}")
+    return evidence
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
