@@ -42,6 +42,12 @@
   ],
   "recent_events": [
     {
+      "timestamp": "2026-10-02",
+      "source_id": "backslashxx_kernelsu",
+      "text": "REVIEW_FINDINGS_RECONCILED: reconciled xxKSU drift to master 5da23982; removed dead boot_completed symbol and fixed webview_zygote condition in Patch 11; restored lock-free returns in GKI 6.12 namespace; removed dead try-umount replacements in Sultan; restored lifecycle test fixtures.",
+      "replaces_text": "Candidate patch generated (`11_enable_susfs_for_ksu.patch`)"
+    },
+    {
       "timestamp": "2026-09-28",
       "source_id": "runtime-gki-6.12",
       "text": "GKI Android 16 / 6.12 LSM+BL: runtime healthy with warnings; SuSFS v2.3.0. No observed KSU/SuSFS Oops/BUG/panic or duplicate legacy transport. Runtime evidence alone does not prove strict static transport exclusivity."

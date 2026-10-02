@@ -1,28 +1,28 @@
 From: yapixel <yapixel@users.noreply.github.com>
-Date: Fri, 25 Sep 2026 17:48:27 +0000
+Date: Thu, 24 Sep 2026 10:00:00 +0800
 Subject: [PATCH] SUSFS de-inlined hooks for android16-6.12-2025-09_r38
 
 ---
- fs/Makefile          |   2 +
- fs/namei.c           | 237 +++++++++++++++++++++++++++++++++++++++
- fs/namespace.c       | 305 ++++++++++++++++++++++++++++++++++++++++++++++++++-
- fs/notify/fdinfo.c   |  78 +++++++++++++
- fs/proc/base.c       |  24 ++++
- fs/proc/bootconfig.c |  13 +++
- fs/proc/fd.c         |  70 ++++++++++++
- fs/proc/task_mmu.c   | 107 ++++++++++++++++++
- fs/proc_namespace.c  | 174 +++++++++++++++++++++++++++++
- fs/readdir.c         | 126 +++++++++++++++++++++
- fs/stat.c            |  67 +++++++++++
- fs/statfs.c          |  81 ++++++++++++++
- fs/super.c           |  24 ++++
- kernel/kallsyms.c    |  31 ++++++
- kernel/sys.c         |   8 ++
- mm/memory.c          |  14 +++
- 16 files changed, 1360 insertions(+), 1 deletion(-)
+ fs/Makefile          |    2 
+ fs/namei.c           |  232 +++++++++++++++++++++++++++++++++++++++++
+ fs/namespace.c       |  285 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ fs/notify/fdinfo.c   |   78 ++++++++++++++
+ fs/proc/base.c       |   24 ++++
+ fs/proc/bootconfig.c |   13 ++
+ fs/proc/fd.c         |   70 ++++++++++++
+ fs/proc/task_mmu.c   |   75 +++++++++++++
+ fs/proc_namespace.c  |  174 +++++++++++++++++++++++++++++++
+ fs/readdir.c         |  126 ++++++++++++++++++++++
+ fs/stat.c            |   67 ++++++++++++
+ fs/statfs.c          |   77 ++++++++++++++
+ fs/super.c           |   24 ++++
+ kernel/kallsyms.c    |   31 +++++
+ kernel/sys.c         |    8 +
+ mm/memory.c          |   13 ++
+ 16 files changed, 1299 insertions(+)
 
 diff --git a/fs/Makefile b/fs/Makefile
-index 9f5d06f4a1a1e3c1bd418986a4e639e2be8002c2..eeea6b70b47aa4c22cfad3548205ae234664d6dc 100644
+index 9f5d06f4a1a1..eeea6b70b47a 100644
 --- a/fs/Makefile
 +++ b/fs/Makefile
 @@ -22,6 +22,8 @@ obj-y :=	open.o read_write.o file_table.o super.o \
@@ -35,7 +35,7 @@ index 9f5d06f4a1a1e3c1bd418986a4e639e2be8002c2..eeea6b70b47aa4c22cfad3548205ae23
  obj-$(CONFIG_PROC_FS)		+= proc_namespace.o
  obj-$(CONFIG_LEGACY_DIRECT_IO)	+= direct-io.o
 diff --git a/fs/namei.c b/fs/namei.c
-index ce03b3d91a62abaa0a5661ac4b9c90fd3fca09a5..508b31132a1efe9bd4c1d730cc3aeb30b229684b 100644
+index ce03b3d91a62..26ff8daa2d16 100644
 --- a/fs/namei.c
 +++ b/fs/namei.c
 @@ -40,10 +40,21 @@
@@ -298,7 +298,7 @@ index ce03b3d91a62abaa0a5661ac4b9c90fd3fca09a5..508b31132a1efe9bd4c1d730cc3aeb30
  
  	nd->flags |= op->intent;
  
-@@ -3879,9 +4008,32 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
+@@ -3879,9 +4008,31 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
  		const struct open_flags *op,
  		struct file *file)
  {
@@ -316,22 +316,21 @@ index ce03b3d91a62abaa0a5661ac4b9c90fd3fca09a5..508b31132a1efe9bd4c1d730cc3aeb30
 +	{
 +		fake_filename = susfs_open_redirect_spoof_do_sys_openat(path.dentry->d_inode);
 +		if (fake_filename && !IS_ERR(fake_filename)) {
-+			struct path fake_path;
-+
-+			error = filename_lookup(old_dfd, fake_filename, flags | LOOKUP_DIRECTORY, &fake_path, NULL);
 +			path_put(&path);
++			restore_nameidata();
++			set_nameidata(nd, old_dfd, fake_filename, NULL);
++			error = path_lookupat(nd, flags | LOOKUP_DIRECTORY, &path);
 +			if (unlikely(error)) {
 +				putname(fake_filename);
 +				return error;
 +			}
-+			path = fake_path;
 +		}
 +	}
 +#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
  	if (unlikely(error))
  		return error;
  	error = mnt_want_write(path.mnt);
-@@ -3895,24 +4047,61 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
+@@ -3895,24 +4046,59 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
  	mnt_drop_write(path.mnt);
  out:
  	path_put(&path);
@@ -358,15 +357,14 @@ index ce03b3d91a62abaa0a5661ac4b9c90fd3fca09a5..508b31132a1efe9bd4c1d730cc3aeb30
 +		{
 +			fake_filename = susfs_open_redirect_spoof_do_sys_openat(path.dentry->d_inode);
 +			if (fake_filename && !IS_ERR(fake_filename)) {
-+				struct path fake_path;
-+
-+				error = filename_lookup(old_dfd, fake_filename, flags, &fake_path, NULL);
 +				path_put(&path);
++				restore_nameidata();
++				set_nameidata(nd, old_dfd, fake_filename, NULL);
++				error = path_lookupat(nd, flags, &path);
 +				if (unlikely(error)) {
 +					putname(fake_filename);
 +					return error;
 +				}
-+				path = fake_path;
 +			}
 +		}
 +#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
@@ -386,14 +384,13 @@ index ce03b3d91a62abaa0a5661ac4b9c90fd3fca09a5..508b31132a1efe9bd4c1d730cc3aeb30
  {
 +#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
 +	int old_dfd = nd->dfd;
-+	struct filename *old_name = nd->name;
 +	bool is_nd_state_root_preset = (nd->state & ND_ROOT_PRESET);
 +	struct filename *fake_filename = NULL;
 +#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
  	struct file *file;
  	int error;
  
-@@ -3929,10 +4118,33 @@ static struct file *path_openat(struct nameidata *nd,
+@@ -3929,10 +4115,31 @@ static struct file *path_openat(struct nameidata *nd,
  		while (!(error = link_path_walk(s, nd)) &&
  		       (s = open_last_lookups(nd, file, op)) != NULL)
  			;
@@ -419,15 +416,13 @@ index ce03b3d91a62abaa0a5661ac4b9c90fd3fca09a5..508b31132a1efe9bd4c1d730cc3aeb30
  		terminate_walk(nd);
  	}
 +#ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
-+	if (fake_filename && !IS_ERR(fake_filename)) {
-+		nd->name = old_name;
++	if (fake_filename && !IS_ERR(fake_filename))
 +		putname(fake_filename);
-+	}
 +#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
  	if (likely(!error)) {
  		if (likely(file->f_mode & FMODE_OPENED))
  			return file;
-@@ -5243,6 +5455,11 @@ int readlink_copy(char __user *buffer, int buflen, const char *link)
+@@ -5243,6 +5450,11 @@ int readlink_copy(char __user *buffer, int buflen, const char *link)
   *
   * Does not call security hook.
   */
@@ -439,7 +434,7 @@ index ce03b3d91a62abaa0a5661ac4b9c90fd3fca09a5..508b31132a1efe9bd4c1d730cc3aeb30
  int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
  {
  	struct inode *inode = d_inode(dentry);
-@@ -5252,7 +5469,18 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
+@@ -5252,7 +5464,18 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
  
  	if (unlikely(!(inode->i_opflags & IOP_DEFAULT_READLINK))) {
  		if (unlikely(inode->i_op->readlink))
@@ -458,7 +453,7 @@ index ce03b3d91a62abaa0a5661ac4b9c90fd3fca09a5..508b31132a1efe9bd4c1d730cc3aeb30
  
  		if (!d_is_symlink(dentry))
  			return -EINVAL;
-@@ -5268,6 +5496,15 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
+@@ -5268,6 +5491,15 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
  		if (IS_ERR(link))
  			return PTR_ERR(link);
  	}
@@ -475,7 +470,7 @@ index ce03b3d91a62abaa0a5661ac4b9c90fd3fca09a5..508b31132a1efe9bd4c1d730cc3aeb30
  	do_delayed_call(&done);
  	return res;
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 6281247dc33b9466265ae85239b2f6f9a9534f77..b1e0f8c86be5957482aafafb86b6c3b425f54158 100644
+index 6281247dc33b..ad711a3ab6b0 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
 @@ -33,11 +33,21 @@
@@ -722,14 +717,10 @@ index 6281247dc33b9466265ae85239b2f6f9a9534f77..b1e0f8c86be5957482aafafb86b6c3b4
  	if (!mnt)
  		return ERR_PTR(-ENOMEM);
  
-@@ -1285,8 +1473,44 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
- 	struct super_block *sb = old->mnt.mnt_sb;
+@@ -1286,7 +1474,39 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
  	struct mount *mnt;
  	int err;
-+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+	bool is_mnt_ksu_unshared = false;
-+#endif
-+
+ 
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +	// - We will just stop checking for ksu process if /sdcard/Android is accessible,
 +	//   for the sake of performance
@@ -743,7 +734,6 @@ index 6281247dc33b9466265ae85239b2f6f9a9534f77..b1e0f8c86be5957482aafafb86b6c3b4
 +			//   mnt->mnt_id is assigned without ida when it is being freed in mnt_free_id().
 +			if (flag & CL_COPY_MNT_NS) {
 +				mnt = susfs_alloc_unshare_ksu_vfsmnt(old->mnt_devname, old->mnt_id);
-+				is_mnt_ksu_unshared = true;
 +				goto bypass_orig_flow;
 +			}
 +			// else we just go assign fake mnt_id starting with DEFAULT_KSU_MNT_ID
@@ -759,7 +749,7 @@ index 6281247dc33b9466265ae85239b2f6f9a9534f77..b1e0f8c86be5957482aafafb86b6c3b4
 +		goto bypass_orig_flow;
 +	}
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
- 
++
  	mnt = alloc_vfsmnt(old->mnt_devname);
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +bypass_orig_flow:
@@ -767,32 +757,21 @@ index 6281247dc33b9466265ae85239b2f6f9a9534f77..b1e0f8c86be5957482aafafb86b6c3b4
  	if (!mnt)
  		return ERR_PTR(-ENOMEM);
  
-@@ -1304,6 +1528,12 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
+@@ -1304,6 +1524,13 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
  	mnt->mnt.mnt_flags = old->mnt.mnt_flags;
  	mnt->mnt.mnt_flags &= ~(MNT_WRITE_HOLD|MNT_MARKED|MNT_INTERNAL);
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+	mnt->mnt.mnt_flags &= ~VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;
-+	if (unlikely(is_mnt_ksu_unshared))
-+		mnt->mnt.mnt_flags |= VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;
++	if (static_branch_unlikely(&susfs_is_sdcard_android_data_not_decrypted)) {
++		if (susfs_is_current_ksu_domain() && (flag & CL_COPY_MNT_NS))
++			mnt->mnt.mnt_flags |= VFSMOUNT_MNT_FLAGS_KSU_UNSHARED_MNT;
++	}
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 +
  	atomic_inc(&sb->s_active);
  	mnt->mnt.mnt_idmap = mnt_idmap_get(mnt_idmap(&old->mnt));
  
-@@ -1342,7 +1572,10 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
- 	return mnt;
- 
-  out_free:
--	mnt_free_id(mnt);
-+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-+	if (!is_mnt_ksu_unshared)
-+#endif
-+		mnt_free_id(mnt);
- 	free_vfsmnt(mnt);
- 	return ERR_PTR(err);
- }
-@@ -1548,6 +1781,12 @@ static struct mount *mnt_find_id_at(struct mnt_namespace *ns, u64 mnt_id)
+@@ -1548,6 +1775,12 @@ static struct mount *mnt_find_id_at(struct mnt_namespace *ns, u64 mnt_id)
  			node = node->rb_right;
  		}
  	}
@@ -805,7 +784,7 @@ index 6281247dc33b9466265ae85239b2f6f9a9534f77..b1e0f8c86be5957482aafafb86b6c3b4
  	return ret;
  }
  
-@@ -3960,6 +4199,9 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
+@@ -3960,6 +4193,9 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
  	copy_flags = CL_COPY_UNBINDABLE | CL_EXPIRE;
  	if (user_ns != ns->user_ns)
  		copy_flags |= CL_SHARED_TO_SLAVE;
@@ -815,7 +794,7 @@ index 6281247dc33b9466265ae85239b2f6f9a9534f77..b1e0f8c86be5957482aafafb86b6c3b4
  	new = copy_tree(old, old->mnt.mnt_root, copy_flags);
  	if (IS_ERR(new)) {
  		namespace_unlock();
-@@ -5446,6 +5688,12 @@ static ssize_t do_listmount(struct mnt_namespace *ns, u64 mnt_parent_id,
+@@ -5446,6 +5682,12 @@ static ssize_t do_listmount(struct mnt_namespace *ns, u64 mnt_parent_id,
  			continue;
  		if (!is_path_reachable(r, r->mnt.mnt_root, &orig))
  			continue;
@@ -828,7 +807,7 @@ index 6281247dc33b9466265ae85239b2f6f9a9534f77..b1e0f8c86be5957482aafafb86b6c3b4
  		*mnt_ids = r->mnt_id_unique;
  		mnt_ids++;
  		nr_mnt_ids--;
-@@ -5852,3 +6100,58 @@ static int __init init_fs_namespace_sysctls(void)
+@@ -5852,3 +6094,46 @@ static int __init init_fs_namespace_sysctls(void)
  fs_initcall(init_fs_namespace_sysctls);
  
  #endif /* CONFIG_SYSCTL */
@@ -838,9 +817,6 @@ index 6281247dc33b9466265ae85239b2f6f9a9534f77..b1e0f8c86be5957482aafafb86b6c3b4
 +int susfs_get_non_sus_mnt_id_from_mnt(struct mount *orig_mnt) {
 +	struct mount *mnt = orig_mnt;
 +	int mnt_id;
-+
-+	if (mnt->mnt_id < DEFAULT_KSU_MNT_ID)
-+		return mnt->mnt_id;
 +
 +	lock_mount_hash();
 +	for (; mnt && mnt->mnt_parent && mnt != mnt->mnt_parent && mnt->mnt_id >= DEFAULT_KSU_MNT_ID; mnt = mnt->mnt_parent) { }
@@ -854,9 +830,6 @@ index 6281247dc33b9466265ae85239b2f6f9a9534f77..b1e0f8c86be5957482aafafb86b6c3b4
 +	struct mount *mnt = orig_mnt;
 +	u64 mnt_id_unique;
 +
-+	if (mnt->mnt_id < DEFAULT_KSU_MNT_ID)
-+		return mnt->mnt_id_unique;
-+
 +	lock_mount_hash();
 +	for (; mnt && mnt->mnt_parent && mnt != mnt->mnt_parent && mnt->mnt_id >= DEFAULT_KSU_MNT_ID; mnt = mnt->mnt_parent) { }
 +	mnt_id_unique = mnt->mnt_id_unique;
@@ -867,12 +840,6 @@ index 6281247dc33b9466265ae85239b2f6f9a9534f77..b1e0f8c86be5957482aafafb86b6c3b4
 +/* - To retrieve the non sus vfsmount from vfsmount, takes a reference on &mnt->mnt and mnt->mnt.mnt_root */
 +struct vfsmount *susfs_get_non_sus_vfsmnt_from_vfsmnt(struct vfsmount *vfsmnt) {
 +	struct mount *mnt = real_mount(vfsmnt);
-+
-+	if (mnt->mnt_id < DEFAULT_KSU_MNT_ID) {
-+		mntget(&mnt->mnt);
-+		dget(mnt->mnt.mnt_root);
-+		return &mnt->mnt;
-+	}
 +
 +	lock_mount_hash();
 +	for (; mnt && mnt->mnt_parent && mnt != mnt->mnt_parent && mnt->mnt_id >= DEFAULT_KSU_MNT_ID; mnt = mnt->mnt_parent) { }
@@ -888,7 +855,7 @@ index 6281247dc33b9466265ae85239b2f6f9a9534f77..b1e0f8c86be5957482aafafb86b6c3b4
 +}
 +#endif // #ifdef CONFIG_KSU_SUSFS
 diff --git a/fs/notify/fdinfo.c b/fs/notify/fdinfo.c
-index e933f9c65d904af6a37ab0c418df2bb14d76f32d..44880b8813d4b011938e85a7c5273335e9801eed 100644
+index e933f9c65d90..44880b8813d4 100644
 --- a/fs/notify/fdinfo.c
 +++ b/fs/notify/fdinfo.c
 @@ -12,6 +12,9 @@
@@ -1009,7 +976,7 @@ index e933f9c65d904af6a37ab0c418df2bb14d76f32d..44880b8813d4b011938e85a7c5273335
  			   inode_mark->wd, inode->i_ino, inode->i_sb->s_dev,
  			   inotify_mark_user_mask(mark));
 diff --git a/fs/proc/base.c b/fs/proc/base.c
-index 26abf573e6150968471135a2e998422fc849e5d2..de467386bd9f0dbe344801ac174b186f3bd0d4a5 100644
+index 26abf573e615..de467386bd9f 100644
 --- a/fs/proc/base.c
 +++ b/fs/proc/base.c
 @@ -100,6 +100,10 @@
@@ -1065,7 +1032,7 @@ index 26abf573e6150968471135a2e998422fc849e5d2..de467386bd9f0dbe344801ac174b186f
  			continue;
  
 diff --git a/fs/proc/bootconfig.c b/fs/proc/bootconfig.c
-index 87dcaae32ff87b40c3d65a0d2463a6e60cdc0dbc..431965c17a3fbe0c34ef3ac48491def949ebe3c8 100644
+index 87dcaae32ff8..431965c17a3f 100644
 --- a/fs/proc/bootconfig.c
 +++ b/fs/proc/bootconfig.c
 @@ -12,8 +12,21 @@
@@ -1091,7 +1058,7 @@ index 87dcaae32ff87b40c3d65a0d2463a6e60cdc0dbc..431965c17a3fbe0c34ef3ac48491def9
  		seq_puts(m, saved_boot_config);
  	return 0;
 diff --git a/fs/proc/fd.c b/fs/proc/fd.c
-index 5e391cbca7a3be0cb02f55e96d6728ad98e3ea16..b6d2e16283963e3cabd98e3aba3cc76d0ac042ae 100644
+index 5e391cbca7a3..b6d2e1628396 100644
 --- a/fs/proc/fd.c
 +++ b/fs/proc/fd.c
 @@ -15,11 +15,22 @@
@@ -1189,7 +1156,7 @@ index 5e391cbca7a3be0cb02f55e96d6728ad98e3ea16..b6d2e16283963e3cabd98e3aba3cc76d
  	show_fd_locks(m, file, files);
  	if (seq_has_overflowed(m))
 diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
-index 71acc984fac225ac1d659a1bfd5cfe0044cadf76..a115b02cdc888e1652650aa99662b31b9e0b0a33 100644
+index 71acc984fac2..bef2ca29e275 100644
 --- a/fs/proc/task_mmu.c
 +++ b/fs/proc/task_mmu.c
 @@ -26,6 +26,9 @@
@@ -1260,19 +1227,7 @@ index 71acc984fac225ac1d659a1bfd5cfe0044cadf76..a115b02cdc888e1652650aa99662b31b
  	}
  
  	start = vma->vm_start;
-@@ -1213,6 +1256,11 @@ static void smap_gather_stats(struct vm_area_struct *vma,
- 	const struct mm_walk_ops *ops = &smaps_walk_ops;
- 	unsigned long end = VMA_PAD_START(vma);
- 
-+#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-+	if (vma->vm_file && SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))
-+		return;
-+#endif
-+
- 	/* Invalid start */
- 	if (start >= end)
- 		return;
-@@ -1304,6 +1352,13 @@ static int show_smap(struct seq_file *m, void *v)
+@@ -1304,6 +1347,13 @@ static int show_smap(struct seq_file *m, void *v)
  	struct vm_area_struct *vma = v;
  	struct mem_size_stats mss = {};
  
@@ -1286,7 +1241,7 @@ index 71acc984fac225ac1d659a1bfd5cfe0044cadf76..a115b02cdc888e1652650aa99662b31b
  	if (!vma_pages(vma))
  		goto show_pad;
  
-@@ -1363,7 +1418,14 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
+@@ -1363,7 +1413,14 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
  
  	vma_start = vma->vm_start;
  	do {
@@ -1301,7 +1256,7 @@ index 71acc984fac225ac1d659a1bfd5cfe0044cadf76..a115b02cdc888e1652650aa99662b31b
  		last_vma_end = vma->vm_end;
  
  		/*
-@@ -1429,8 +1491,15 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
+@@ -1429,8 +1486,15 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
  
  			/* Case 4 above */
  			if (vma->vm_end > last_vma_end) {
@@ -1317,61 +1272,34 @@ index 71acc984fac225ac1d659a1bfd5cfe0044cadf76..a115b02cdc888e1652650aa99662b31b
  			}
  		}
  	} for_each_vma(vmi, vma);
-@@ -2144,6 +2213,40 @@ static inline void __collapse_pagemap_result(pagemap_entry_t *src_vec,
-  * determine which areas of memory are actually mapped and llseek to
-  * skip over unmapped regions.
-  */
+@@ -2221,6 +2285,9 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
+ 	while (count && (start_vaddr < end_vaddr)) {
+ 		int len;
+ 		unsigned long end;
 +#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-+/* Caller holds mmap_lock. Hidden pages have the same zero representation as
-+ * unmapped holes, including read length and position; never skip a walk chunk.
-+ */
-+static int susfs_pagemap_walk(struct mm_struct *mm, unsigned long start,
-+                            unsigned long end, struct pagemapread *pm)
-+{
-+	while (start < end) {
-+		struct vm_area_struct *vma = find_vma(mm, start);
-+		unsigned long next = end;
-+		int ret;
-+
-+		if (vma)
-+			next = min(end, start < vma->vm_start ? vma->vm_start : vma->vm_end);
-+		if (vma && start >= vma->vm_start && vma->vm_file &&
-+		    SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file))) {
-+			pagemap_entry_t pme = make_pme(0, 0);
-+
-+			for (; start < next; start += PAGE_SIZE) {
-+				ret = add_to_pagemap(&pme, pm);
-+				if (ret)
-+					return ret;
-+			}
-+		} else {
-+			ret = walk_page_range(mm, start, next, &pagemap_ops, pm);
-+			if (ret)
-+				return ret;
-+		}
-+		start = next;
-+	}
-+	return 0;
-+}
-+#endif
-+
- static ssize_t pagemap_read(struct file *file, char __user *buf,
- 			    size_t count, loff_t *ppos)
- {
-@@ -2230,7 +2333,11 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
++		struct vm_area_struct *vma;
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
+ 
+ 		pm.pos = 0;
+ 		end = (start_vaddr + PAGEMAP_WALK_SIZE) & PAGEMAP_WALK_MASK;
+@@ -2230,7 +2297,15 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
  		ret = mmap_read_lock_killable(mm);
  		if (ret)
  			goto out_free;
 +#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-+		ret = susfs_pagemap_walk(mm, start_vaddr, end, &pm);
-+#else
++		vma = vma_lookup(mm, start_vaddr);
++		if (vma && vma->vm_file && SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))
++			goto bypass_orig_flow;
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
  		ret = walk_page_range(mm, start_vaddr, end, &pagemap_ops, &pm);
-+#endif
++#ifdef CONFIG_KSU_SUSFS_SUS_MAP
++bypass_orig_flow:
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
  		mmap_read_unlock(mm);
  		start_vaddr = end;
  
 diff --git a/fs/proc_namespace.c b/fs/proc_namespace.c
-index e133b507ddf3941525c1a2b70cd82846569dfa20..3dc4bfc563f1a8b48f3a2f13af6061c03138b3c2 100644
+index e133b507ddf3..3dc4bfc563f1 100644
 --- a/fs/proc_namespace.c
 +++ b/fs/proc_namespace.c
 @@ -12,12 +12,20 @@
@@ -1586,7 +1514,7 @@ index e133b507ddf3941525c1a2b70cd82846569dfa20..3dc4bfc563f1a8b48f3a2f13af6061c0
  }
  
 diff --git a/fs/readdir.c b/fs/readdir.c
-index 6d29cab8576e6411a81bdc060cc6af252bbf50de..77213f638951bc9c0766f1172e2800e0836d22b1 100644
+index 6d29cab8576e..77213f638951 100644
 --- a/fs/readdir.c
 +++ b/fs/readdir.c
 @@ -22,6 +22,10 @@
@@ -1863,7 +1791,7 @@ index 6d29cab8576e6411a81bdc060cc6af252bbf50de..77213f638951bc9c0766f1172e2800e0
  	if (error >= 0)
  		error = buf.error;
 diff --git a/fs/stat.c b/fs/stat.c
-index adb071bc92e145e12cff4f7a9ba695104497d90c..8e2cf2b05d23870c7839cabbd559dae4af2bb691 100644
+index adb071bc92e1..f30b435ad1fa 100644
 --- a/fs/stat.c
 +++ b/fs/stat.c
 @@ -20,12 +20,21 @@
@@ -1972,7 +1900,7 @@ index adb071bc92e145e12cff4f7a9ba695104497d90c..8e2cf2b05d23870c7839cabbd559dae4
  		stat->attributes |= STATX_ATTR_MOUNT_ROOT;
  	stat->attributes_mask |= STATX_ATTR_MOUNT_ROOT;
 diff --git a/fs/statfs.c b/fs/statfs.c
-index 83c5d3febbb809f2e53659d7113d23766e286ba4..aa6655c83140cbfe452f0beaa4d802a9bca1b895 100644
+index 83c5d3febbb8..6975513ebc36 100644
 --- a/fs/statfs.c
 +++ b/fs/statfs.c
 @@ -9,8 +9,20 @@
@@ -2080,7 +2008,7 @@ index 83c5d3febbb809f2e53659d7113d23766e286ba4..aa6655c83140cbfe452f0beaa4d802a9
  	if (!error)
  		buf->f_flags = calculate_f_flags(path->mnt);
 diff --git a/fs/super.c b/fs/super.c
-index 6a8a1b67a35a11041f229a20e9a63e082eb192d3..cecc61130f5d24e0cef3941781a414889c3085d2 100644
+index 6a8a1b67a35a..cecc61130f5d 100644
 --- a/fs/super.c
 +++ b/fs/super.c
 @@ -37,9 +37,17 @@
@@ -2125,7 +2053,7 @@ index 6a8a1b67a35a11041f229a20e9a63e082eb192d3..cecc61130f5d24e0cef3941781a41488
  	 * Many userspace utilities consider an FSID of 0 invalid.
  	 * Always return at least 1 from get_anon_bdev.
 diff --git a/kernel/kallsyms.c b/kernel/kallsyms.c
-index a9a0ca605d4a8c82c5575706443287120ee6edc4..a6308f3f5017df134d568a2c2435f9aef028f064 100644
+index a9a0ca605d4a..a6308f3f5017 100644
 --- a/kernel/kallsyms.c
 +++ b/kernel/kallsyms.c
 @@ -31,6 +31,9 @@
@@ -2176,7 +2104,7 @@ index a9a0ca605d4a8c82c5575706443287120ee6edc4..a6308f3f5017df134d568a2c2435f9ae
  }
  
 diff --git a/kernel/sys.c b/kernel/sys.c
-index 4a87dc5fa8679d5e0e37ca1e746f2abe2369c6b6..b3e62ed0639a9ac3c18498a9905952447fda0b71 100644
+index 4a87dc5fa867..811b1afa2310 100644
 --- a/kernel/sys.c
 +++ b/kernel/sys.c
 @@ -1326,12 +1326,20 @@ static int override_release(char __user *release, size_t len)
@@ -2201,7 +2129,7 @@ index 4a87dc5fa8679d5e0e37ca1e746f2abe2369c6b6..b3e62ed0639a9ac3c18498a990595244
  	if (copy_to_user(name, &tmp, sizeof(tmp)))
  		return -EFAULT;
 diff --git a/mm/memory.c b/mm/memory.c
-index dfcefce759a3345eec723fedb3b0d6e5503e0f91..3c5140e893ebb7a79d4f7dd88c30bddcae12364b 100644
+index dfcefce759a3..9fa3d2b8d267 100644
 --- a/mm/memory.c
 +++ b/mm/memory.c
 @@ -79,6 +79,9 @@
@@ -2214,14 +2142,13 @@ index dfcefce759a3345eec723fedb3b0d6e5503e0f91..3c5140e893ebb7a79d4f7dd88c30bddc
  
  #include <trace/events/kmem.h>
  #include <trace/hooks/mm.h>
-@@ -6837,8 +6840,19 @@ static int __access_remote_vm(struct mm_struct *mm, unsigned long addr,
+@@ -6837,8 +6840,18 @@ static int __access_remote_vm(struct mm_struct *mm, unsigned long addr,
  		int bytes, offset;
  		void *maddr;
  		struct vm_area_struct *vma = NULL;
 +#ifdef CONFIG_KSU_SUSFS_SUS_MAP
 +		struct page *page = NULL;
 +
-+		vma = vma_lookup(mm, addr);
 +		if (vma && vma->vm_file && SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))
 +			break;
 +		
