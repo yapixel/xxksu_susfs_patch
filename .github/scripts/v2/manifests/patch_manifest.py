@@ -126,7 +126,7 @@ def generate_patch_manifest(repo_root: Optional[Path] = None) -> dict[str, Any]:
         "apply_target": r38_apply_target,
         "compatibility_target": compat.get(
             "compatibility_target",
-            "android16-6.12-2025-09_r38 (Pixel 9 / GKI 6.12)",
+            "android16-6.12-2025-09_r38 (GKI 6.12)",
         ),
         "id": "gki-android16-6.12-r38-patch51",
         "kernel_version": gki_baseline.kernel_version,

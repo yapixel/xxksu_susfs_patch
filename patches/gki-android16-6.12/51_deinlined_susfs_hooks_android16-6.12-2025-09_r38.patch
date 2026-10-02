@@ -4,22 +4,22 @@ Subject: [PATCH] SUSFS de-inlined hooks for android16-6.12-2025-09_r38
 
 ---
  fs/Makefile          |   2 +
- fs/namei.c           | 237 +++++++++++++++++++++++++++++++++++++++++
- fs/namespace.c       | 293 ++++++++++++++++++++++++++++++++++++++++++++++++++-
- fs/notify/fdinfo.c   |  78 ++++++++++++++
- fs/proc/base.c       |  24 +++++
+ fs/namei.c           | 237 +++++++++++++++++++++++++++++++++++++++
+ fs/namespace.c       | 305 ++++++++++++++++++++++++++++++++++++++++++++++++++-
+ fs/notify/fdinfo.c   |  78 +++++++++++++
+ fs/proc/base.c       |  24 ++++
  fs/proc/bootconfig.c |  13 +++
  fs/proc/fd.c         |  70 ++++++++++++
- fs/proc/task_mmu.c   | 107 +++++++++++++++++++
- fs/proc_namespace.c  | 174 ++++++++++++++++++++++++++++++
- fs/readdir.c         | 126 ++++++++++++++++++++++
- fs/stat.c            |  67 ++++++++++++
+ fs/proc/task_mmu.c   | 107 ++++++++++++++++++
+ fs/proc_namespace.c  | 174 +++++++++++++++++++++++++++++
+ fs/readdir.c         | 126 +++++++++++++++++++++
+ fs/stat.c            |  67 +++++++++++
  fs/statfs.c          |  81 ++++++++++++++
- fs/super.c           |  24 +++++
+ fs/super.c           |  24 ++++
  kernel/kallsyms.c    |  31 ++++++
  kernel/sys.c         |   8 ++
  mm/memory.c          |  14 +++
- 16 files changed, 1348 insertions(+), 1 deletion(-)
+ 16 files changed, 1360 insertions(+), 1 deletion(-)
 
 diff --git a/fs/Makefile b/fs/Makefile
 index 9f5d06f4a1a1e3c1bd418986a4e639e2be8002c2..eeea6b70b47aa4c22cfad3548205ae234664d6dc 100644
@@ -475,7 +475,7 @@ index ce03b3d91a62abaa0a5661ac4b9c90fd3fca09a5..508b31132a1efe9bd4c1d730cc3aeb30
  	do_delayed_call(&done);
  	return res;
 diff --git a/fs/namespace.c b/fs/namespace.c
-index 6281247dc33b9466265ae85239b2f6f9a9534f77..c86bcf1becc7f4cd6e57cef4a0de4a1b2a9f2086 100644
+index 6281247dc33b9466265ae85239b2f6f9a9534f77..b1e0f8c86be5957482aafafb86b6c3b425f54158 100644
 --- a/fs/namespace.c
 +++ b/fs/namespace.c
 @@ -33,11 +33,21 @@
@@ -828,7 +828,7 @@ index 6281247dc33b9466265ae85239b2f6f9a9534f77..c86bcf1becc7f4cd6e57cef4a0de4a1b
  		*mnt_ids = r->mnt_id_unique;
  		mnt_ids++;
  		nr_mnt_ids--;
-@@ -5852,3 +6100,46 @@ static int __init init_fs_namespace_sysctls(void)
+@@ -5852,3 +6100,58 @@ static int __init init_fs_namespace_sysctls(void)
  fs_initcall(init_fs_namespace_sysctls);
  
  #endif /* CONFIG_SYSCTL */
@@ -838,6 +838,9 @@ index 6281247dc33b9466265ae85239b2f6f9a9534f77..c86bcf1becc7f4cd6e57cef4a0de4a1b
 +int susfs_get_non_sus_mnt_id_from_mnt(struct mount *orig_mnt) {
 +	struct mount *mnt = orig_mnt;
 +	int mnt_id;
++
++	if (mnt->mnt_id < DEFAULT_KSU_MNT_ID)
++		return mnt->mnt_id;
 +
 +	lock_mount_hash();
 +	for (; mnt && mnt->mnt_parent && mnt != mnt->mnt_parent && mnt->mnt_id >= DEFAULT_KSU_MNT_ID; mnt = mnt->mnt_parent) { }
@@ -851,6 +854,9 @@ index 6281247dc33b9466265ae85239b2f6f9a9534f77..c86bcf1becc7f4cd6e57cef4a0de4a1b
 +	struct mount *mnt = orig_mnt;
 +	u64 mnt_id_unique;
 +
++	if (mnt->mnt_id < DEFAULT_KSU_MNT_ID)
++		return mnt->mnt_id_unique;
++
 +	lock_mount_hash();
 +	for (; mnt && mnt->mnt_parent && mnt != mnt->mnt_parent && mnt->mnt_id >= DEFAULT_KSU_MNT_ID; mnt = mnt->mnt_parent) { }
 +	mnt_id_unique = mnt->mnt_id_unique;
@@ -861,6 +867,12 @@ index 6281247dc33b9466265ae85239b2f6f9a9534f77..c86bcf1becc7f4cd6e57cef4a0de4a1b
 +/* - To retrieve the non sus vfsmount from vfsmount, takes a reference on &mnt->mnt and mnt->mnt.mnt_root */
 +struct vfsmount *susfs_get_non_sus_vfsmnt_from_vfsmnt(struct vfsmount *vfsmnt) {
 +	struct mount *mnt = real_mount(vfsmnt);
++
++	if (mnt->mnt_id < DEFAULT_KSU_MNT_ID) {
++		mntget(&mnt->mnt);
++		dget(mnt->mnt.mnt_root);
++		return &mnt->mnt;
++	}
 +
 +	lock_mount_hash();
 +	for (; mnt && mnt->mnt_parent && mnt != mnt->mnt_parent && mnt->mnt_id >= DEFAULT_KSU_MNT_ID; mnt = mnt->mnt_parent) { }

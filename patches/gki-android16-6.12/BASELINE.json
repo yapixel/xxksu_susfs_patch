@@ -4,9 +4,21 @@
     "scope-min-manual-hooks-v2.3.patch": "sha256:2168daaed174a4e64dc133bca7c39c49a75bb9e2fcc62df726e1b66604368c72"
   },
   "kernel_version": "6.12",
+  "metadata": {
+    "compatibility_patches": {
+      "gki-android16-6.12-r38": {
+        "apply_target": "android16-6.12-2025-09_r38",
+        "archive_sha256": "accf8f9348280116792c9608f420f8d4554da52499119a8536883c5eefd429ff",
+        "archive_url": "https://github.com/yapixel/gki-build-assets/releases/download/android16-6.12-2025-09_r38/common-android16-6.12-2025-09_r38.tar.gz",
+        "compatibility_target": "android16-6.12-2025-09_r38 (GKI 6.12)",
+        "patch_file": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
+        "patch_sha256": "sha256:0ed6a527ee9af78a51df152224648c79b4f335ad18146b9b566bb1a3deddbe28"
+      }
+    }
+  },
   "patch_51": {
     "patch_file": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
-    "patch_sha256": "sha256:f722add04728a9a9f1fdd02d5f708c129ebb82998b74550d9cadd7ce12ff89b5",
+    "patch_sha256": "sha256:0ed6a527ee9af78a51df152224648c79b4f335ad18146b9b566bb1a3deddbe28",
     "retired_internal_patch": "51_deinlined_susfs_hooks_gki-android16-6.12.patch",
     "strict_apply": "PASS"
   },
@@ -56,18 +68,6 @@
     "repository": "https://android.googlesource.com/kernel/common",
     "resolved_commit": "c8909f7cf1380810b285cbeee347dd01a8c9ec5c",
     "tree": "4ce1cd677e86aed8188e040fcd2971a95b1cd5f4"
-  },
-  "metadata": {
-    "compatibility_patches": {
-      "gki-android16-6.12-r38": {
-        "archive_url": "https://github.com/yapixel/gki-build-assets/releases/download/android16-6.12-2025-09_r38/common-android16-6.12-2025-09_r38.tar.gz",
-        "archive_sha256": "accf8f9348280116792c9608f420f8d4554da52499119a8536883c5eefd429ff",
-        "apply_target": "android16-6.12-2025-09_r38",
-        "compatibility_target": "android16-6.12-2025-09_r38 (Pixel 9 / GKI 6.12)",
-        "patch_file": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
-        "patch_sha256": "sha256:f722add04728a9a9f1fdd02d5f708c129ebb82998b74550d9cadd7ce12ff89b5"
-      }
-    }
   },
   "validation_results": {
     "gki-android16-6.12-lsm_bl": "PASS",

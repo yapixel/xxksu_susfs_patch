@@ -27,13 +27,6 @@ def _adapt(path: str, source: str) -> str:
             "\tint old_dfd = nd->dfd;\n\tstruct filename *old_name = nd->name;")
     elif path == "fs/namespace.c":
         source = fix_namespace(source)
-        for field in ("mnt_id", "mnt_id_unique"):
-            source = replace_once(source,
-                f"\tif (mnt->mnt_id < DEFAULT_KSU_MNT_ID)\n\t\treturn mnt->{field};\n\n", "")
-        source = replace_once(source,
-            "\tif (mnt->mnt_id < DEFAULT_KSU_MNT_ID) {\n"
-            "\t\tmntget(&mnt->mnt);\n\t\tdget(mnt->mnt.mnt_root);\n"
-            "\t\treturn &mnt->mnt;\n\t}\n\n", "")
         source = replace_once(source, "\tbool is_mnt_ksu_unshared = false;\n\n",
             "\tbool is_mnt_ksu_unshared = false;\n#endif\n\n"
             "#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT\n")

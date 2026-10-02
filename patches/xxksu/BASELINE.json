@@ -9,33 +9,33 @@
     "ref": "gki-android16-6.12",
     "repository": "https://gitlab.com/simonpunk/susfs4ksu",
     "resolved_commit": "c8f64e41e3dea2cd44754d7472d3cd0bc0b40784",
+    "role": "semantic_lineage_and_watch_input",
     "sha256": "sha256:757d0991e3582e74a7a875e9b03398258b5a32e04bfdab9cc3d9255f341e3ab8",
-    "size": 107571,
-    "role": "semantic_lineage_and_watch_input"
+    "size": 107571
   },
   "patch_11": {
     "patch_file": "patches/xxksu/11_enable_susfs_for_ksu.patch",
-    "patch_sha256": "sha256:c3f40703808f3db7c54b3c1fdb3f7820590ff01d1a64241ae357d78e171065cf",
-    "size": 16772,
+    "patch_sha256": "sha256:2a654bcba265bf5ceaa17dd0c0766f59b40866bda5afba30d1f5af6417adbf67",
+    "size": 15299,
     "strict_apply": "PASS"
   },
   "policy": {
-    "v27_policy_identity": "v2.policy.patch11",
     "generation_policy": "v2.adapters.xxksu.get_patch11_operation_specs",
     "reviewed_revision": {
+      "commit_object": ".github/fixtures/v2/patch11-policy-commit.txt",
       "repository": "https://github.com/yapixel/xxksu_susfs_patch",
-      "resolved_commit": "f138d2ed35d101c16172294489cc5ce7e8868939",
-      "commit_object": ".github/fixtures/v2/patch11-policy-commit.txt"
-    }
+      "resolved_commit": "f138d2ed35d101c16172294489cc5ce7e8868939"
+    },
+    "v27_policy_identity": "v2.policy.patch11"
   },
   "retained_file_hashes": {
-    "kernel/Kconfig": "sha256:e736aec3f381cbaf5c11e71714b65cd7f1d74578a10ec33d8fa883d9e7c45e22",
+    "kernel/Kconfig": "sha256:52fa19170361e6a0b21867df5a195e2dee23659db13aa29a21b63ef14ca39cfb",
     "kernel/downstream/ksu_hostsredirect.h": "sha256:9dbaf73b1edcb515ca98ca0cfe9f12dc4fa3c264041aba70398061fe897cf4e9",
-    "kernel/feature/kernel_umount.c": "sha256:391e61a859ae5f332cf0e887ab29637d2981b206b980234c6ab6484254b3a077",
+    "kernel/feature/kernel_umount.c": "sha256:05c8335c8cc3140bc6a867b464c5d5556a5b32d99aa92f5c144e4da01b461a13",
     "kernel/feature/sucompat.c": "sha256:2b016b7a49792d13c0982f9a0a272b560901cec70f005ac5d7b591c27601f597",
     "kernel/hook/setuid_hook.c": "sha256:dd7f40fa454fdea2d997ee219f3aed2892a71efa8ad2b69a5f2d6aca86ada1e5",
     "kernel/hook/syscall_table_hook_arm64.c": "sha256:9e0b0c3ce4935455032888ec9c7c6102664aa360767f607372835103fb42fa5d",
-    "kernel/ksu.c": "sha256:08fa2558b19d1751d5866e008bb05e7d436e241a7d4fb18a53c2eae6a044085b",
+    "kernel/ksu.c": "sha256:e786d88ccb49b1a3ecd4a60fa68b08f0d76f19ad3bccfac3502568f8ffcc82b8",
     "kernel/runtime/ksud.c": "sha256:6761b422cdcb0777c609e0b0e991531c7f153787951a89e7579a589f9bf8c0e1",
     "kernel/selinux/rules.c": "sha256:b1d5ba8d2f90090ba029c76e4484158452fc170006fceb4f9d2b34eb4bb57003",
     "kernel/selinux/selinux.c": "sha256:f864d3c4f0ee87fd5ecc2a822ffd63c73a7983127f690bc66c2e39ec2a63915d",
@@ -47,17 +47,17 @@
   "source_bundle": {
     "artifact_path": ".github/fixtures/v2/v29-baselines/xxksu.json",
     "file_count": 13,
-    "identity": "sha256:eb752d31e0260b5bb9ad96259d608cf395d0c1f62f445170c09682ccce19eb54",
+    "identity": "sha256:0eeede44e27715f4c4b57c87a614079e5d6bc58c399648c71a61b0620de21f49",
     "schema": "xxksu-susfs-source-bundle/v1"
   },
   "status": "VERIFIED",
   "target_id": "xxksu",
   "upstream": {
-    "archive_sha256": "b4a01e1a264701f346c6f890685639b627b41b02e38f318fb8d8c413417b4692",
+    "archive_sha256": "b3214678662e1f4a6789d86fcc44ec27c571449f5cfebef0aaecc3c6b90a8b32",
+    "archive_url": "https://codeload.github.com/backslashxx/KernelSU/tar.gz/5da239823066c9d14a962de5052ce78aa6c41091",
     "ref": "master",
     "repository": "https://github.com/backslashxx/KernelSU",
-    "resolved_commit": "f263bdb97a4e336f2bcc7e6dc7661c0fa576c05f",
-    "tree": "a3afb26ba5c1802bae239d22bc163065576db5f9",
-    "archive_url": "https://codeload.github.com/backslashxx/KernelSU/tar.gz/f263bdb97a4e336f2bcc7e6dc7661c0fa576c05f"
+    "resolved_commit": "5da239823066c9d14a962de5052ce78aa6c41091",
+    "tree": "a05cfc71ea7f4325f3e000983fc4c19321a01622"
   }
 }

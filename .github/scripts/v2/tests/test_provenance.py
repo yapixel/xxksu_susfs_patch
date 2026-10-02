@@ -352,6 +352,7 @@ class ProvenanceTests(unittest.TestCase):
                 script = "\n".join(line[10:] for line in block.splitlines())
                 output = self.root / "run-identities"
                 env = {**os.environ, "GITHUB_ENV": str(output), "KSU_OVERRIDE": "",
+                       "RUNNER_TEMP": os.environ.get("RUNNER_TEMP", tempfile.gettempdir()),
                        "PYTHONDONTWRITEBYTECODE": "1"}
                 subprocess.run(["bash", "-c", script], cwd=self.root, env=env, check=True)
                 self.assertIn("KSU_COMMIT=" + state["sources"]["authoritative"]["backslashxx_kernelsu"]["commit"], output.read_text())

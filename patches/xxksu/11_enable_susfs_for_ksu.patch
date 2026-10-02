@@ -1,4 +1,4 @@
-From b670f2ba5c232d9b6f52c151390d024d4b04ee73 Mon Sep 17 00:00:00 2001
+From 600b44168a2a3f0a7a73f8adac4d5c4f2d20a35d Mon Sep 17 00:00:00 2001
 From: yapixel <yapixel@users.noreply.github.com>
 Date: Sat, 26 Sep 2026 15:37:34 +0000
 Subject: [PATCH] Enable SUSFS for backslashxx KernelSU
@@ -10,15 +10,15 @@ Subject: [PATCH] Enable SUSFS for backslashxx KernelSU
  kernel/selinux/rules.c                |   7 ++
  kernel/selinux/selinux.c              | 103 ++++++++++++++++
  kernel/selinux/selinux.h              |  14 +++
- kernel/supercall/dispatch.c           |  13 +++
+ kernel/supercall/dispatch.c           |   9 +++
  kernel/supercall/supercall.c          |  93 +++++++++++++++
- 8 files changed, 367 insertions(+), 1 deletion(-)
+ 8 files changed, 363 insertions(+), 1 deletion(-)
 
 diff --git a/kernel/Kconfig b/kernel/Kconfig
 index 45e09d1..bf7a578 100644
 --- a/kernel/Kconfig
 +++ b/kernel/Kconfig
-@@ -130,4 +130,94 @@ config KSU_HEURISTIC_IN_TREE_BUILD
+@@ -131,4 +131,94 @@ config KSU_HEURISTIC_IN_TREE_BUILD
  	depends on KSU
  	default y
  
@@ -157,7 +157,7 @@ index 9257980..d42a673 100644
  	// Handle kernel umount
 -	ksu_handle_umount(new, old);
 +#ifdef CONFIG_KSU_SUSFS
-+	if (susfs_is_current_zygote_domain() || new_uid == WEBVIEW_ZYGOTE_UID) {
++	if (susfs_is_current_zygote_domain()) {
 +		handle_zygote_setresuid(new, old, new_uid, false);
 +	} else if (susfs_is_current_zygote_next_domain()) {
 +		handle_zygote_setresuid(new, old, new_uid, true);
@@ -352,21 +352,17 @@ diff --git a/kernel/supercall/dispatch.c b/kernel/supercall/dispatch.c
 index fe628e3..b4c6386 100644
 --- a/kernel/supercall/dispatch.c
 +++ b/kernel/supercall/dispatch.c
-@@ -1,3 +1,13 @@
+@@ -1,3 +1,9 @@
 +#ifdef CONFIG_KSU_SUSFS
 +#include <linux/namei.h>
 +#include <linux/susfs.h>
 +#include "objsec.h"
 +#endif // #ifdef CONFIG_KSU_SUSFS
 +
-+#ifdef CONFIG_KSU_SUSFS
-+bool susfs_is_boot_completed_triggered __read_mostly = false;
-+#endif // #ifdef CONFIG_KSU_SUSFS
-+
  static int do_grant_root(void __user *arg)
  {
  	int ret;
-@@ -86,6 +96,9 @@ static int do_report_event(void __user *arg)
+@@ -86,6 +92,9 @@ static int do_report_event(void __user *arg)
  			boot_complete_lock = true;
  			pr_info("boot_complete triggered\n");
  			on_boot_completed();

@@ -118,7 +118,7 @@ class Patch51SourceTests(unittest.TestCase):
 
     def test_target_adapters_interface_and_metadata(self):
         for pid, expected_target, expected_file_count in (
-            ("sultan-android14-6.1-patch51", "sultan-android14-6.1", 18),
+            ("sultan-android14-6.1-patch51", "sultan-android14-6.1", 16),
             ("gki-android16-6.12-r38-patch51", "android16-6.12-2025-09_r38", 16),
         ):
             adapter = get_adapter(pid)
