@@ -42,10 +42,14 @@
   ],
   "recent_events": [
     {
+      "timestamp": "2026-10-04",
+      "source_id": "backslashxx_kernelsu",
+      "text": "UPSTREAM_RECONCILED: reconciled xxKSU upstream to master 1f47db46 (v3.3.0-56); shifted dispatch.c offset (+4 lines for EVENT_SERVICES); candidate Patch 11 regenerated and verified with exact application across all 8 files."
+    },
+    {
       "timestamp": "2026-10-02",
       "source_id": "backslashxx_kernelsu",
-      "text": "REVIEW_FINDINGS_RECONCILED: reconciled xxKSU drift to master 5da23982; removed dead boot_completed symbol and fixed webview_zygote condition in Patch 11; restored lock-free returns in GKI 6.12 namespace; removed dead try-umount replacements in Sultan; restored lifecycle test fixtures.",
-      "replaces_text": "Candidate patch generated (`11_enable_susfs_for_ksu.patch`)"
+      "text": "REVIEW_FINDINGS_RECONCILED: reconciled xxKSU drift to master 5da23982; removed dead boot_completed symbol and fixed webview_zygote condition in Patch 11; restored lock-free returns in GKI 6.12 namespace; removed dead try-umount replacements in Sultan; restored lifecycle test fixtures."
     },
     {
       "timestamp": "2026-09-28",
