@@ -5,7 +5,7 @@
       "backslashxx_kernelsu": {
         "commit": "1f47db46ed59fd3495a0905552627ce4dd970c63",
         "ref": "master",
-        "relevant_content_hash": "sha256:2e9498c43914afa2151e7e4ee1de009f87339d88e845fb21d8beea1d2209615e",
+        "relevant_content_hash": "sha256:f32a3fa91ec138706f9446d0493adb66731f885b00280deeaf82b5d5ce414261",
         "repository": "https://github.com/backslashxx/KernelSU.git",
         "tracked_files": {
           "kernel/Kconfig": "sha256:52fa19170361e6a0b21867df5a195e2dee23659db13aa29a21b63ef14ca39cfb",
@@ -22,7 +22,7 @@
           "kernel/selinux/rules.c": "sha256:b1d5ba8d2f90090ba029c76e4484158452fc170006fceb4f9d2b34eb4bb57003",
           "kernel/selinux/selinux.c": "sha256:f864d3c4f0ee87fd5ecc2a822ffd63c73a7983127f690bc66c2e39ec2a63915d",
           "kernel/selinux/selinux.h": "sha256:125bb10481a681e53c2e745333e7a7d9d3fdae3cccbc1e32974b56b136276c83",
-          "kernel/supercall/dispatch.c": "sha256:cafa744b43b4b82a09f0d16c9e2771cec56ccb122f9538a519b328483ae6fbb9",
+          "kernel/supercall/dispatch.c": "sha256:f807f3612d455ef2ef92531ca1de21d2f5f851fed9862a06f289cec28b4426e3",
           "kernel/supercall/supercall.c": "sha256:7fcf757a0a04399312365556be47120d7ce95d8c6229d08534d1c9559449f01e"
         }
       },
