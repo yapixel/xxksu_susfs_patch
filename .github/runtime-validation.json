@@ -42,9 +42,9 @@
   ],
   "recent_events": [
     {
-      "timestamp": "2026-10-04",
+      "timestamp": "2026-10-07",
       "source_id": "backslashxx_kernelsu",
-      "text": "UPSTREAM_RECONCILED: reconciled xxKSU upstream to master 1f47db46 (v3.3.0-56); shifted dispatch.c offset (+4 lines for EVENT_SERVICES); candidate Patch 11 regenerated and verified with exact application across all 8 files."
+      "text": "UPSTREAM_RECONCILED: reconciled xxKSU upstream to master b59c6888 (v3.3.0+); shifted ksu.c kernelsu_init offset (+1 line); candidate Patch 11 regenerated and verified with exact application across all 8 files."
     },
     {
       "timestamp": "2026-10-02",

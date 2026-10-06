@@ -1,4 +1,4 @@
-From 0d74f5e3b80c870970f67078de4dce04fde25b48 Mon Sep 17 00:00:00 2001
+From 150ab8c4a0a04ae37240cc68959ed526dc3926c0 Mon Sep 17 00:00:00 2001
 From: yapixel <yapixel@users.noreply.github.com>
 Date: Sat, 26 Sep 2026 15:37:34 +0000
 Subject: [PATCH] Enable SUSFS for backslashxx KernelSU
@@ -183,7 +183,7 @@ index 06df055..77210ba 100644
  // track backports and other quirks here
  // ref: kernel_compat.c, Makefile
  // yes looks nasty
-@@ -264,6 +268,10 @@ static int __init kernelsu_init(void)
+@@ -265,6 +269,10 @@ static int __init kernelsu_init(void)
  
  	ksu_throne_tracker_init();
  
