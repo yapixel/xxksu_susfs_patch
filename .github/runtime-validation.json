@@ -42,14 +42,14 @@
   ],
   "recent_events": [
     {
-      "timestamp": "2026-10-11",
-      "source_id": "susfs_sultan",
-      "text": "UPSTREAM_RECONCILED: reconciled susfs_sultan upstream to sultan-shiba-susfs-minimal 6732b6fe; reconciled selinux hook specifications in registry; candidate Patch 51 verified with exact application."
+      "timestamp": "2026-10-12",
+      "source_id": "backslashxx_kernelsu",
+      "text": "UPSTREAM_RECONCILED: reconciled xxKSU upstream to master 9010ab9b (v3.3.0+); candidate Patch 11 regenerated and verified with exact application across all 8 files."
     },
     {
-      "timestamp": "2026-10-11",
-      "source_id": "backslashxx_kernelsu",
-      "text": "UPSTREAM_RECONCILED: reconciled xxKSU upstream to master 7d83ae0f (v3.3.0+); re-anchored selinux.h with ADBD_CONTEXT; candidate Patch 11 regenerated and verified with exact application across all 8 files."
+      "timestamp": "2026-10-12",
+      "source_id": "susfs_sultan",
+      "text": "UPSTREAM_RECONCILED: reconciled susfs_sultan upstream to sultan-shiba-susfs-minimal 02802483; candidate Patch 51 verified with exact application."
     },
     {
       "timestamp": "2026-10-02",

@@ -1,10 +1,12 @@
-tree aa3c7a895cead0cf8d3212e8dd66ba8df764e55b
-parent 507a4f2f7618625556a5c4874113a90e2b5b6076
-author simonpunk <simonpunk2016@gmail.com> 1791734352 +0800
-committer simonpunk <simonpunk2016@gmail.com> 1791734352 +0800
+tree 1ca0a18b96d6b11d012ce4cfed9b8cda035ff09c
+parent 6732b6fe3491072bd4b65905a5e46dda5574656a
+author simonpunk <simonpunk2016@gmail.com> 1791785143 +0800
+committer simonpunk <simonpunk2016@gmail.com> 1791785143 +0800
 
-KernelSU: Sync with the official KernelSU main repo
+kernel & KernelSU: Sync with the official KernelSU main repo
 
-- See https://github.com/tiann/KernelSU/commit/f895b80a3aad79948ba8074f53cf8f65a314d576
+[KernelSU]
+- See https://github.com/tiann/KernelSU/commit/0a1f3ff71719fa2d6ec15f5568dac27fdb957fcc
 
-- This commit brings back the infra/symbol_resolver.o as it is required for feature/module_blacklist.o
+[kernel]
+- Removed unused __ksu_is_allow_uid_for_current() in fs/exec.c
