@@ -3,26 +3,26 @@
   "sources": {
     "authoritative": {
       "backslashxx_kernelsu": {
-        "commit": "fd93fd040cbcdcdeb3dcd40b3ed80e8302ff46c2",
+        "commit": "7d83ae0fde45cf9c83a73e5164569f525e90971b",
         "ref": "master",
-        "relevant_content_hash": "sha256:969525f45028941124486774a181aa0aa61e615858f0670c7a70693c49aac8c8",
+        "relevant_content_hash": "sha256:eba9e34c6af5785c4ac1a78372a6679dc01779dc4859d61e288e2797591f0834",
         "repository": "https://github.com/backslashxx/KernelSU.git",
         "tracked_files": {
           "kernel/Kconfig": "sha256:52fa19170361e6a0b21867df5a195e2dee23659db13aa29a21b63ef14ca39cfb",
           "kernel/downstream/ksu_hostsredirect.h": "sha256:9dbaf73b1edcb515ca98ca0cfe9f12dc4fa3c264041aba70398061fe897cf4e9",
           "kernel/feature/kernel_umount.c": "sha256:05c8335c8cc3140bc6a867b464c5d5556a5b32d99aa92f5c144e4da01b461a13",
-          "kernel/feature/sucompat.c": "sha256:690190899f28bd8b33f5d04e0c5998a22dd787b9d54e7914dc01030212223bff",
+          "kernel/feature/sucompat.c": "sha256:b3a6ec5a190f36ef6fce9713b7ac4db7d8a4ed97cd44a81e24c9474f91c2a69d",
           "kernel/hook/lsm_hooks_list.c": "sha256:4352e2d36d65cde854d844e288b2ddd6d0eec237e456fe9d89bca46a017372e9",
           "kernel/hook/setuid_hook.c": "sha256:dd7f40fa454fdea2d997ee219f3aed2892a71efa8ad2b69a5f2d6aca86ada1e5",
           "kernel/hook/syscall_table_hook_arm64.c": "sha256:9e0b0c3ce4935455032888ec9c7c6102664aa360767f607372835103fb42fa5d",
-          "kernel/kernel_compat.h": "sha256:be38088bc604f4eb9ef81977d878433c9bec1cd7769ec51a61879cfcfb547ba2",
-          "kernel/kernel_includes.h": "sha256:be49612f7b0c5fc85bcb6fffc241533f07b0cc0be5ae79b4be829b4e7f0b68f1",
-          "kernel/ksu.c": "sha256:655c68aa1beeccb0f48a5ee6bf82e870ef4d588e4c71b5d6d8c41decb216b14b",
+          "kernel/kernel_compat.h": "sha256:e77fa49cf90ae4b18631b6ce09a0155215f9a5e49e4b5f454566215e0d008569",
+          "kernel/kernel_includes.h": "sha256:fa2cae42c9ca39fdca31f5c57b28a25cb82e28c12622e1a8abcce72330614924",
+          "kernel/ksu.c": "sha256:356e7d17a8299272861fc67920ac7d3cdd406a53a9fa5c9b598431d43e61306c",
           "kernel/runtime/ksud.c": "sha256:5664fbf9373469133e42e54c8345b9ec2dabc558672296e808826a4fdd18f55d",
           "kernel/selinux/rules.c": "sha256:b1d5ba8d2f90090ba029c76e4484158452fc170006fceb4f9d2b34eb4bb57003",
-          "kernel/selinux/selinux.c": "sha256:f864d3c4f0ee87fd5ecc2a822ffd63c73a7983127f690bc66c2e39ec2a63915d",
-          "kernel/selinux/selinux.h": "sha256:125bb10481a681e53c2e745333e7a7d9d3fdae3cccbc1e32974b56b136276c83",
-          "kernel/supercall/dispatch.c": "sha256:84ebb79c048a66e6f2cb0ba60566f19bd9f195f02f3f8ffb114bbb0eafe1bd7a",
+          "kernel/selinux/selinux.c": "sha256:c22331a2db5ee3bbb53234e51c04e98054281cb1a4d06550bb1413c817b985dc",
+          "kernel/selinux/selinux.h": "sha256:33219ac85de4b689ca307e5a869211353064aac9aa6df3c150ed670960a14968",
+          "kernel/supercall/dispatch.c": "sha256:d031ab99534a279e5e8681b0f74b518106c8bd41c4f6fc43bd43aa3bbe5464c7",
           "kernel/supercall/supercall.c": "sha256:7fcf757a0a04399312365556be47120d7ce95d8c6229d08534d1c9559449f01e"
         }
       },
@@ -40,12 +40,12 @@
         }
       },
       "susfs_sultan": {
-        "commit": "a8324101bca5e5a2dd7d0dc82b1650e10923eec9",
+        "commit": "6732b6fe3491072bd4b65905a5e46dda5574656a",
         "ref": "sultan-shiba-susfs-minimal",
-        "relevant_content_hash": "sha256:02be941a7732b465a3cc80c5282c8929564b451173ffa9196ff6282927953fad",
+        "relevant_content_hash": "sha256:3d914a455319464ea779a6f26db21a5a21b2fe8e2a9eb2dea0363866a7caf546",
         "repository": "https://gitlab.com/simonpunk/susfs4ksu.git",
         "tracked_files": {
-          "kernel_patches/50_add_susfs_in_gki-android14-6.1.patch": "sha256:86232b4f751f3b5175e49b58a002f586e0e1fdda2e818d0cd129de458a0ea069",
+          "kernel_patches/50_add_susfs_in_gki-android14-6.1.patch": "sha256:1c3f38808f684ccc249e085bf293248baf8515b5c3ab5d66f2822602b8dce085",
           "kernel_patches/fs/susfs.c": "sha256:5521aa600f6df698e1d5e31df72e3557a36d33c161bd65dcafe5788fb56a7fa7",
           "kernel_patches/include/linux/susfs.h": "sha256:fafff787b8856bd37a6736c2f0bbc5a57fd1f36232be267936f892fb57bc5120",
           "kernel_patches/include/linux/susfs_def.h": "sha256:db7f98dcf8119a4eb5c45c05205b6c1065766047d6f803b0e86f3d14b1a251f0"

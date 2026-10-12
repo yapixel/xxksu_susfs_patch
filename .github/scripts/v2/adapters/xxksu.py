@@ -234,7 +234,7 @@ def get_patch11_operation_specs() -> Tuple[XxksuOperationSpec, ...]:
         XxksuOperationSpec(
             operation_id='xxksu.kernel_selinux_selinux_h.hunk_0',
             file_path='kernel/selinux/selinux.h',
-            spec=AnchorSpec('kernel/selinux/selinux.h', 'void setup_selinux(const char *, struct cred *);\n', context_before=('#define INIT_CONTEXT "u:r:init:s0"',), context_after=()),
+            spec=AnchorSpec('kernel/selinux/selinux.h', 'void setup_selinux(const char *, struct cred *);\n', context_before=('#define ADBD_CONTEXT "u:r:adbd:s0"',), context_after=()),
             placement=Placement.BEFORE,
             payload='#ifdef CONFIG_KSU_SUSFS\nbool susfs_is_sid_equal(const struct cred *cred, u32 sid2);\nu32 susfs_get_sid_from_name(const char *secctx_name);\nu32 susfs_get_current_sid(void);\nvoid susfs_set_zygote_sid(void);\nbool susfs_is_current_zygote_domain(void);\nbool susfs_is_current_zygote_next_domain(void);\nvoid susfs_set_ksu_sid(void);\nbool susfs_is_current_ksu_domain(void);\nvoid susfs_set_init_sid(void);\nbool susfs_is_current_init_domain(void);\nvoid susfs_set_priv_app_sid(void);\n#endif // #ifdef CONFIG_KSU_SUSFS\n\n',
             section_context='',
