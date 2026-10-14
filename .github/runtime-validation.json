@@ -42,6 +42,11 @@
   ],
   "recent_events": [
     {
+      "timestamp": "2026-10-13",
+      "source_id": "susfs_gki",
+      "text": "UPSTREAM_RECONCILED: reconciled susfs_gki upstream to gki-android16-6.12 5e0b2b92; candidate Patch 51 verified with exact application."
+    },
+    {
       "timestamp": "2026-10-12",
       "source_id": "backslashxx_kernelsu",
       "text": "UPSTREAM_RECONCILED: reconciled xxKSU upstream to master 9010ab9b (v3.3.0+); candidate Patch 11 regenerated and verified with exact application across all 8 files."
