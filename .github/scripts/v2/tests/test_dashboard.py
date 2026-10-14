@@ -307,7 +307,7 @@ class DashboardTests(unittest.TestCase):
 
             # Test trimming with excessive text
             huge_events = [
-                {"timestamp": "2026-09-24", "source_id": "test", "text": "x" * 8000}
+                {"timestamp": "2026-09-24", "source_id": "test", "text": "x" * 20000}
                 for _ in range(10)
             ]
             initial_body = render_dashboard_body(

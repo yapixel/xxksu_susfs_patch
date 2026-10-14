@@ -3,12 +3,12 @@
   "sources": {
     "authoritative": {
       "backslashxx_kernelsu": {
-        "commit": "9010ab9b3a5eb036117a31f262184fcb88827fb7",
+        "commit": "12cdc2bf8ed85f7f79191ae8d262868f0ac76103",
         "ref": "master",
-        "relevant_content_hash": "sha256:a06569fc9e3e3c4aa200462a0a5f8bc056b4bb3b011d5d518c31d552ac0f67b0",
+        "relevant_content_hash": "sha256:a4b2eb9262ba74ca4d6237bfb5475661364ce61be0f3635628f52af0c2854bc3",
         "repository": "https://github.com/backslashxx/KernelSU.git",
         "tracked_files": {
-          "kernel/Kconfig": "sha256:52fa19170361e6a0b21867df5a195e2dee23659db13aa29a21b63ef14ca39cfb",
+          "kernel/Kconfig": "sha256:3a30954bbff10ec57c9897fd17d856877c0b9db9f71692b3e0430639c99c9ec8",
           "kernel/downstream/ksu_hostsredirect.h": "sha256:9dbaf73b1edcb515ca98ca0cfe9f12dc4fa3c264041aba70398061fe897cf4e9",
           "kernel/feature/kernel_umount.c": "sha256:05c8335c8cc3140bc6a867b464c5d5556a5b32d99aa92f5c144e4da01b461a13",
           "kernel/feature/sucompat.c": "sha256:b3a6ec5a190f36ef6fce9713b7ac4db7d8a4ed97cd44a81e24c9474f91c2a69d",
@@ -17,7 +17,7 @@
           "kernel/hook/syscall_table_hook_arm64.c": "sha256:9e0b0c3ce4935455032888ec9c7c6102664aa360767f607372835103fb42fa5d",
           "kernel/kernel_compat.h": "sha256:b3cc3bfabd4cd221b6c39d65b44ff85ef8b02347923e0982d0f42ab03e5c570d",
           "kernel/kernel_includes.h": "sha256:fa2cae42c9ca39fdca31f5c57b28a25cb82e28c12622e1a8abcce72330614924",
-          "kernel/ksu.c": "sha256:185c48902c839ea3bbbfb7ac21ab0479c03f9692255c61199e05e3f16ef41546",
+          "kernel/ksu.c": "sha256:1e8bf2ae937d29ade0f240da2395cdd7966e4a8585e9122741606f469a1b81b3",
           "kernel/runtime/ksud.c": "sha256:5664fbf9373469133e42e54c8345b9ec2dabc558672296e808826a4fdd18f55d",
           "kernel/selinux/rules.c": "sha256:b1d5ba8d2f90090ba029c76e4484158452fc170006fceb4f9d2b34eb4bb57003",
           "kernel/selinux/selinux.c": "sha256:c22331a2db5ee3bbb53234e51c04e98054281cb1a4d06550bb1413c817b985dc",

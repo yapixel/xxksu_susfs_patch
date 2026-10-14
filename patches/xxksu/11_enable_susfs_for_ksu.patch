@@ -1,4 +1,4 @@
-From cca23491f0fbae96592658083f088cf35bcd00a4 Mon Sep 17 00:00:00 2001
+From 3fb2efbe8ed291021e4c4af90697c51df70d4185 Mon Sep 17 00:00:00 2001
 From: yapixel <yapixel@users.noreply.github.com>
 Date: Sat, 26 Sep 2026 15:37:34 +0000
 Subject: [PATCH] Enable SUSFS for backslashxx KernelSU
@@ -18,9 +18,9 @@ diff --git a/kernel/Kconfig b/kernel/Kconfig
 index 45e09d1..bf7a578 100644
 --- a/kernel/Kconfig
 +++ b/kernel/Kconfig
-@@ -131,4 +131,94 @@ config KSU_HEURISTIC_IN_TREE_BUILD
- 	depends on KSU
- 	default y
+@@ -143,4 +143,94 @@ config KSU_HEURISTIC_IN_TREE_BUILD
+ 	help
+ 	  Note: if youre building out-of-tree, configure by editing ksu.c #defines instead.
  
 +menu "KernelSU - SUSFS"
 +config KSU_SUSFS
@@ -172,7 +172,7 @@ diff --git a/kernel/ksu.c b/kernel/ksu.c
 index 06df055..77210ba 100644
 --- a/kernel/ksu.c
 +++ b/kernel/ksu.c
-@@ -162,6 +162,10 @@
+@@ -166,6 +166,10 @@
  #include "hook/kp_ksud.c"
  #endif
  
@@ -183,7 +183,7 @@ index 06df055..77210ba 100644
  // track backports and other quirks here
  // ref: kernel_compat.c, Makefile
  // yes looks nasty
-@@ -272,6 +276,10 @@ static int __init kernelsu_init(void)
+@@ -276,6 +280,10 @@ static int __init kernelsu_init(void)
  
  	ksu_allowlist_init();
  	ksu_throne_tracker_init();
