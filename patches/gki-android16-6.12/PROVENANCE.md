@@ -7,7 +7,7 @@ The production apply target is `android16-6.12-2025-09_r38`, not the historical 
 - URL: `https://github.com/yapixel/gki-build-assets/releases/download/android16-6.12-2025-09_r38/common-android16-6.12-2025-09_r38.tar.gz`
 - SHA-256: `accf8f9348280116792c9608f420f8d4554da52499119a8536883c5eefd429ff`
 - Exact retained source contents/hashes: `.github/fixtures/v2/r38-sources.json`.
-- Accepted SuSFS: `b213c54126fb243595ce7876e91d84d6e0861fec`.
+- Accepted SuSFS: `5e0b2b925865000ca7dce993ecf1d281ee312887`.
 - Current generated Patch 51 hash: `patches/manifest.json` and `BASELINE.json:patch_51.patch_sha256`.
 
 The workflow verifies the downloaded file against this hash before extraction. Lifecycle corrections and publication evidence are documented in `PATCH51_CORRECTIONS.md`.
@@ -29,7 +29,7 @@ This retained lineage supports historical source-bundle validation. It is not th
 ### SuSFS Lineage
 - **Repository:** `https://gitlab.com/simonpunk/susfs4ksu`
 - **Branch:** `gki-android16-6.12`
-- **Accepted commit:** `b213c54126fb243595ce7876e91d84d6e0861fec` (historical record previously listed `2528bdb0e2e76d26b9b174a8314ac115c9f00b3c`).
+- **Accepted commit:** `5e0b2b925865000ca7dce993ecf1d281ee312887` (historical records previously listed `b213c54126fb243595ce7876e91d84d6e0861fec` and `2528bdb0e2e76d26b9b174a8314ac115c9f00b3c`).
 - **Upstream Patch:** `kernel_patches/50_add_susfs_in_gki-android16-6.12.patch`
 
 ### Authoritative Source Bundle
