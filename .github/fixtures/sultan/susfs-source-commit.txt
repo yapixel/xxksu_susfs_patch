@@ -1,12 +1,6 @@
-tree 1ca0a18b96d6b11d012ce4cfed9b8cda035ff09c
-parent 6732b6fe3491072bd4b65905a5e46dda5574656a
-author simonpunk <simonpunk2016@gmail.com> 1791785143 +0800
-committer simonpunk <simonpunk2016@gmail.com> 1791785143 +0800
+tree b09abcc6132f9291d4d5fd52faba83771ac6d934
+parent 0995c4fb0b44da7b23a4e57473b3f8463148c7a4
+author simonpunk <simonpunk2016@gmail.com> 1791983649 +0800
+committer simonpunk <simonpunk2016@gmail.com> 1791983649 +0800
 
-kernel & KernelSU: Sync with the official KernelSU main repo
-
-[KernelSU]
-- See https://github.com/tiann/KernelSU/commit/0a1f3ff71719fa2d6ec15f5568dac27fdb957fcc
-
-[kernel]
-- Removed unused __ksu_is_allow_uid_for_current() in fs/exec.c
+kernel: Fix missing #ifdef guard in sel_open_handle_status()
