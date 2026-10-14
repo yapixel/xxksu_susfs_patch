@@ -32,6 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      issues: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -115,4 +116,13 @@ jobs:
           git apply --stat patches/xxksu/11_enable_susfs_for_ksu.patch >> report_11.md
           echo '```' >> report_11.md
           cat report_11.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Sync Dashboard Status to Healthy
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          PYTHONPATH=.github/scripts python3 -m v2.watch.cli --dry-run || true
 

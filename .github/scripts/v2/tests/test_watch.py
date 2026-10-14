@@ -536,6 +536,42 @@ class XxksuDependencyRewriteTests(unittest.TestCase):
             self.assertEqual(current.classification, WatchClassification.NO_CHANGE)
             self.assertEqual((current.old_identity, current.new_identity), (new, new))
 
+    def test_cli_dispatch_plan_generation(self):
+        from v2.watch.cli import main
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            cand_dir = Path(td) / "candidate_patches"
+            ret = main(["--dry-run", "--candidate-dir", str(cand_dir), "--no-dashboard"])
+            self.assertEqual(ret, 0)
+            self.assertFalse((cand_dir / "dispatch.json").exists())
+
+    def test_cli_dispatch_plan_with_safe_candidate(self):
+        from v2.watch.cli import main
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            cand_dir = Path(td) / "candidate_patches"
+            mock_res = SourceResult(
+                source_id="backslashxx_kernelsu",
+                source_type="authoritative",
+                classification=WatchClassification.SAFE_REGEN_CANDIDATE,
+                old_identity="1111111111111111111111111111111111111111",
+                new_identity="2222222222222222222222222222222222222222",
+                old_content_hash="sha256:0000",
+                new_content_hash="sha256:1111",
+                candidate_patch="diff --git a/a b/a\n",
+                candidate_patch_name="11_enable_susfs_for_ksu.patch",
+            )
+            mock_report = WatchReport(results=(mock_res,), timestamp="2026-10-14T00:00:00Z")
+            with patch("v2.watch.checker.UpstreamWatcher.run_all", return_value=mock_report):
+                ret = main(["--candidate-dir", str(cand_dir), "--no-dashboard"])
+                self.assertEqual(ret, 0)
+                dispatch_file = cand_dir / "dispatch.json"
+                self.assertTrue(dispatch_file.exists())
+                data = json.loads(dispatch_file.read_text(encoding="utf-8"))
+                self.assertTrue(data["dispatch_11"])
+                self.assertEqual(data["ksu_commit"], "2222222222222222222222222222222222222222")
+                self.assertFalse(data["dispatch_51"])
+
 
 if __name__ == "__main__":
     unittest.main()

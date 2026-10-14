@@ -65,6 +65,26 @@ def main(argv: list[str] | None = None) -> int:
                 cand_path.write_text(r.candidate_patch, encoding="utf-8")
                 logger.info("Saved candidate patch to %s", cand_path)
 
+    # Prepare automated pipeline dispatch plan for verified safe candidates
+    dispatch_plan = {
+        "dispatch_11": False,
+        "ksu_commit": None,
+        "dispatch_51": False,
+    }
+    for r in report.results:
+        if r.classification == WatchClassification.SAFE_REGEN_CANDIDATE:
+            if r.source_id == "backslashxx_kernelsu":
+                dispatch_plan["dispatch_11"] = True
+                dispatch_plan["ksu_commit"] = r.new_identity
+            elif r.source_id in ("susfs_sultan", "susfs_gki"):
+                dispatch_plan["dispatch_51"] = True
+
+    if dispatch_plan["dispatch_11"] or dispatch_plan["dispatch_51"]:
+        args.candidate_dir.mkdir(parents=True, exist_ok=True)
+        dispatch_file = args.candidate_dir / "dispatch.json"
+        dispatch_file.write_text(json.dumps(dispatch_plan, indent=2) + "\n", encoding="utf-8")
+        logger.info("Wrote pipeline dispatch plan to %s: %s", dispatch_file, dispatch_plan)
+
     # Handle escalations
     escalations = []
     if args.escalate:

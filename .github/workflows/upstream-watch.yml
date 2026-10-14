@@ -25,6 +25,7 @@ on:
 permissions:
   contents: read
   issues: write
+  actions: write
 
 jobs:
   watch_upstream:
@@ -75,3 +76,38 @@ jobs:
           name: upstream-candidate-patches
           path: candidate_patches/
           if-no-files-found: ignore
+
+      - name: Auto-Dispatch Production Pipelines for Safe Candidates
+        if: success() && (github.event.inputs.dry_run || 'false') != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          DISPATCH_FILE="candidate_patches/dispatch.json"
+          if [ -f "$DISPATCH_FILE" ]; then
+            python3 - <<'PY'
+            import json, subprocess
+            from pathlib import Path
+
+            dispatch_path = Path("candidate_patches/dispatch.json")
+            if not dispatch_path.is_file():
+                exit(0)
+
+            data = json.loads(dispatch_path.read_text(encoding="utf-8"))
+            if data.get("dispatch_11") and data.get("ksu_commit"):
+                commit = data["ksu_commit"]
+                print(f"🚀 Auto-dispatching generate-11-ksu-patch.yml for KSU @ {commit}...")
+                subprocess.run(
+                    ["gh", "workflow", "run", "generate-11-ksu-patch.yml", "-f", f"ksu_commit={commit}"],
+                    check=True,
+                )
+            if data.get("dispatch_51"):
+                print("🚀 Auto-dispatching generate-51-kernel-patches.yml...")
+                subprocess.run(
+                    ["gh", "workflow", "run", "generate-51-kernel-patches.yml"],
+                    check=True,
+                )
+            PY
+          else
+            echo "No production pipeline auto-dispatch required (no safe candidates pending promotion)."
+          fi
