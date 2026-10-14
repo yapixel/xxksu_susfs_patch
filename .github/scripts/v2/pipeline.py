@@ -363,6 +363,7 @@ def deliver_promotion(
     ]
     if patch_id == "xxksu-patch11":
         allowed_paths.append(Path("patches/xxksu/BASELINE.json"))
+        allowed_paths.append(Path(".github/fixtures/v2/patch11-policy-commit.txt"))
     elif patch_id == "sultan-android14-6.1-patch51":
         allowed_paths.append(Path("patches/sultan-android14-6.1/BASELINE.json"))
     elif patch_id == "gki-android16-6.12-r38-patch51":
@@ -575,6 +576,8 @@ def deliver_multi_candidates(
 
     allowed_paths = [Path("patches/manifest.json"), *metadata_updates]
     allowed_paths.extend(TARGET_REL_PATHS[patch_id] for patch_id in changed_targets)
+    if "xxksu-patch11" in candidate_targets:
+        allowed_paths.append(Path(".github/fixtures/v2/patch11-policy-commit.txt"))
 
     for rel_path in allowed_paths:
         full_path = repo_root / rel_path

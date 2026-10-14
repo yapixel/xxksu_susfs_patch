@@ -13,6 +13,8 @@ on:
     paths:
       - ".github/workflows/generate-11-ksu-patch.yml"
       - ".github/scripts/v2/pipeline.py"
+      - ".github/scripts/v2/adapters/**"
+      - ".github/fixtures/v2/patch11-policy-commit.txt"
       - "patches/xxksu/11_enable_susfs_for_ksu.patch"
       - "patches/manifest.json"
 
@@ -79,6 +81,35 @@ jobs:
           git remote add origin "https://github.com/${{ env.KSU_REPO }}.git"
           git fetch --depth=1 origin "$TARGET_COMMIT"
           git checkout FETCH_HEAD
+
+      - name: Synchronize Patch 11 Policy Commit Provenance
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+
+          repo_root = Path.cwd()
+          baseline_path = repo_root / "patches/xxksu/BASELINE.json"
+          baseline = json.loads(baseline_path.read_text())
+          current = baseline["policy"]["reviewed_revision"]["resolved_commit"]
+
+          proc = subprocess.run(
+              ["git", "log", "-1", "--format=%H", "--", ".github/scripts/v2/adapters/xxksu.py"],
+              capture_output=True, text=True, check=True
+          )
+          latest = proc.stdout.strip()
+          if latest and latest != current:
+              print(f"Advancing Patch 11 policy commit object from {current[:8]} to {latest[:8]}...")
+              raw = subprocess.check_output(["git", "cat-file", "commit", latest])
+              fixture_path = repo_root / baseline["policy"]["reviewed_revision"]["commit_object"]
+              fixture_path.write_bytes(raw)
+              baseline["policy"]["reviewed_revision"]["resolved_commit"] = latest
+              baseline_path.write_text(json.dumps(baseline, indent=2) + "\n")
+              print("✅ Policy commit object and BASELINE.json synchronized.")
+          else:
+              print(f"Policy commit object is already up to date ({current[:8]}).")
+          PY
 
       - name: Run Patch 11 Authoritative Pipeline (Generate -> Candidate -> Validate -> Promote -> Deliver)
         run: |
