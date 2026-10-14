@@ -13,6 +13,8 @@ from v2.model.result import (
     HunkCountMismatch, InvalidHunkLine, MalformedFileHeader,
     MalformedHunkHeader, PatchError, PatchParseError, UnsupportedPatchFormat,
 )
+from v2.validation.exact_patch import substantive_patch_text
+from v2.watch.checker import normalize_reference_patch
 
 
 def round_trip(text):
@@ -171,6 +173,118 @@ class RepositoryFixtureTests(unittest.TestCase):
         sample = "diff --git " + text.split("diff --git ", 1)[1].split("diff --git ", 1)[0]
         first, second = round_trip(sample)
         self.assertEqual(second.structural_key(), first.structural_key())
+
+
+class SubstantivePatchTextTests(unittest.TestCase):
+    def test_strip_mail_headers_and_git_version_trailer(self):
+        patch = (
+            "From e3b0c44298fc1c149afbf4c8996fb92427ae41e4 Mon Sep 17 00:00:00 2001\n"
+            "From: Author <author@example.com>\n"
+            "Date: Mon, 1 Jan 2024 00:00:00 +0000\n"
+            "Subject: [PATCH] Dummy subject\n"
+            "\n"
+            "---\n"
+            " a.c | 2 +-\n"
+            " 1 file changed, 1 insertion(+), 1 deletion(-)\n"
+            "\n"
+            "diff --git a/a.c b/a.c\n"
+            "index 1111111..2222222 100644\n"
+            "--- a/a.c\n"
+            "+++ b/a.c\n"
+            "@@ -1 +1 @@\n"
+            "-old\n"
+            "+new\n"
+            "-- \n"
+            "2.55.0\n"
+        )
+        expected = (
+            "diff --git a/a.c b/a.c\n"
+            "--- a/a.c\n"
+            "+++ b/a.c\n"
+            "@@ -1 +1 @@\n"
+            "-old\n"
+            "+new"
+        )
+        self.assertEqual(substantive_patch_text(patch), expected)
+        self.assertEqual(normalize_reference_patch(patch), expected)
+
+    def test_strip_trailer_without_version(self):
+        patch = (
+            "diff --git a/a.c b/a.c\n"
+            "--- a/a.c\n"
+            "+++ b/a.c\n"
+            "@@ -1 +1 @@\n"
+            "-old\n"
+            "+new\n"
+            "-- \n"
+        )
+        expected = (
+            "diff --git a/a.c b/a.c\n"
+            "--- a/a.c\n"
+            "+++ b/a.c\n"
+            "@@ -1 +1 @@\n"
+            "-old\n"
+            "+new"
+        )
+        self.assertEqual(substantive_patch_text(patch), expected)
+
+    def test_strip_uppercase_and_mixed_case_index_hashes(self):
+        patch = (
+            "diff --git a/a.c b/a.c\n"
+            "index 1A2B3C4..5D6E7F0 100644\n"
+            "--- a/a.c\n"
+            "+++ b/a.c\n"
+            "@@ -1 +1 @@\n"
+            "-old\n"
+            "+new\n"
+        )
+        expected = (
+            "diff --git a/a.c b/a.c\n"
+            "--- a/a.c\n"
+            "+++ b/a.c\n"
+            "@@ -1 +1 @@\n"
+            "-old\n"
+            "+new"
+        )
+        self.assertEqual(substantive_patch_text(patch), expected)
+
+    def test_preserves_code_lines_not_matching_trailer(self):
+        patch = (
+            "diff --git a/a.c b/a.c\n"
+            "--- a/a.c\n"
+            "+++ b/a.c\n"
+            "@@ -1,3 +1,3 @@\n"
+            " int x;\n"
+            "+--\n"
+            "+int y = 1;\n"
+        )
+        expected = (
+            "diff --git a/a.c b/a.c\n"
+            "--- a/a.c\n"
+            "+++ b/a.c\n"
+            "@@ -1,3 +1,3 @@\n"
+            " int x;\n"
+            "+--\n"
+            "+int y = 1;"
+        )
+        self.assertEqual(substantive_patch_text(patch), expected)
+
+    def test_fallback_to_non_git_unified_diff(self):
+        patch = (
+            "--- a/a.c\n"
+            "+++ b/a.c\n"
+            "@@ -1 +1 @@\n"
+            "-old\n"
+            "+new\n"
+        )
+        expected = (
+            "--- a/a.c\n"
+            "+++ b/a.c\n"
+            "@@ -1 +1 @@\n"
+            "-old\n"
+            "+new"
+        )
+        self.assertEqual(substantive_patch_text(patch), expected)
 
 
 if __name__ == "__main__":

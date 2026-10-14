@@ -30,7 +30,7 @@ from ..semantic.gate import evaluate_semantic_gate
 from ..source.baseline import load_authoritative_bundle
 from ..source.bundle import SourceBundle, create_source_bundle
 from ..source.patch_apply import SourceBundlePatchError, apply_patch_to_bundle
-from ..validation.exact_patch import validate_patch_syntax
+from ..validation.exact_patch import substantive_patch_text, validate_patch_syntax
 from .model import SourceResult, WatchClassification, WatchReport
 
 try:
@@ -130,31 +130,7 @@ def fetch_url_content(url: str, timeout: int = 30) -> tuple[str, str]:
 
 def normalize_reference_patch(text: str) -> str:
     """Normalize reference patch by stripping commit metadata headers, footers, and index hashes."""
-    diff_idx = text.find("\ndiff --git ")
-    if diff_idx != -1:
-        diff_text = text[diff_idx + 1:]
-    elif text.startswith("diff --git "):
-        diff_text = text
-    else:
-        diff_idx = text.find("\n--- ")
-        if diff_idx != -1:
-            diff_text = text[diff_idx + 1:]
-        elif text.startswith("--- "):
-            diff_text = text
-        else:
-            diff_text = text
-
-    lines = diff_text.splitlines()
-    while lines and not lines[-1].strip():
-        lines.pop()
-    if len(lines) >= 2 and lines[-2].strip() == "--":
-        lines = lines[:-2]
-
-    filtered = [
-        l for l in lines
-        if not (l.startswith("index ") and re.match(r"^index [0-9a-f]+\.\.[0-9a-f]+", l))
-    ]
-    return "\n".join(filtered).strip()
+    return substantive_patch_text(text)
 
 
 def compute_normalized_patch_hash(text: str) -> str:

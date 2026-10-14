@@ -26,21 +26,47 @@ from ..source.patch_apply import SourceBundlePatchError, apply_patch_to_bundle
 
 
 def substantive_patch_text(patch_text: str) -> str:
-    """Return the source diff, excluding mail metadata, indexes, and footer."""
+    """Return the substantive code diff, excluding mail metadata, index hashes, and footers.
+
+    Extracts purely substantive code changes (diff blocks) from a patch:
+    - Anchors at the first 'diff --git ' (or '--- ' if non-git unified diff).
+    - Strips Git index lines matching '^index [0-9a-fA-F]+\\.\\.[0-9a-fA-F]+'.
+    - Strips trailing Git format-patch signatures ('-- \\n<version>' or standalone '--') safely,
+      guarding against accidental corruption of code context lines.
+    """
     lines = patch_text.splitlines()
+    has_git_diff = any(l.startswith("diff --git ") for l in lines)
+    has_file_header = any(l.startswith("--- ") for l in lines)
+
     body: list[str] = []
-    in_diff = False
+    in_diff = not has_git_diff and not has_file_header
+
     for line in lines:
         if line.startswith("diff --git "):
             in_diff = True
-        if in_diff:
-            if line.startswith("index ") and ".." in line:
-                continue
-            body.append(line)
+        elif not has_git_diff and line.startswith("--- "):
+            in_diff = True
+
+        if not in_diff:
+            continue
+
+        if line.startswith("index ") and re.match(r"^index [0-9a-fA-F]+\.\.[0-9a-fA-F]+", line):
+            continue
+
+        body.append(line)
+
     while body and not body[-1].strip():
         body.pop()
-    if len(body) >= 2 and body[-2].strip() == "--":
-        body = body[:-2]
+
+    if len(body) >= 2 and re.match(r"^\d+\.\d+", body[-1].strip()) and body[-2].strip() == "--":
+        body.pop()  # remove version string
+        body.pop()  # remove '--'
+    elif body and body[-1].strip() == "--":
+        body.pop()  # remove '--'
+
+    while body and not body[-1].strip():
+        body.pop()
+
     return "\n".join(body).strip()
 
 
