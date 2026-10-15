@@ -1,16 +1,16 @@
-tree 778cd4438a6612f4d8cbe74ccf48a506a85e929f
-parent b213c54126fb243595ce7876e91d84d6e0861fec
-author simonpunk <simonpunk2016@gmail.com> 1791817321 +0800
-committer simonpunk <simonpunk2016@gmail.com> 1791817321 +0800
+tree c347593f37748275592449cf4e0535c32aaf8769
+parent 37ccef9bb79eb61a9ed4877859daef4de7343fe3
+author simonpunk <simonpunk2016@gmail.com> 1791997054 +0800
+committer simonpunk <simonpunk2016@gmail.com> 1791997054 +0800
 
 kernel & KernelSU: Sync with the official KernelSU main repo
 
 [KernelSU]
 - See https://github.com/tiann/KernelSU/commit/0a1f3ff71719fa2d6ec15f5568dac27fdb957fcc
 
-- Brings back the infra/symbol_resolver.o as it is required for feature/module_blacklist.o
+- Remove unused upstream functions in selinux_hide.c
 
 [kernel]
 - Removed unused __ksu_is_allow_uid_for_current() in fs/exec.c
 
-- Fix selinux leaks by imitating the upstream fix.
+- Previous selinux fix in sel_open_handle_status() was wrong, and the detection is fixed after completely imitating the upstream fix.
