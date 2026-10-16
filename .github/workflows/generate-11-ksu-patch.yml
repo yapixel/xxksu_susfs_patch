@@ -155,5 +155,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          PYTHONPATH=.github/scripts python3 -m v2.watch.cli --dry-run || true
+          PYTHONPATH=.github/scripts python3 -m v2.watch.cli || true
 
