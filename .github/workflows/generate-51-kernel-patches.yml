@@ -303,6 +303,7 @@ jobs:
           if not re.fullmatch(r"[0-9a-f]{40}", ksu):
               raise ValueError("KernelSU override must be an exact reviewed candidate SHA, not a moving ref")
           print("KSU_COMMIT=" + ksu)
+          print("SULTAN_SUSFS_COMMIT=" + sources["susfs_sultan"]["commit"])
           print("GKI_SUSFS_COMMIT=" + sources["susfs_gki"]["commit"])
           PY
 
@@ -344,6 +345,10 @@ jobs:
       - name: Run Patch 51 Candidate Validation (2026-09_r6)
         run: |
           set -euo pipefail
+          if [ "${{ github.event.inputs.test_fail_validation || 'none' }}" = "gki_2026_09" ]; then
+            echo "❌ Simulating validation failure for GKI 2026-09_r6 (Atomicity Test)"
+            exit 1
+          fi
           mkdir -p candidate_patches/gki-android16-6.12-2026-09_r6
           PYTHONPATH="${{ github.workspace }}/.github/scripts" python3 - <<'PY'
           import hashlib, json, os, subprocess, tempfile
@@ -355,7 +360,7 @@ jobs:
           )
           from v2.policy.gki_r38 import _adapt
 
-          repo = Path(".")
+          repo = Path(".").resolve()
           tree = repo / "kernel_tree"
           upstream_patch = repo / "susfs_src/kernel_patches/50_add_susfs_in_gki-android16-6.12.patch"
           parsed = parse_patch(upstream_patch.read_text())
@@ -404,6 +409,12 @@ jobs:
           subprocess.run(["git", "apply", "--check", "--verbose", str(cand_patch)], cwd=tree, check=True)
           subprocess.run(["git", "apply", "--verbose", str(cand_patch)], cwd=tree, check=True)
           print("✅ Candidate patch strictly applied on 2026-09_r6 with 0 fuzz, 0 offsets, 0 rejects.")
+
+          evidence = {p: {"preimage": hashlib.sha256(before[p].encode()).hexdigest(),
+                          "postimage": hashlib.sha256(after[p].encode()).hexdigest(),
+                          "applied": hashlib.sha256((tree / p).read_bytes()).hexdigest()}
+                      for p in sorted(after)}
+          (cand_dir / "postimages.json").write_text(json.dumps(evidence, indent=2) + "\n")
           PY
 
       - name: Real Kbuild objects and SuSFS symbol closure (2026-09_r6)

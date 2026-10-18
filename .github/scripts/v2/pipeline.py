@@ -578,6 +578,8 @@ def deliver_multi_candidates(
     allowed_paths.extend(TARGET_REL_PATHS[patch_id] for patch_id in changed_targets)
     if "xxksu-patch11" in candidate_targets:
         allowed_paths.append(Path(".github/fixtures/v2/patch11-policy-commit.txt"))
+    for compat in (repo_root / "patches/gki-android16-6.12").glob("51_*.patch"):
+        allowed_paths.append(compat.relative_to(repo_root))
 
     for rel_path in allowed_paths:
         full_path = repo_root / rel_path
