@@ -433,10 +433,10 @@ class XxksuAdapterTests(unittest.TestCase):
             "kernel/ksu.c", prefix + ksu_entry.content, update_hash=True,
         )
         gen_mod = generate_patch11(mod_bundle)
-        # In the baseline patch, ksu.c hunk 0 is @@ -166,6 +166,10 @@
-        # With 5 lines prepended, it must shift to @@ -171,6 +171,10 @@
-        self.assertIn("@@ -171,6 +171,10 @@", gen_mod)
-        self.assertNotIn("@@ -166,6 +166,10 @@", gen_mod)
+        # In the baseline patch, ksu.c hunk 0 is @@ -169,6 +169,10 @@
+        # With 5 lines prepended, it must shift to @@ -174,6 +174,10 @@
+        self.assertIn("@@ -174,6 +174,10 @@", gen_mod)
+        self.assertNotIn("@@ -169,6 +169,10 @@", gen_mod)
 
     def test_bundle_file_order_permutation_invariance(self):
         """Permuting file ordering in clean bundle produces identical generated patch."""
