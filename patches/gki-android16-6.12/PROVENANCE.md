@@ -7,7 +7,7 @@ The production apply target is `android16-6.12-2025-09_r38`, not the historical 
 - URL: `https://github.com/yapixel/gki-build-assets/releases/download/android16-6.12-2025-09_r38/common-android16-6.12-2025-09_r38.tar.gz`
 - SHA-256: `accf8f9348280116792c9608f420f8d4554da52499119a8536883c5eefd429ff`
 - Exact retained source contents/hashes: `.github/fixtures/v2/r38-sources.json`.
-- Accepted SuSFS: `5e0b2b925865000ca7dce993ecf1d281ee312887`.
+- Accepted SuSFS: `bd2756895e557f339b6304b57e4de131868ea429`.
 - Current generated Patch 51 hash: `patches/manifest.json` and `BASELINE.json:patch_51.patch_sha256`.
 
 The workflow verifies the downloaded file against this hash before extraction. Lifecycle corrections and publication evidence are documented in `PATCH51_CORRECTIONS.md`.

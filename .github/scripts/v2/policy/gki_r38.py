@@ -3,6 +3,7 @@
 Target preimages are clean archive members, not reverse-applied Patch 51 hunks.
 An input change needs review before this bounded transformation will accept it.
 """
+import copy
 import json
 from pathlib import Path
 
@@ -13,6 +14,59 @@ from .patch51_source import (
 
 FILES = KERNEL_FILES
 _apply_retained = apply_retained
+
+
+def _adapt_upstream_retained(path: str, source: str, diff_file) -> str:
+    """Target-specific adaptation for upstream Patch 50 hunks on GKI 6.12 r38."""
+    if path == "fs/proc/base.c":
+        diff_file = copy.deepcopy(diff_file)
+        diff_file.hunks[0].lines = [l for l in diff_file.hunks[0].lines if l.text != "#include <linux/dma-buf.h>"]
+        diff_file.hunks[0].old_count -= 1
+        return _apply_retained(source, diff_file)
+    elif path == "fs/proc/task_mmu.c":
+        diff_file = copy.deepcopy(diff_file)
+        diff_file.hunks = [diff_file.hunks[i] for i in (0, 1, 2, 6, 7)]
+        src = _apply_retained(source, diff_file)
+        smap_hook = ("#ifdef CONFIG_KSU_SUSFS_SUS_MAP\n"
+                     "\tif (vma->vm_file) {\n"
+                     "\t\tif (SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))\n"
+                     "\t\t\treturn 0;\n"
+                     "\t}\n"
+                     "#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP\n\n")
+        src = replace_once(src, "\tif (!vma_pages(vma))\n\t\tgoto show_pad;\n",
+                           smap_hook + "\tif (!vma_pages(vma))\n\t\tgoto show_pad;\n")
+        old_rollup1 = ("\tdo {\n"
+                       "\t\tsmap_gather_stats(vma, &mss, 0);\n"
+                       "\t\tlast_vma_end = vma->vm_end;\n")
+        new_rollup1 = ("\tdo {\n"
+                       "#ifdef CONFIG_KSU_SUSFS_SUS_MAP\n"
+                       "\t\tif (vma->vm_file && SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))\n"
+                       "\t\t\tgoto bypass_orig_flow;\n"
+                       "#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP\n"
+                       "\t\tsmap_gather_stats(vma, &mss, 0);\n"
+                       "#ifdef CONFIG_KSU_SUSFS_SUS_MAP\n"
+                       "bypass_orig_flow:\n"
+                       "#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP\n"
+                       "\t\tlast_vma_end = vma->vm_end;\n")
+        src = replace_once(src, old_rollup1, new_rollup1)
+        old_rollup2 = ("\t\t\tif (vma->vm_end > last_vma_end) {\n"
+                       "\t\t\t\tsmap_gather_stats(vma, &mss, last_vma_end);\n"
+                       "\t\t\t\tlast_vma_end = vma->vm_end;\n"
+                       "\t\t\t}\n")
+        new_rollup2 = ("\t\t\tif (vma->vm_end > last_vma_end) {\n"
+                       "#ifdef CONFIG_KSU_SUSFS_SUS_MAP\n"
+                       "\t\t\t\tif (!vma->vm_file || !(SUSFS_IS_INODE_SUS_MAP(file_inode(vma->vm_file)))) {\n"
+                       "\t\t\t\t\tsmap_gather_stats(vma, &mss, last_vma_end);\n"
+                       "\t\t\t\t\tlast_vma_end = vma->vm_end;\n"
+                       "\t\t\t\t}\n"
+                       "#else\n"
+                       "\t\t\t\tsmap_gather_stats(vma, &mss, last_vma_end);\n"
+                       "\t\t\t\tlast_vma_end = vma->vm_end;\n"
+                       "#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP\n"
+                       "\t\t\t}\n")
+        src = replace_once(src, old_rollup2, new_rollup2)
+        return src
+    return _apply_retained(source, diff_file)
 
 
 def _adapt(path: str, source: str) -> str:
@@ -65,6 +119,9 @@ class GkiR38Patch51Adapter:
         if not set(KERNEL_FILES) <= before.keys():
             raise ValueError("required r38 source context missing")
         return before
+
+    def apply_retained(self, path: str, source: str, diff_file) -> str:
+        return _adapt_upstream_retained(path, source, diff_file)
 
     def apply_target_adaptation(self, path: str, source: str) -> str:
         return _adapt(path, source)

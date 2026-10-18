@@ -214,7 +214,10 @@ def reconstruct_postimages(patch_id: str, upstream_input: Path, root: Path):
     after = {}
     for path in KERNEL_FILES:
         diff_file = upstream[path]
-        retained_source = apply_retained(before[path], diff_file)
+        if hasattr(adapter, "apply_retained"):
+            retained_source = adapter.apply_retained(path, before[path], diff_file)
+        else:
+            retained_source = apply_retained(before[path], diff_file)
 
         # Decompose mixed-ownership files at source level
         if path in MIXED_FILES:

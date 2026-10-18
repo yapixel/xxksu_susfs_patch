@@ -1,16 +1,6 @@
-tree c347593f37748275592449cf4e0535c32aaf8769
-parent 37ccef9bb79eb61a9ed4877859daef4de7343fe3
-author simonpunk <simonpunk2016@gmail.com> 1791997054 +0800
-committer simonpunk <simonpunk2016@gmail.com> 1791997054 +0800
+tree 0de0e0425f98fdc1d791332ae964ec31c7b9ff00
+parent acb92d4abc922cac384a207744b2db40281a7c7f
+author simonpunk <simonpunk2016@gmail.com> 1792298403 +0800
+committer simonpunk <simonpunk2016@gmail.com> 1792298403 +0800
 
-kernel & KernelSU: Sync with the official KernelSU main repo
-
-[KernelSU]
-- See https://github.com/tiann/KernelSU/commit/0a1f3ff71719fa2d6ec15f5568dac27fdb957fcc
-
-- Remove unused upstream functions in selinux_hide.c
-
-[kernel]
-- Removed unused __ksu_is_allow_uid_for_current() in fs/exec.c
-
-- Previous selinux fix in sel_open_handle_status() was wrong, and the detection is fixed after completely imitating the upstream fix.
+rebase susfs patches onto android16-6.12.92
