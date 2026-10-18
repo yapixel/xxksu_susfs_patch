@@ -35,11 +35,11 @@
     "kernel/feature/sucompat.c": "sha256:ef1215f7cdf01103e50c62606851fb4ca06f50fc229d66f76e6704506b2ed9f9",
     "kernel/hook/setuid_hook.c": "sha256:dd7f40fa454fdea2d997ee219f3aed2892a71efa8ad2b69a5f2d6aca86ada1e5",
     "kernel/hook/syscall_table_hook_arm64.c": "sha256:9e0b0c3ce4935455032888ec9c7c6102664aa360767f607372835103fb42fa5d",
-    "kernel/ksu.c": "sha256:e41e5e002fc46329a7c2ab538fae821c93a9fb4fe6e9aaa04e20c78caec29112",
-    "kernel/runtime/ksud.c": "sha256:d7e72db324b9caf01dfab6e351408d16d93770c9f63a400a255b3e95ad5c3f43",
+    "kernel/ksu.c": "sha256:8ffc5c5bfc669296c24e1e3fdb213534f6a251c676bfa51a6462c0ea58ae170e",
+    "kernel/runtime/ksud_integration.c": "sha256:a8c65d547fbe7bf342a80502484dcd4cabeab1acc7d739b07b3aa77f5fa79a55",
     "kernel/selinux/rules.c": "sha256:b1d5ba8d2f90090ba029c76e4484158452fc170006fceb4f9d2b34eb4bb57003",
     "kernel/selinux/selinux.c": "sha256:c22331a2db5ee3bbb53234e51c04e98054281cb1a4d06550bb1413c817b985dc",
-    "kernel/selinux/selinux.h": "sha256:33219ac85de4b689ca307e5a869211353064aac9aa6df3c150ed670960a14968",
+    "kernel/selinux/selinux.h": "sha256:d2477e1f5c208554246ade801a039a459fe401a86f7077bca71b225c40ba566d",
     "kernel/supercall/dispatch.c": "sha256:ee7c559dc2be8a20c472c0460836445b9534e64a57d1ea16e621165595a8ef24",
     "kernel/supercall/supercall.c": "sha256:7fcf757a0a04399312365556be47120d7ce95d8c6229d08534d1c9559449f01e"
   },
@@ -47,7 +47,7 @@
   "source_bundle": {
     "artifact_path": ".github/fixtures/v2/v29-baselines/xxksu.json",
     "file_count": 13,
-    "identity": "sha256:3740814c70ff0e490b4df9bd07c031ee410993f47eb14636637ad7d2fd007cbb",
+    "identity": "sha256:ebb122e5386bbcd1eba4d88e2b797e5618abff154f89d405a3e32bd81b18ba38",
     "schema": "xxksu-susfs-source-bundle/v1"
   },
   "status": "VERIFIED",
@@ -57,7 +57,7 @@
     "archive_url": "https://codeload.github.com/backslashxx/KernelSU/tar.gz/12cdc2bf8ed85f7f79191ae8d262868f0ac76103",
     "ref": "master",
     "repository": "https://github.com/backslashxx/KernelSU",
-    "resolved_commit": "463f3dc3325f16b421dc79472e56089eca60826c",
-    "tree": "ead3a04b8fd85d9d0164f93692d8a28593597ba0"
+    "resolved_commit": "632ad62db00cd410273a1fbba3e796e1673ce3e9",
+    "tree": "e98002ab400eb478ffbed442c10b0612d831e7d4"
   }
 }

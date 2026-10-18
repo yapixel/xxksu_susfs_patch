@@ -89,9 +89,9 @@ _EXPECTED_PATHS = {
     "susfs.umount.webview_zygote": ("kernel/feature/kernel_umount.c", "kernel/downstream/ksu_hostsredirect.h"),
     "susfs.selinux.sid_management": ("kernel/selinux/rules.c", "kernel/selinux/selinux.c", "kernel/selinux/selinux.h"),
     "official_only.exec.sucompat": ("kernel/feature/sucompat.c",),
-    "official_only.fstat.definition": ("kernel/runtime/ksud.c",),
-    "official_only.read.definition": ("kernel/runtime/ksud.c",),
-    "official_only.input.definition": ("kernel/runtime/ksud.c",),
+    "official_only.fstat.definition": ("kernel/runtime/ksud.c", "kernel/runtime/ksud_integration.c"),
+    "official_only.read.definition": ("kernel/runtime/ksud.c", "kernel/runtime/ksud_integration.c"),
+    "official_only.input.definition": ("kernel/runtime/ksud.c", "kernel/runtime/ksud_integration.c"),
 }
 
 _EXPECTED_SYMBOLS = {
@@ -128,9 +128,9 @@ def _reviewed_statement(key: str, evidence) -> bool:
 def _source_shape(source_id: str, source: SemanticUnit, evidence) -> bool:
     expected_paths = {
         "transport.exec.definition": ("kernel/feature/sucompat.c",),
-        "transport.fstat_return.definition": ("kernel/runtime/ksud.c",),
+        "transport.fstat_return.definition": ("kernel/runtime/ksud.c", "kernel/runtime/ksud_integration.c"),
         "transport.read.internal_fallback": ("kernel/hook/syscall_table_hook_arm64.c",),
-        "transport.input.registration": ("kernel/runtime/ksud.c", "kernel/feature/vol_detector.c"),
+        "transport.input.registration": ("kernel/runtime/ksud.c", "kernel/runtime/ksud_integration.c", "kernel/feature/vol_detector.c"),
         "transport.umount.definition": ("kernel/feature/kernel_umount.c",),
     }
     expected_symbols = {

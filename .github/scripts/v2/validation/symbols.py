@@ -80,7 +80,7 @@ DEFAULT_SYMBOL_CONTRACTS: Tuple[SymbolContract, ...] = (
     SymbolContract(
         symbol="ksu_handle_newfstat_ret",
         is_required=True,
-        expected_paths=("kernel/runtime/ksud.c",),
+        expected_paths=("kernel/runtime/ksud.c", "kernel/runtime/ksud_integration.c"),
         bundle_target="xxksu",
         description="xxKSU fstat return handler",
     ),
@@ -94,7 +94,7 @@ DEFAULT_SYMBOL_CONTRACTS: Tuple[SymbolContract, ...] = (
     SymbolContract(
         symbol="input_register_handler",
         is_required=True,
-        expected_paths=("kernel/runtime/ksud.c", "kernel/feature/vol_detector.c"),
+        expected_paths=("kernel/runtime/ksud.c", "kernel/runtime/ksud_integration.c", "kernel/feature/vol_detector.c"),
         bundle_target="xxksu",
         description="xxKSU volume detector input registration",
     ),

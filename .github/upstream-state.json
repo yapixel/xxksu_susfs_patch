@@ -3,9 +3,9 @@
   "sources": {
     "authoritative": {
       "backslashxx_kernelsu": {
-        "commit": "463f3dc3325f16b421dc79472e56089eca60826c",
+        "commit": "632ad62db00cd410273a1fbba3e796e1673ce3e9",
         "ref": "master",
-        "relevant_content_hash": "sha256:695e79f87748c4248a6f5a47353b754565224a68421033c878e6ab9195f1ed28",
+        "relevant_content_hash": "sha256:f00bd25efbb637decc836c915276f4b3ec42b97bd30816fc681be9e266ca0764",
         "repository": "https://github.com/backslashxx/KernelSU.git",
         "tracked_files": {
           "kernel/Kconfig": "sha256:3a30954bbff10ec57c9897fd17d856877c0b9db9f71692b3e0430639c99c9ec8",
@@ -16,12 +16,12 @@
           "kernel/hook/setuid_hook.c": "sha256:dd7f40fa454fdea2d997ee219f3aed2892a71efa8ad2b69a5f2d6aca86ada1e5",
           "kernel/hook/syscall_table_hook_arm64.c": "sha256:9e0b0c3ce4935455032888ec9c7c6102664aa360767f607372835103fb42fa5d",
           "kernel/kernel_compat.h": "sha256:4da3eae8a7c39fad2712b24dcfbe5a2626a121d31fa48b2c7c035c007914b9f3",
-          "kernel/kernel_includes.h": "sha256:ad339b780c48d772b4a9446d9da4e27b663d1a6ad6329b5f9c82f55375c4771a",
-          "kernel/ksu.c": "sha256:e41e5e002fc46329a7c2ab538fae821c93a9fb4fe6e9aaa04e20c78caec29112",
-          "kernel/runtime/ksud.c": "sha256:d7e72db324b9caf01dfab6e351408d16d93770c9f63a400a255b3e95ad5c3f43",
+          "kernel/kernel_includes.h": "sha256:b9bc0f995d5718048963701f89ba02ed673c8931ccdb025240d4602a39b0ca56",
+          "kernel/ksu.c": "sha256:8ffc5c5bfc669296c24e1e3fdb213534f6a251c676bfa51a6462c0ea58ae170e",
+          "kernel/runtime/ksud_integration.c": "sha256:a8c65d547fbe7bf342a80502484dcd4cabeab1acc7d739b07b3aa77f5fa79a55",
           "kernel/selinux/rules.c": "sha256:b1d5ba8d2f90090ba029c76e4484158452fc170006fceb4f9d2b34eb4bb57003",
           "kernel/selinux/selinux.c": "sha256:c22331a2db5ee3bbb53234e51c04e98054281cb1a4d06550bb1413c817b985dc",
-          "kernel/selinux/selinux.h": "sha256:33219ac85de4b689ca307e5a869211353064aac9aa6df3c150ed670960a14968",
+          "kernel/selinux/selinux.h": "sha256:d2477e1f5c208554246ade801a039a459fe401a86f7077bca71b225c40ba566d",
           "kernel/supercall/dispatch.c": "sha256:ee7c559dc2be8a20c472c0460836445b9534e64a57d1ea16e621165595a8ef24",
           "kernel/supercall/supercall.c": "sha256:7fcf757a0a04399312365556be47120d7ce95d8c6229d08534d1c9559449f01e"
         }
