@@ -78,7 +78,7 @@ Therefore, the r58 lineage remains permanently non-authoritative and retained so
 - **Tag:** `android16-6.12-2026-09_r6`
 - **Commit:** `9257cac5f5440a3f5492477d5ac82dd722703da9`
 - **Kernel Version:** Linux 6.12.92 (AOSP Android 16)
-- **Patch Artifact:** `patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12.92_r6.patch`
+- **Patch Artifact:** `patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2026-09_r6.patch`
 - **Patch SHA-256:** `070ddd77ffc2469f1f10f23f1803c5ead94d4bcf4e9e389ed481e60bc6ed8856`
 - **Strict Application:** `PASS` (zero rejects, exact preimages, zero fuzz, offset 0 across all 16 kernel files)
 - **SuSFS Lineage:** `bd2756895e557f339b6304b57e4de131868ea429` (rebase susfs patches onto android16-6.12.92)
