@@ -66,3 +66,20 @@ The original historical `51_deinlined_susfs_hooks_gki-android16-6.12.patch` was 
 Neither input had immutable content verification at commit time. The archive currently served at that URL exhibited preimage divergence against the patch (e.g. `drivers/input/input.c` preimage prefix `78be582b5766` vs actual archive blob `c51858f1cdc556939c2ee1bd21669c71c169d84e`). Reconstructing the baseline from patch context is strictly forbidden under V2 architectural rules.
 
 Therefore, the r58 lineage remains permanently non-authoritative and retained solely as historical evidence.
+
+---
+
+## 4. Upstream GKI 6.12.92 Compatibility Target (android16-6.12-2026-09_r6)
+
+**Status:** `VERIFIED`
+
+- **Compatibility Target:** `android16-6.12-2026-09_r6 (GKI 6.12.92)`
+- **Upstream Repository:** `https://android.googlesource.com/kernel/common`
+- **Tag:** `android16-6.12-2026-09_r6`
+- **Commit:** `9257cac5f5440a3f5492477d5ac82dd722703da9`
+- **Kernel Version:** Linux 6.12.92 (AOSP Android 16)
+- **Patch Artifact:** `patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12.92_r6.patch`
+- **Symlink:** `patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2026-09_r6.patch`
+- **Patch SHA-256:** `070ddd77ffc2469f1f10f23f1803c5ead94d4bcf4e9e389ed481e60bc6ed8856`
+- **Strict Application:** `PASS` (zero rejects, exact preimages, zero fuzz, offset 0 across all 16 kernel files)
+- **SuSFS Lineage:** `bd2756895e557f339b6304b57e4de131868ea429` (rebase susfs patches onto android16-6.12.92)

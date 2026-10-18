@@ -13,6 +13,13 @@
         "compatibility_target": "android16-6.12-2025-09_r38 (GKI 6.12)",
         "patch_file": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
         "patch_sha256": "sha256:ec298ba43699ce414433c7aa5f820b652f852b54817d35a5e58627d97783108b"
+      },
+      "gki-android16-6.12.92-r6": {
+        "apply_target": "android16-6.12-2026-09_r6",
+        "archive_url": "https://android.googlesource.com/kernel/common/+archive/refs/tags/android16-6.12-2026-09_r6.tar.gz",
+        "compatibility_target": "android16-6.12-2026-09_r6 (GKI 6.12.92)",
+        "patch_file": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12.92_r6.patch",
+        "patch_sha256": "sha256:070ddd77ffc2469f1f10f23f1803c5ead94d4bcf4e9e389ed481e60bc6ed8856"
       }
     }
   },
