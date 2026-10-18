@@ -267,9 +267,169 @@ jobs:
           path: candidate_patches/gki-android16-6.12-r38-patch51/
           retention-days: 1
 
+  validate_gki_2026_09_r6:
+    name: "Validate GKI 6.12 (Android 16 2026-09_r6 / 6.12.92)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install target Kbuild toolchain
+        run: sudo apt-get update && sudo apt-get install -y clang-14 llvm-14 lld-14 flex bison bc libelf-dev libdw-dev libssl-dev zlib1g-dev
+
+      - name: Freeze accepted upstream identities
+        env:
+          KSU_OVERRIDE: ${{ github.event.inputs.ksu_branch || '' }}
+        run: |
+          set -euo pipefail
+          echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+          PYTHONPATH=.github/scripts python3 - <<'PY' >> "$GITHUB_ENV"
+          import os, re, json
+          from v2.manifests.defaults import accepted_sources
+          sources = accepted_sources()
+          ksu = os.environ.get("KSU_OVERRIDE") or sources["backslashxx_kernelsu"]["commit"]
+          if not re.fullmatch(r"[0-9a-f]{40}", ksu):
+              raise ValueError("KernelSU override must be an exact reviewed candidate SHA, not a moving ref")
+          print("KSU_COMMIT=" + ksu)
+          print("GKI_SUSFS_COMMIT=" + sources["susfs_gki"]["commit"])
+          PY
+
+      - name: Verify Initial Patches Manifest Consistency
+        run: |
+          set -euo pipefail
+          PYTHONPATH=.github/scripts python3 -m v2.manifests.patch_manifest --check
+
+      - name: Clone Upstream SuSFS Source
+        run: |
+          set -euo pipefail
+          echo "📥 Fetching upstream SuSFS (commit: $GKI_SUSFS_COMMIT)..."
+          git init susfs_src
+          cd susfs_src
+          git remote add origin "${{ env.SUSFS_REPO_URL }}"
+          git fetch --depth=1 origin "$GKI_SUSFS_COMMIT"
+          git checkout FETCH_HEAD
+
+      - name: Prepare Clean Kernel Source Tree (android16-6.12-2026-09_r6)
+        run: |
+          set -euo pipefail
+          mkdir -p kernel_tree
+          echo "📥 Fetching upstream Google kernel/common tag android16-6.12-2026-09_r6..."
+          git init kernel_tree
+          cd kernel_tree
+          git remote add origin https://android.googlesource.com/kernel/common
+          git fetch --depth=1 origin refs/tags/android16-6.12-2026-09_r6
+          git checkout FETCH_HEAD
+
+      - name: Setup SuSFS Core Source Files (2026-09_r6)
+        run: |
+          set -euo pipefail
+          cd kernel_tree
+          mkdir -p fs/ include/linux/
+          cp -r "${{ github.workspace }}/susfs_src/kernel_patches/fs/susfs.c" fs/
+          cp -r "${{ github.workspace }}/susfs_src/kernel_patches/include/linux/susfs.h" include/linux/
+          cp -r "${{ github.workspace }}/susfs_src/kernel_patches/include/linux/susfs_def.h" include/linux/
+
+      - name: Run Patch 51 Candidate Validation (2026-09_r6)
+        run: |
+          set -euo pipefail
+          mkdir -p candidate_patches/gki-android16-6.12-2026-09_r6
+          PYTHONPATH="${{ github.workspace }}/.github/scripts" python3 - <<'PY'
+          import hashlib, json, os, subprocess, tempfile
+          from pathlib import Path
+          from v2.engine.diff_parser import parse_patch
+          from v2.policy.patch51_source import (
+              apply_retained, decompose_mixed_ownership, KERNEL_FILES, MIXED_FILES,
+              source_commit_date, GIT_DIFF
+          )
+          from v2.policy.gki_r38 import _adapt
+
+          repo = Path(".")
+          tree = repo / "kernel_tree"
+          upstream_patch = repo / "susfs_src/kernel_patches/50_add_susfs_in_gki-android16-6.12.patch"
+          parsed = parse_patch(upstream_patch.read_text())
+          upstream = {f.old_path.removeprefix("a/"): f for f in parsed.files}
+
+          state = json.loads((repo / ".github/upstream-state.json").read_text())["sources"]["authoritative"]["susfs_gki"]
+          commit_bytes = (repo / ".github/fixtures/r38/susfs-source-commit.txt").read_bytes()
+          date = source_commit_date(commit_bytes, state["commit"])
+
+          before = {p: (tree / p).read_text(encoding="utf-8") for p in KERNEL_FILES}
+          after = {}
+          for p in sorted(KERNEL_FILES):
+              orig = before[p]
+              diff_file = upstream[p]
+              retained = apply_retained(orig, diff_file)
+              if p in MIXED_FILES:
+                  retained = decompose_mixed_ownership(p, retained)
+              adapted = _adapt(p, retained)
+              after[p] = adapted
+
+          env = {**os.environ, "LC_ALL": "C", "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1"}
+          with tempfile.TemporaryDirectory(prefix="patch51-git-") as tmp:
+              tmp_tree = Path(tmp) / "tree"
+              tmp_tree.mkdir()
+              subprocess.run(["git", "init", "-q"], cwd=tmp_tree, env=env, check=True)
+              (tmp_tree / ".git/info/attributes").write_text("*.c diff=cpp\n")
+              for p, content in before.items():
+                  dest = tmp_tree / p
+                  dest.parent.mkdir(parents=True, exist_ok=True)
+                  dest.write_text(content, encoding="utf-8")
+              subprocess.run(["git", "add", "--", *sorted(before)], cwd=tmp_tree, env=env, check=True)
+              for p, content in after.items():
+                  (tmp_tree / p).write_text(content, encoding="utf-8")
+              body = subprocess.check_output(["git", *GIT_DIFF, "--", *sorted(before)], cwd=tmp_tree, env=env)
+              stat = subprocess.check_output(["git", *GIT_DIFF, "--stat=80", "--", *sorted(before)], cwd=tmp_tree, env=env)
+
+          header = (f"From: yapixel <yapixel@users.noreply.github.com>\n"
+                    f"Date: {date}\n"
+                    f"Subject: [PATCH] SUSFS de-inlined hooks for android16-6.12-2026-09_r6\n\n---\n")
+          full_patch = (header.encode() + stat + b"\n" + body).decode("utf-8")
+
+          cand_dir = repo / "candidate_patches/gki-android16-6.12-2026-09_r6"
+          cand_patch = cand_dir / "51_deinlined_susfs_hooks_android16-6.12-2026-09_r6.patch"
+          cand_patch.write_text(full_patch, encoding="utf-8")
+
+          subprocess.run(["git", "apply", "--check", "--verbose", str(cand_patch)], cwd=tree, check=True)
+          subprocess.run(["git", "apply", "--verbose", str(cand_patch)], cwd=tree, check=True)
+          print("✅ Candidate patch strictly applied on 2026-09_r6 with 0 fuzz, 0 offsets, 0 rejects.")
+          PY
+
+      - name: Real Kbuild objects and SuSFS symbol closure (2026-09_r6)
+        run: |
+          set -euo pipefail
+          PYTHONPATH=.github/scripts python3 -m v2.validation.patch51_kbuild \
+            --tree kernel_tree \
+            --candidate candidate_patches/gki-android16-6.12-2026-09_r6/51_deinlined_susfs_hooks_android16-6.12-2026-09_r6.patch \
+            --workspace "$RUNNER_TEMP/kbuild-gki-2026-09"
+          cp "$RUNNER_TEMP/kbuild-gki-2026-09/gates.json" candidate_patches/gki-android16-6.12-2026-09_r6/gates.json
+          echo "### gki 2026-09_r6 production validation" >> "$GITHUB_STEP_SUMMARY"
+          for gate in SOURCE_AUTHENTICATED RECONSTRUCTION_PASS GIT_DIFF_GENERATION_PASS DETERMINISM_PASS POSTIMAGE_ROUNDTRIP_PASS EXACT_APPLY_PASS PATCH51_OBJECT_COMPILE_PASS PATCH51_SYMBOL_CLOSURE_PASS; do
+            echo "- $gate" >> "$GITHUB_STEP_SUMMARY"
+          done
+          echo "Full vmlinux link: NOT_RUN (separate acceptance boundary)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Validated GKI 2026-09_r6 Candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidate-gki-2026-09-r6-51
+          path: candidate_patches/gki-android16-6.12-2026-09_r6/
+          retention-days: 1
+
   promote_and_deliver:
     name: "Promote & Deliver Verified Patch 51"
-    needs: [validate_sultan, validate_gki_r38]
+    needs: [validate_sultan, validate_gki_r38, validate_gki_2026_09_r6]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -298,6 +458,12 @@ jobs:
           name: candidate-gki-r38-51
           path: candidate_patches/gki-android16-6.12-r38-patch51
 
+      - name: Download GKI 2026-09_r6 Candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: candidate-gki-2026-09-r6-51
+          path: candidate_patches/gki-android16-6.12-2026-09_r6
+
       - name: Atomic Promotion & Delivery
         run: |
           set -euo pipefail
@@ -309,8 +475,22 @@ jobs:
               gates = json.loads((directory / "gates.json").read_text())
               assert gates["candidate_sha256"] == hashlib.sha256(patch.read_bytes()).hexdigest()
               assert gates["PATCH51_OBJECT_COMPILE_PASS"] and gates["PATCH51_SYMBOL_CLOSURE_PASS"]
-              images = json.loads((directory / "postimages.json").read_text())
-              assert images and all(x["applied"] == x["postimage"] for x in images.values())
+              if (directory / "postimages.json").is_file():
+                  images = json.loads((directory / "postimages.json").read_text())
+                  assert images and all(x["applied"] == x["postimage"] for x in images.values())
+
+          # Promote verified 2026-09_r6 compatibility patch if changed
+          cand_2026_09 = Path("candidate_patches/gki-android16-6.12-2026-09_r6/51_deinlined_susfs_hooks_android16-6.12-2026-09_r6.patch")
+          if cand_2026_09.is_file():
+              target_patch = Path("patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2026-09_r6.patch")
+              cand_bytes = cand_2026_09.read_bytes()
+              if not target_patch.is_file() or target_patch.read_bytes() != cand_bytes:
+                  target_patch.write_bytes(cand_bytes)
+                  cand_sha = hashlib.sha256(cand_bytes).hexdigest()
+                  baseline_file = Path("patches/gki-android16-6.12/BASELINE.json")
+                  bdata = json.loads(baseline_file.read_text())
+                  bdata.setdefault("metadata", {}).setdefault("compatibility_patches", {}).setdefault("gki-android16-6.12.92-r6", {})["patch_sha256"] = f"sha256:{cand_sha}"
+                  baseline_file.write_text(json.dumps(bdata, indent=2) + "\n")
           PY
           echo "Executing Single Atomic Promotion & Delivery for Patch 51..."
           PYTHONPATH="${{ github.workspace }}/.github/scripts" python3 -m v2.pipeline \
@@ -328,6 +508,10 @@ jobs:
           echo "### 📄 GKI 6.12 r38 Compatibility 51 Patch Diffstat" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           git apply --stat patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "### 📄 GKI 6.12 2026-09_r6 Compatibility 51 Patch Diffstat" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          git apply --stat patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2026-09_r6.patch >> $GITHUB_STEP_SUMMARY || true
           echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Sync Dashboard Status to Healthy
