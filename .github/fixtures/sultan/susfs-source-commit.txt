@@ -1,6 +1,8 @@
-tree b09abcc6132f9291d4d5fd52faba83771ac6d934
-parent 0995c4fb0b44da7b23a4e57473b3f8463148c7a4
-author simonpunk <simonpunk2016@gmail.com> 1791983649 +0800
-committer simonpunk <simonpunk2016@gmail.com> 1791983649 +0800
+tree a30d713b687abec6bc05cfecb26f8cb053474198
+parent ffa3831ddb6a71a3a078f5ff2204adcdcdba97ab
+author simonpunk <simonpunk2016@gmail.com> 1792379926 +0800
+committer simonpunk <simonpunk2016@gmail.com> 1792379926 +0800
 
-kernel: Fix missing #ifdef guard in sel_open_handle_status()
+KernelSU: Sync with the official KernelSU main repo
+
+- See https://github.com/tiann/KernelSU/commit/0f58f12c2d94de7a72346ef6ec6bb7bf5e46c261

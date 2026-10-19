@@ -42,14 +42,14 @@
   ],
   "recent_events": [
     {
-      "timestamp": "2026-10-18",
+      "timestamp": "2026-10-19",
       "source_id": "susfs_gki",
-      "text": "UPSTREAM_RECONCILED: reconciled susfs_gki upstream to gki-android16-6.12 bd27568; candidate Patch 51 verified with exact application."
+      "text": "UPSTREAM_RECONCILED: reconciled susfs_gki upstream to gki-android16-6.12 291d571; candidate Patch 51 verified with exact application."
     },
     {
-      "timestamp": "2026-10-14",
+      "timestamp": "2026-10-19",
       "source_id": "susfs_sultan",
-      "text": "UPSTREAM_RECONCILED: reconciled susfs_sultan upstream to sultan-shiba-susfs-minimal 0b86929d; candidate Patch 51 verified with exact application."
+      "text": "UPSTREAM_RECONCILED: reconciled susfs_sultan upstream to sultan-shiba-susfs-minimal 665e5d1; candidate Patch 51 verified with exact application."
     },
     {
       "timestamp": "2026-10-13",
