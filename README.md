@@ -27,9 +27,7 @@ A source-driven system that publishes reviewed Patch 11 / Patch 51 artifacts for
 | Target | Kernel | Artifact | Status |
 | :--- | :--- | :--- | :--- |
 | **xxKSU** | — | [Patch 11](patches/xxksu/11_enable_susfs_for_ksu.patch) · [Raw](https://raw.githubusercontent.com/yapixel/xxksu_susfs_patch/main/patches/xxksu/11_enable_susfs_for_ksu.patch) | Verified |
-| **Sultan** (see target note below) | Android 14 / Linux 6.1 | [Patch 51](patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch) · [Raw](https://raw.githubusercontent.com/yapixel/xxksu_susfs_patch/main/patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch) | Verified |
-| **GKI (Latest)** | Android 16 / Linux 6.12 (2026-09_r6) | [Patch 51](patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2026-09_r6.patch) · [Raw](https://raw.githubusercontent.com/yapixel/xxksu_susfs_patch/main/patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2026-09_r6.patch) | Verified |
-| **GKI (Compat)** | Android 16 / Linux 6.12 (2025-09_r38) | [Patch 51](patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch) · [Raw](https://raw.githubusercontent.com/yapixel/xxksu_susfs_patch/main/patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch) | Verified |
+| **GKI** | Android 16 / Linux 6.12 r38 | [Patch 51](patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch) · [Raw](https://raw.githubusercontent.com/yapixel/xxksu_susfs_patch/main/patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch) | Verified |
 
 Complete artifact checksums, source identities, and compatibility targets are maintained in [patches/manifest.json](patches/manifest.json).
 
@@ -100,7 +98,7 @@ Select the appropriate patch for your component:
 
 - **Patch 11** → Apply to accepted / compatible [backslashxx/KernelSU](https://github.com/backslashxx/KernelSU) source.
 - **Sultan Patch 51** → Apply to Sultan Android 14 / Linux 6.1 kernel source (accepted Tensynos `16.0.0-sultan` lineage; see the Sultan target note).
-- **GKI Patch 51** → Apply to Android 16 / Linux 6.12 common kernel source (latest `android16-6.12-2026-09_r6` or compatibility `android16-6.12-2025-09_r38`).
+- **GKI Patch 51** → Apply to Android 16 / Linux 6.12 r38 common kernel source (GKI 6.12).
 
 Check [patches/manifest.json](patches/manifest.json) or each target's `BASELINE.json` for companion SuSFS core files and patch checksums.
 

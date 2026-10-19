@@ -347,7 +347,7 @@ class ProvenanceTests(unittest.TestCase):
             self.assertNotIn("ref: main", workflow)
             self.assertNotRegex(workflow, r"bb0be929|a8324101|b213c541")
             blocks = re.findall(r"name: Freeze accepted upstream identities.*?        run: \|\n(.*?)(?=\n      - name:)", workflow, re.S)
-            self.assertEqual(len(blocks), 1 if "11-" in name else 3)
+            self.assertEqual(len(blocks), 1 if "11-" in name else 2)
             for block in blocks:
                 script = "\n".join(line[10:] for line in block.splitlines())
                 output = self.root / "run-identities"
