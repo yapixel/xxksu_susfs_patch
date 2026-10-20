@@ -1,6 +1,7 @@
 """Comprehensive test suite for V2.7: official 10 -> shared 11 policy and xxKSU adapter."""
 
 import hashlib
+import re
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -433,10 +434,12 @@ class XxksuAdapterTests(unittest.TestCase):
             "kernel/ksu.c", prefix + ksu_entry.content, update_hash=True,
         )
         gen_mod = generate_patch11(mod_bundle)
-        # In the baseline patch, ksu.c hunk 0 is @@ -171,6 +171,10 @@
-        # With 5 lines prepended, it must shift to @@ -176,6 +176,10 @@
-        self.assertIn("@@ -176,6 +176,10 @@", gen_mod)
-        self.assertNotIn("@@ -171,6 +171,10 @@", gen_mod)
+        # Derive ksu.c hunk 0 from the accepted bundle; the bundle advances with xxKSU.
+        ksu_diff = generate_patch11(self.clean_bundle).split("diff --git a/kernel/ksu.c", 1)[1]
+        start = int(re.search(r"^@@ -(\d+),6 \+\1,10 @@", ksu_diff, re.M).group(1))
+        # With 5 lines prepended, it must shift by exactly 5.
+        self.assertIn(f"@@ -{start + 5},6 +{start + 5},10 @@", gen_mod)
+        self.assertNotIn(f"@@ -{start},6 +{start},10 @@", gen_mod)
 
     def test_bundle_file_order_permutation_invariance(self):
         """Permuting file ordering in clean bundle produces identical generated patch."""

@@ -79,6 +79,13 @@ class TestPipelineDelivery(unittest.TestCase):
             fp = self.ksu_tree / f.path
             fp.parent.mkdir(parents=True, exist_ok=True)
             fp.write_text(f.content, encoding="utf-8")
+        # A real checkout also carries the watched dependency surfaces outside the bundle.
+        state = json.loads((real_root / ".github/upstream-state.json").read_text())
+        for rel in state["sources"]["authoritative"]["backslashxx_kernelsu"]["tracked_files"]:
+            fp = self.ksu_tree / rel
+            if not fp.exists():
+                fp.parent.mkdir(parents=True, exist_ok=True)
+                fp.write_text(f"/* {rel} */\n", encoding="utf-8")
 
         # Initial commit and push to origin main
         subprocess.run(["git", "add", "-A"], cwd=self.repo_root, check=True)
@@ -555,6 +562,63 @@ class TestPipelineDelivery(unittest.TestCase):
         # Public files completely unmodified
         self.assertEqual(public_patch.read_bytes(), orig_bytes)
         self.assertEqual((self.repo_root / "patches" / "manifest.json").read_bytes(), orig_manifest)
+
+
+class TestXxksuSourceSync(unittest.TestCase):
+    """Patch 11 promotion advances the source bundle and tracked hashes with the commit."""
+
+    def test_sync_reads_committed_bytes_and_keeps_records_coherent(self):
+        real_root = Path(__file__).resolve().parents[4]
+        rels = ("patches/xxksu/BASELINE.json", ".github/upstream-state.json",
+                ".github/fixtures/v2/v29-baselines/xxksu.json")
+        with tempfile.TemporaryDirectory() as tmp_root, tempfile.TemporaryDirectory() as tmp_ksu:
+            root, ksu = Path(tmp_root), Path(tmp_ksu)
+            for rel in rels:
+                (root / rel).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(real_root / rel, root / rel)
+            state = json.loads((root / rels[1]).read_text())["sources"]["authoritative"]["backslashxx_kernelsu"]
+            bundle = json.loads((root / rels[2]).read_text())
+            files = {item["path"]: item["content"] for item in bundle["files"]}
+            for rel in state["tracked_files"]:
+                files.setdefault(rel, f"/* {rel} */\n")
+            files["kernel/ksu.c"] = "/* accepted */\n" + files["kernel/ksu.c"]
+            for rel, content in files.items():
+                (ksu / rel).parent.mkdir(parents=True, exist_ok=True)
+                (ksu / rel).write_text(content, encoding="utf-8")
+            git = lambda *args: subprocess.run(["git", *args], cwd=ksu, check=True,
+                                               capture_output=True, text=True).stdout.strip()
+            git("init", "-q")
+            git("add", "-A")
+            git("-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-qm", "accepted")
+            commit, tree = git("rev-parse", "HEAD"), git("rev-parse", "HEAD^{tree}")
+            # The applied candidate dirties the tree; only committed bytes may be recorded.
+            (ksu / "kernel/ksu.c").write_text("/* applied patch */\n", encoding="utf-8")
+
+            updates = pipeline._plan_metadata_updates(
+                {"xxksu-patch11": "0" * 64}, {"xxksu-patch11": commit}, root, source_tree=ksu)
+            self.assertEqual(set(updates), {Path(rel) for rel in rels})
+            for rel, content in updates.items():
+                (root / rel).write_bytes(content)
+
+            synced = load_authoritative_bundle("xxksu", root)
+            self.assertEqual(synced.get_file("kernel/ksu.c").content, files["kernel/ksu.c"])
+            baseline = json.loads((root / rels[0]).read_text())
+            self.assertEqual(baseline["upstream"]["resolved_commit"], commit)
+            self.assertEqual(baseline["upstream"]["tree"], tree)
+            self.assertEqual(baseline["retained_file_hashes"],
+                             {f.path: str(f.content_hash) for f in synced.files})
+            state = json.loads((root / rels[1]).read_text())["sources"]["authoritative"]["backslashxx_kernelsu"]
+            for rel, content in files.items():
+                if rel in state["tracked_files"]:
+                    self.assertEqual(state["tracked_files"][rel],
+                                     "sha256:" + hashlib.sha256(content.encode()).hexdigest())
+            from v2.watch.checker import compute_composite_hash
+            self.assertEqual(state["relevant_content_hash"], compute_composite_hash(state["tracked_files"]))
+            # Rerun on synced records is a no-op for source metadata.
+            again = pipeline._plan_metadata_updates(
+                {"xxksu-patch11": "0" * 64}, {"xxksu-patch11": commit}, root, source_tree=ksu)
+            self.assertNotIn(Path(rels[2]), again)
+            self.assertNotIn(Path(rels[1]), again)
 
 
 if __name__ == "__main__":

@@ -201,16 +201,27 @@ def _extract_git_commit(upstream_input: Path) -> Optional[str]:
     return None
 
 
+def _accepted_blob(source_tree: Path, rel: str) -> bytes:
+    """Clean committed bytes; the working tree may already carry the applied candidate."""
+    proc = subprocess.run(["git", "show", f"HEAD:{rel}"], cwd=source_tree, capture_output=True)
+    if proc.returncode != 0:
+        raise PromotionError(f"accepted xxKSU commit lacks tracked file {rel}")
+    return proc.stdout
+
+
 def _plan_metadata_updates(
     candidate_shas: Mapping[str, str], upstream_commits: Mapping[str, str],
-    repo_root: Path,
+    repo_root: Path, source_tree: Optional[Path] = None,
 ) -> dict[Path, bytes]:
     """Read-only plan for the existing baseline/provenance synchronization fields.
 
     Commits are supplied only after the caller's validation gates. Equality of
-    patch bytes does not imply equality of accepted source provenance.
+    patch bytes does not imply equality of accepted source provenance. For Patch 11,
+    ``source_tree`` is the clean accepted xxKSU checkout; the source bundle and
+    tracked hashes advance with the accepted commit.
     """
     updates = {}
+    sync_xxksu = source_tree is not None and bool(upstream_commits.get("xxksu-patch11"))
     for patch_id, candidate_sha in candidate_shas.items():
         path = TARGET_REL_PATHS[patch_id].parent / "BASELINE.json"
         full_path = repo_root / path
@@ -227,6 +238,24 @@ def _plan_metadata_updates(
         if commit:
             lineage = "upstream" if patch_id == "xxksu-patch11" else "susfs"
             data.setdefault(lineage, {})["resolved_commit"] = commit
+        if patch_id == "xxksu-patch11" and sync_xxksu:
+            bundle_rel = Path(data["source_bundle"]["artifact_path"])
+            raw = json.loads((repo_root / bundle_rel).read_bytes())
+            contents = {item["path"]: _accepted_blob(source_tree, item["path"]).decode("utf-8")
+                        for item in raw["files"]}
+            bundle = create_source_bundle(raw["target_id"], raw["kernel_version"], contents, raw["metadata"])
+            raw["files"] = [dict(f.to_dict(), content=f.content) for f in bundle.files]
+            text = (json.dumps(raw, indent=2, sort_keys=True) + "\n").encode()
+            if text != (repo_root / bundle_rel).read_bytes():
+                updates[bundle_rel] = text
+            if set(data["retained_file_hashes"]) != set(contents):
+                raise PromotionError("xxKSU retained_file_hashes and source bundle paths disagree")
+            for f in bundle.files:
+                data["retained_file_hashes"][f.path] = str(f.content_hash)
+            data["source_bundle"]["identity"] = str(bundle.identity)
+            data["upstream"]["tree"] = subprocess.run(
+                ["git", "rev-parse", "HEAD^{tree}"], cwd=source_tree,
+                capture_output=True, text=True, check=True).stdout.strip()
         if data != before:
             updates[path] = (json.dumps(data, indent=2) + "\n").encode()
 
@@ -245,6 +274,12 @@ def _plan_metadata_updates(
             key = source_keys[patch_id]
             if commit and key in authoritative:
                 authoritative[key]["commit"] = commit
+            if patch_id == "xxksu-patch11" and sync_xxksu and key in authoritative:
+                from .watch.checker import compute_composite_hash
+                tracked = authoritative[key]["tracked_files"]
+                for rel in tracked:
+                    tracked[rel] = "sha256:" + hashlib.sha256(_accepted_blob(source_tree, rel)).hexdigest()
+                authoritative[key]["relevant_content_hash"] = compute_composite_hash(tracked)
         if data != before:
             updates[state_path] = (json.dumps(data, indent=2) + "\n").encode()
     return updates
@@ -364,6 +399,7 @@ def deliver_promotion(
     if patch_id == "xxksu-patch11":
         allowed_paths.append(Path("patches/xxksu/BASELINE.json"))
         allowed_paths.append(Path(".github/fixtures/v2/patch11-policy-commit.txt"))
+        allowed_paths.append(Path(".github/fixtures/v2/v29-baselines/xxksu.json"))
     elif patch_id == "sultan-android14-6.1-patch51":
         allowed_paths.append(Path("patches/sultan-android14-6.1/BASELINE.json"))
     elif patch_id == "gki-android16-6.12-r38-patch51":
@@ -832,6 +868,7 @@ def run_pipeline(
         metadata_updates = _plan_metadata_updates(
             {patch_id: candidate_sha},
             {patch_id: upstream_commit} if upstream_commit else {}, repo_root,
+            source_tree=upstream_input if patch_id == "xxksu-patch11" else None,
         )
         patch_changed = public_bytes_before != candidate_bytes
         old_substantive = (substantive_patch_text(public_bytes_before.decode("utf-8"))
