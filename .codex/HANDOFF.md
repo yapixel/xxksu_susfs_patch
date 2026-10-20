@@ -23,3 +23,4 @@
 - 2026-10-19 UTC: `df7df1b` (`chore: reconcile susfs_sultan to 665e5d1 and susfs_gki to 291d571`) was committed with `--no-gpg-sign` per user instruction.
 - 2026-10-19 UTC: `5a20b88` (`revert: remove GKI 6.12.92 (2026-09_r6) patch and generation pipeline`) was committed with `--no-gpg-sign` per user instruction.
 - 2026-10-20 UTC: `738ed96` (`chore: reconcile susfs_sultan to 75d60eb and susfs_gki to 9c9f19d`) was committed with `--no-gpg-sign` because GPG signing failed in the unattended environment.
+- 2026-10-20 UTC: `1751a29` (`fix(pipeline): advance xxKSU source bundle and tracked hashes on Patch 11 promotion`) was committed with `--no-gpg-sign` because GPG signing failed in the unattended environment.
