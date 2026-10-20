@@ -25,3 +25,4 @@
 - 2026-10-20 UTC: `738ed96` (`chore: reconcile susfs_sultan to 75d60eb and susfs_gki to 9c9f19d`) was committed with `--no-gpg-sign` because GPG signing failed in the unattended environment.
 - 2026-10-20 UTC: `1751a29` (`fix(pipeline): advance xxKSU source bundle and tracked hashes on Patch 11 promotion`) was committed with `--no-gpg-sign` because GPG signing failed in the unattended environment.
 - 2026-10-20 UTC: `2483ebb` (`fix(pipeline): advance xxKSU source archive identity with the accepted commit`) and `2e64478` (`fix(workflow): stop auto-advancing the Patch 11 policy record`) were committed with `--no-gpg-sign` because GPG signing failed in the unattended environment.
+- 2026-10-20 UTC: `0f326d8` (`fix(gate): report Patch 10 drift as Patch 11 advisory and ignore structural lines`) was committed with `--no-gpg-sign` because GPG signing failed in the unattended environment.
