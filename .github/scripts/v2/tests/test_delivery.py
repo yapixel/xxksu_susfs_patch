@@ -36,6 +36,10 @@ class TestPipelineDelivery(unittest.TestCase):
     """Test suite proving delivery, commit, push, and no-op invariants."""
 
     def setUp(self):
+        # Source archive authentication is network-bound; fixture commits have no archive.
+        archive = patch("v2.pipeline._archive_sha256", return_value="f" * 64)
+        archive.start()
+        self.addCleanup(archive.stop)
         self.tmp_dir = tempfile.TemporaryDirectory()
         self.repo_root = Path(self.tmp_dir.name).resolve()
         self.remote_dir = tempfile.TemporaryDirectory()
@@ -594,8 +598,10 @@ class TestXxksuSourceSync(unittest.TestCase):
             # The applied candidate dirties the tree; only committed bytes may be recorded.
             (ksu / "kernel/ksu.c").write_text("/* applied patch */\n", encoding="utf-8")
 
-            updates = pipeline._plan_metadata_updates(
-                {"xxksu-patch11": "0" * 64}, {"xxksu-patch11": commit}, root, source_tree=ksu)
+            with patch("v2.pipeline._archive_sha256", return_value="f" * 64) as archive:
+                updates = pipeline._plan_metadata_updates(
+                    {"xxksu-patch11": "0" * 64}, {"xxksu-patch11": commit}, root, source_tree=ksu)
+            archive.assert_called_once()
             self.assertEqual(set(updates), {Path(rel) for rel in rels})
             for rel, content in updates.items():
                 (root / rel).write_bytes(content)
@@ -605,6 +611,8 @@ class TestXxksuSourceSync(unittest.TestCase):
             baseline = json.loads((root / rels[0]).read_text())
             self.assertEqual(baseline["upstream"]["resolved_commit"], commit)
             self.assertEqual(baseline["upstream"]["tree"], tree)
+            self.assertTrue(baseline["upstream"]["archive_url"].endswith("/tar.gz/" + commit))
+            self.assertEqual(baseline["upstream"]["archive_sha256"], "f" * 64)
             self.assertEqual(baseline["retained_file_hashes"],
                              {f.path: str(f.content_hash) for f in synced.files})
             state = json.loads((root / rels[1]).read_text())["sources"]["authoritative"]["backslashxx_kernelsu"]
@@ -615,8 +623,9 @@ class TestXxksuSourceSync(unittest.TestCase):
             from v2.watch.checker import compute_composite_hash
             self.assertEqual(state["relevant_content_hash"], compute_composite_hash(state["tracked_files"]))
             # Rerun on synced records is a no-op for source metadata.
-            again = pipeline._plan_metadata_updates(
-                {"xxksu-patch11": "0" * 64}, {"xxksu-patch11": commit}, root, source_tree=ksu)
+            with patch("v2.pipeline._archive_sha256", side_effect=AssertionError("repeated download")):
+                again = pipeline._plan_metadata_updates(
+                    {"xxksu-patch11": "0" * 64}, {"xxksu-patch11": commit}, root, source_tree=ksu)
             self.assertNotIn(Path(rels[2]), again)
             self.assertNotIn(Path(rels[1]), again)
 

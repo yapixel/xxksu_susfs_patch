@@ -209,6 +209,19 @@ def _accepted_blob(source_tree: Path, rel: str) -> bytes:
     return proc.stdout
 
 
+def _archive_sha256(url: str) -> str:
+    """SHA-256 of the GitHub source archive recorded beside the accepted commit."""
+    import urllib.request
+    last_error: Optional[Exception] = None
+    for _ in range(3):
+        try:
+            with urllib.request.urlopen(url, timeout=60) as response:
+                return hashlib.file_digest(response, "sha256").hexdigest()
+        except OSError as exc:
+            last_error = exc
+    raise PromotionError(f"cannot authenticate source archive {url}: {last_error}")
+
+
 def _plan_metadata_updates(
     candidate_shas: Mapping[str, str], upstream_commits: Mapping[str, str],
     repo_root: Path, source_tree: Optional[Path] = None,
@@ -256,6 +269,11 @@ def _plan_metadata_updates(
             data["upstream"]["tree"] = subprocess.run(
                 ["git", "rev-parse", "HEAD^{tree}"], cwd=source_tree,
                 capture_output=True, text=True, check=True).stdout.strip()
+            slug = data["upstream"]["repository"].removeprefix("https://github.com/").removesuffix(".git")
+            archive_url = f"https://codeload.github.com/{slug}/tar.gz/{commit}"
+            if data["upstream"].get("archive_url") != archive_url:
+                data["upstream"]["archive_url"] = archive_url
+                data["upstream"]["archive_sha256"] = _archive_sha256(archive_url)
         if data != before:
             updates[path] = (json.dumps(data, indent=2) + "\n").encode()
 
