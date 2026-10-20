@@ -58,7 +58,7 @@
     "patch_50": "50_add_susfs_in_gki-android16-6.12.patch",
     "ref": "gki-android16-6.12",
     "repository": "https://gitlab.com/simonpunk/susfs4ksu",
-    "resolved_commit": "291d57156225a02bc8692366b14d4e6d08f1fb7f"
+    "resolved_commit": "9c9f19d8395693327c78df36569b44e94c187b8a"
   },
   "target_id": "gki-android16-6.12",
   "upstream": {

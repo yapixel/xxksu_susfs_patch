@@ -1,12 +1,8 @@
-tree 12e654f163189f03e058cdcc1858ce9431d071d3
-parent f4466db6f54825465b0102a5a5529578c182c839
-author simonpunk <simonpunk2016@gmail.com> 1792394029 +0800
-committer simonpunk <simonpunk2016@gmail.com> 1792394029 +0800
+tree a08ab77b4c725a6ceeaa00449964935b66d2cb69
+parent 1ac091c4f261420361db208194d48929786215d7
+author simonpunk <simonpunk2016@gmail.com> 1792425596 +0800
+committer simonpunk <simonpunk2016@gmail.com> 1792425596 +0800
 
-kernel & KernelSU: Sync with the official KernelSU main repo
+KernelSU: Sync with the official KernelSU main repo
 
-[KernelSU]
-- See https://github.com/tiann/KernelSU/commit/0f58f12c2d94de7a72346ef6ec6bb7bf5e46c261
-
-[kernel]
-- Update fs/exec.c to adapt the changes of module preinit, see https://github.com/tiann/KernelSU/commit/0faec0cc7b5f655170d89bf9c4d28bb5ca271fa2 and https://github.com/tiann/KernelSU/commit/96770dfb807fea61e06819e4cbb438384df54b63
+- See https://github.com/tiann/KernelSU/commit/469c4282e72382388b4598fa022fe8ca91dc9ab5

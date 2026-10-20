@@ -1,8 +1,8 @@
-tree a30d713b687abec6bc05cfecb26f8cb053474198
-parent ffa3831ddb6a71a3a078f5ff2204adcdcdba97ab
-author simonpunk <simonpunk2016@gmail.com> 1792379926 +0800
-committer simonpunk <simonpunk2016@gmail.com> 1792379926 +0800
+tree 48806df5d7fae32b7177957c106151fd6b5e412b
+parent 0754ac81e21de16fd33cadd403c29bbecc2acd26
+author simonpunk <simonpunk2016@gmail.com> 1792425495 +0800
+committer simonpunk <simonpunk2016@gmail.com> 1792425495 +0800
 
 KernelSU: Sync with the official KernelSU main repo
 
-- See https://github.com/tiann/KernelSU/commit/0f58f12c2d94de7a72346ef6ec6bb7bf5e46c261
+- See https://github.com/tiann/KernelSU/commit/469c4282e72382388b4598fa022fe8ca91dc9ab5

@@ -46,7 +46,7 @@
     "patch_50": "50_add_susfs_in_gki-android14-6.1.patch",
     "ref": "sultan-shiba-susfs-minimal",
     "repository": "https://gitlab.com/simonpunk/susfs4ksu",
-    "resolved_commit": "665e5d1741a72ca889586372926fd9d6c318fb11"
+    "resolved_commit": "75d60eb68c95ee7df6c0380da64b2ba817a1644d"
   },
   "target_id": "sultan-android14-6.1",
   "upstream": {
