@@ -1,4 +1,4 @@
-From 85f98ddca68d64daa9cc59f397a4b8b549bb43db Mon Sep 17 00:00:00 2001
+From 84795fb59d41802d1d5690122ca8dac4918b0625 Mon Sep 17 00:00:00 2001
 From: yapixel <yapixel@users.noreply.github.com>
 Date: Wed, 14 Oct 2026 03:50:33 +0000
 Subject: [PATCH] Enable SUSFS for backslashxx KernelSU
@@ -172,7 +172,7 @@ diff --git a/kernel/ksu.c b/kernel/ksu.c
 index 06df055..77210ba 100644
 --- a/kernel/ksu.c
 +++ b/kernel/ksu.c
-@@ -171,6 +171,10 @@
+@@ -177,6 +177,10 @@
  #include "hook/kp_ksud.c"
  #endif
  
@@ -183,7 +183,7 @@ index 06df055..77210ba 100644
  // track backports and other quirks here
  // ref: kernel_compat.c, Makefile
  // yes looks nasty
-@@ -279,6 +283,10 @@ static int __init kernelsu_init(void)
+@@ -285,6 +289,10 @@ static int __init kernelsu_init(void)
  
  	ksu_allowlist_init();
  	ksu_throne_tracker_init();
@@ -193,7 +193,7 @@ index 06df055..77210ba 100644
 +
  	ksu_ksud_init();
  	ksu_file_wrapper_init();
- 
+ 	ksu_preinit_init();
 diff --git a/kernel/selinux/rules.c b/kernel/selinux/rules.c
 index a9d4f67..9351318 100644
 --- a/kernel/selinux/rules.c
@@ -362,7 +362,7 @@ index fe628e3..b4c6386 100644
  static int do_grant_root(void __user *arg)
  {
  	int ret;
-@@ -90,6 +96,9 @@ static int do_report_event(void __user *arg)
+@@ -93,6 +99,9 @@ static int do_report_event(void __user *arg)
  			boot_complete_lock = true;
  			pr_info("boot_complete triggered\n");
  			on_boot_completed();

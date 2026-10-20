@@ -15,7 +15,7 @@
   },
   "patch_11": {
     "patch_file": "patches/xxksu/11_enable_susfs_for_ksu.patch",
-    "patch_sha256": "sha256:04ca95ad93caca0a5248799d1ec1b39e6c8d723e74b1eddb8cf52a97c8c6c706",
+    "patch_sha256": "sha256:02c5ccb9f4f3a1d571e0bf7f32756954bdbd822455981af23fd8b8d9204567a6",
     "size": 15381,
     "strict_apply": "PASS"
   },
@@ -57,7 +57,7 @@
     "archive_url": "https://codeload.github.com/backslashxx/KernelSU/tar.gz/12cdc2bf8ed85f7f79191ae8d262868f0ac76103",
     "ref": "master",
     "repository": "https://github.com/backslashxx/KernelSU",
-    "resolved_commit": "632ad62db00cd410273a1fbba3e796e1673ce3e9",
+    "resolved_commit": "bd0d99c925af73689afb198d4f79fbeafc16794a",
     "tree": "e98002ab400eb478ffbed442c10b0612d831e7d4"
   }
 }

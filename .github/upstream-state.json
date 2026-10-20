@@ -3,7 +3,7 @@
   "sources": {
     "authoritative": {
       "backslashxx_kernelsu": {
-        "commit": "632ad62db00cd410273a1fbba3e796e1673ce3e9",
+        "commit": "bd0d99c925af73689afb198d4f79fbeafc16794a",
         "ref": "master",
         "relevant_content_hash": "sha256:f00bd25efbb637decc836c915276f4b3ec42b97bd30816fc681be9e266ca0764",
         "repository": "https://github.com/backslashxx/KernelSU.git",
