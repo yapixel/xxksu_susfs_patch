@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import re
 from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence, Tuple
 
 from ..adapters import get_adapter
@@ -43,6 +44,22 @@ class SemanticGateResult:
     affected_semantics: Tuple[str, ...] = ()
     unknown_units: Tuple[SemanticUnit, ...] = ()
     drifted_anchors: Tuple[str, ...] = ()
+    advisories: Tuple[str, ...] = ()
+
+
+# Braces, blanks, comments and SuSFS config guards carry no behavior of their own;
+# the guarded code lines are still inventoried individually.
+_STRUCTURAL_LINE = re.compile(
+    r"^(|[{}];?|//.*|/\*.*\*/|#\s*(else|endif)\b.*|#\s*(ifdef|ifndef|if)\b.*\bCONFIG_KSU_SUSFS\w*\b.*)$")
+
+
+def _new_unknowns(units, old_digests: set[str]) -> list[SemanticUnit]:
+    return [
+        u for u in units
+        if u.kind == SemanticKind.UNKNOWN
+        and u.evidence[0].fingerprint.digest.value not in old_digests
+        and not _STRUCTURAL_LINE.match("\n".join(u.evidence[0].fingerprint.normalized_statements).strip())
+    ]
 
 
 def _normalize_target_id(identifier: str) -> str:
@@ -171,10 +188,7 @@ def evaluate_semantic_gate(
                     )
                     old_10_digests = {u.evidence[0].fingerprint.digest.value for u in inv_10_old.units}
 
-                new_unknowns_10 = [
-                    u for u in inv_10_new.units
-                    if u.kind == SemanticKind.UNKNOWN and u.evidence[0].fingerprint.digest.value not in old_10_digests
-                ]
+                new_unknowns_10 = _new_unknowns(inv_10_new.units, old_10_digests)
                 if new_unknowns_10:
                     affected_paths = sorted(set(u.location.path for u in new_unknowns_10))
                     return SemanticGateResult(
@@ -276,10 +290,7 @@ def evaluate_semantic_gate(
             )
             old_digests = {u.evidence[0].fingerprint.digest.value for u in inv_old.units}
 
-        new_unknowns = [
-            u for u in inv_new.units
-            if u.kind == SemanticKind.UNKNOWN and u.evidence[0].fingerprint.digest.value not in old_digests
-        ]
+        new_unknowns = _new_unknowns(inv_new.units, old_digests)
 
         if new_unknowns:
             affected_paths = sorted(set(u.location.path for u in new_unknowns))
@@ -315,6 +326,8 @@ def evaluate_semantic_gate(
             patch10_key = k
             break
 
+    # Patch 10 is watched lineage for Patch 11 review, never a Patch 51 input: report, don't block.
+    advisories: list[str] = []
     if patch10_key in upstream_contents and baseline_contents and patch10_key in baseline_contents:
         try:
             inv_10_new = inventory_patch(
@@ -334,33 +347,21 @@ def evaluate_semantic_gate(
                 )
                 old_10_digests = {u.evidence[0].fingerprint.digest.value for u in inv_10_old.units}
 
-            new_unknowns_10 = [
-                u for u in inv_10_new.units
-                if u.kind == SemanticKind.UNKNOWN and u.evidence[0].fingerprint.digest.value not in old_10_digests
-            ]
+            new_unknowns_10 = _new_unknowns(inv_10_new.units, old_10_digests)
             if new_unknowns_10:
                 affected_paths = sorted(set(u.location.path for u in new_unknowns_10))
-                return SemanticGateResult(
-                    passed=False,
-                    classification=WatchClassification.SEMANTIC_DRIFT,
-                    details=(
-                        f"Upstream SuSFS Patch 10 update introduces {len(new_unknowns_10)} new UNKNOWN semantic units across "
-                        f"{len(affected_paths)} files ({', '.join(affected_paths[:5])}). Semantic reconciliation required."
-                    ),
-                    unknown_units=tuple(new_unknowns_10),
-                    affected_semantics=tuple(f"unknown:{u.location.path}:{u.location.start_line}" for u in new_unknowns_10[:20]),
-                )
+                advisories.append(
+                    f"Patch 10 lineage drift: {len(new_unknowns_10)} new UNKNOWN units across "
+                    f"{len(affected_paths)} files ({', '.join(affected_paths[:5])}); review for Patch 11 "
+                    f"(not a Patch 51 input).")
         except Exception as exc:
-            return SemanticGateResult(
-                passed=False,
-                classification=WatchClassification.SEMANTIC_DRIFT,
-                details=f"Semantic inventory verification failed for SuSFS Patch 10: {exc}",
-            )
+            advisories.append(f"Patch 10 lineage inventory failed (review for Patch 11): {exc}")
 
     return SemanticGateResult(
         passed=True,
         classification=WatchClassification.SAFE_REGEN_CANDIDATE,
         details=f"Semantic gate passed: zero unapproved UNKNOWN semantic units on {target_id}.",
+        advisories=tuple(advisories),
     )
 
 

@@ -227,9 +227,10 @@ class ProvenanceTests(unittest.TestCase):
             result = UpstreamWatcher(repo_root=ROOT, state_path=ROOT / ".github/upstream-state.json").check_susfs_authoritative(
                 "susfs_gki", "gki-android16-6.12", info)
         self.assertTrue(any(p10 in call.args[2] for call in fetched.call_args_list))
-        self.assertEqual(result.classification, WatchClassification.SEMANTIC_DRIFT)
         self.assertIn(p10, result.affected_files)
-        self.assertIn("Patch 10", result.details)
+        # Patch 10 is not a Patch 51 input: the gate reports it as a Patch 11 review advisory
+        # (test_semantic_gate) and it is never the blocking reason for susfs_gki.
+        self.assertNotIn("Patch 10 update introduces", result.details)
 
 
     def test_gki_reconstructs_without_final_outputs_and_requires_authoritative_inputs(self):

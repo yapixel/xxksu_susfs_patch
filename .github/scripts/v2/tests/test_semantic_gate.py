@@ -227,6 +227,40 @@ class TestSemanticGateInvariants(unittest.TestCase):
         self.assertEqual(gate_res_watcher.classification, WatchClassification.SEMANTIC_DRIFT)
         self.assertEqual(gate_res_approved_watcher.classification, gate_res_approved_pipeline.classification)
 
+    def test_patch10_lineage_drift_is_advisory_for_patch51_only(self):
+        p10 = "kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+        p50 = "kernel_patches/50_add_susfs_in_gki-android16-6.12.patch"
+        diff = ("diff --git a/kernel/lineage.c b/kernel/lineage.c\n--- a/kernel/lineage.c\n"
+                "+++ b/kernel/lineage.c\n@@ -1,1 +1,2 @@\n int a;\n+{}\n")
+        old_10, new_10 = diff.format("int b;"), diff.format("unreviewed_lineage_call();")
+        accepted_50 = self.r38_p50_path.read_text(encoding="utf-8")
+        gki = evaluate_semantic_gate("gki-android16-6.12-r38-patch51",
+                                     upstream_contents={p50: accepted_50, p10: new_10},
+                                     baseline_contents={p50: accepted_50, p10: old_10}, repo_root=self.repo_root)
+        self.assertTrue(gki.passed)
+        self.assertEqual(gki.classification, WatchClassification.SAFE_REGEN_CANDIDATE)
+        self.assertEqual(len(gki.advisories), 1)
+        self.assertIn("Patch 10 lineage drift: 1 new UNKNOWN", gki.advisories[0])
+        # Patch 11 review keeps Patch 10 drift blocking.
+        xxksu = evaluate_semantic_gate("xxksu-patch11", upstream_contents={p10: new_10},
+                                       baseline_contents={p10: old_10}, repo_root=self.repo_root)
+        self.assertFalse(xxksu.passed)
+        self.assertEqual(xxksu.classification, WatchClassification.SEMANTIC_DRIFT)
+
+    def test_structural_lines_are_not_drift_but_code_lines_are(self):
+        from v2.engine.diff_parser import parse_patch
+        from v2.semantic.gate import _new_unknowns
+        from v2.semantic.inventory import inventory_patch
+        added = ["{", "}", "};", "", "#ifdef CONFIG_KSU_SUSFS_SUS_PATH", "#else",
+                 "#endif // #ifdef CONFIG_KSU_SUSFS", "// note", "/* note */", "unreviewed_code_call();"]
+        body = "".join(f"+{line}\n" for line in added)
+        text = ("diff --git a/kernel/structure.c b/kernel/structure.c\n--- a/kernel/structure.c\n"
+                f"+++ b/kernel/structure.c\n@@ -1,1 +1,{len(added) + 1} @@\n int a;\n{body}")
+        inv = inventory_patch(parse_patch(text), source_identity="new", source_type="official_50")
+        texts = ["\n".join(u.evidence[0].fingerprint.normalized_statements).strip()
+                 for u in _new_unknowns(inv.units, set())]
+        self.assertEqual(texts, ["unreviewed_code_call();"])
+
 
 if __name__ == "__main__":
     unittest.main()
