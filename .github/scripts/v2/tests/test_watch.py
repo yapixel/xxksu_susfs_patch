@@ -447,6 +447,21 @@ class SuSFSWatcherRegressionTests(unittest.TestCase):
         self.assertTrue(res.requires_escalation())
         self.assertIn("Candidate Patch 51 generation failed", res.details)
 
+    def test_no_change_closes_only_that_sources_escalations(self):
+        from v2.watch.escalation import close_resolved_issues
+        issues = [{"number": 19, "title": "[AGY-REQUIRED] Upstream Drift: susfs_sultan (SEMANTIC_DRIFT)"},
+                  {"number": 20, "title": "[AGY-REQUIRED] Upstream Drift: susfs_gki (SEMANTIC_DRIFT)"}]
+        def result(classification):
+            return SourceResult(source_id="susfs_sultan", source_type="authoritative",
+                                classification=classification, old_identity="a" * 40, new_identity="a" * 40,
+                                old_content_hash="h", new_content_hash="h", details="")
+        with patch("v2.watch.escalation.shutil.which", return_value="gh"), \
+             patch("v2.watch.escalation.subprocess.run",
+                   return_value=MagicMock(stdout=json.dumps(issues))) as run:
+            self.assertEqual(close_resolved_issues(result(WatchClassification.NO_CHANGE)), [19])
+            self.assertEqual(run.call_args.args[0][:4], ["gh", "issue", "close", "19"])
+            self.assertEqual(close_resolved_issues(result(WatchClassification.IRRELEVANT_CHANGE)), [])
+
     @patch("v2.watch.checker.fetch_remote_commit", return_value="f" * 40)
     def test_susfs_core_only_revision_is_safe_with_production_generator(self, _):
         p50 = "kernel_patches/50_add_susfs_in_gki-android14-6.1.patch"

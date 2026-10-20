@@ -10,7 +10,7 @@ from pathlib import Path
 import sys
 
 from .checker import UpstreamWatcher
-from .escalation import escalate_issue
+from .escalation import close_resolved_issues, escalate_issue
 from .dashboard import render_source_identity
 from .model import WatchClassification, WatchReport
 
@@ -97,6 +97,8 @@ def main(argv: list[str] | None = None) -> int:
                 issue_url = escalate_issue(r, repo=repo_slug)
                 if issue_url:
                     escalations.append({"source_id": r.source_id, "url": issue_url})
+            else:
+                close_resolved_issues(r, repo=repo_slug)
 
     if escalations:
         report = WatchReport(results=report.results, timestamp=report.timestamp, escalations=tuple(escalations))

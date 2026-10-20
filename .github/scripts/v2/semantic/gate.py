@@ -53,6 +53,9 @@ _STRUCTURAL_LINE = re.compile(
     r"^(|[{}];?|//.*|/\*.*\*/|#\s*(else|endif)\b.*|#\s*(ifdef|ifndef|if)\b.*\bCONFIG_KSU_SUSFS\w*\b.*)$")
 
 
+_SUSFS_REFERENCE = re.compile(r"susfs", re.IGNORECASE)
+
+
 def _new_unknowns(units, old_digests: set[str]) -> list[SemanticUnit]:
     return [
         u for u in units
@@ -291,6 +294,13 @@ def evaluate_semantic_gate(
             old_digests = {u.evidence[0].fingerprint.digest.value for u in inv_old.units}
 
         new_unknowns = _new_unknowns(inv_new.units, old_digests)
+        dropped: list[SemanticUnit] = []
+        if "50_add_susfs" in patch_key:
+            from ..policy.patch51_source import REMOVE_FILES
+            # Patch 51 drops these KSU-owned files whole; only a SuSFS reference there stays blocking.
+            dropped = [u for u in new_unknowns if u.location.path in REMOVE_FILES and not
+                       _SUSFS_REFERENCE.search("\n".join(u.evidence[0].fingerprint.normalized_statements))]
+            new_unknowns = [u for u in new_unknowns if u not in dropped]
 
         if new_unknowns:
             affected_paths = sorted(set(u.location.path for u in new_unknowns))
@@ -328,6 +338,10 @@ def evaluate_semantic_gate(
 
     # Patch 10 is watched lineage for Patch 11 review, never a Patch 51 input: report, don't block.
     advisories: list[str] = []
+    if target_id != "xxksu" and dropped:
+        paths = sorted(set(u.location.path for u in dropped))
+        advisories.append(f"{len(dropped)} new non-SuSFS units in Patch 51-removed KSU-owned files "
+                          f"({', '.join(paths[:5])}) are dropped with them.")
     if patch10_key in upstream_contents and baseline_contents and patch10_key in baseline_contents:
         try:
             inv_10_new = inventory_patch(
