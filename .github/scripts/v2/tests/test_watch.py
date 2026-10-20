@@ -28,6 +28,22 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 STATE_FILE = REPO_ROOT / ".github" / "upstream-state.json"
 
 
+def local_checkout(files):
+    """Offline stand-in for fetch_git_checkout: a one-commit SuSFS tree."""
+    import subprocess
+    def checkout(url, commit, dest):
+        for rel, text in files.items():
+            (dest / rel).parent.mkdir(parents=True, exist_ok=True)
+            (dest / rel).write_text(text)
+        env = {"GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1", "GIT_AUTHOR_NAME": "t",
+               "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t",
+               "GIT_AUTHOR_DATE": "@1700000000 +0000", "GIT_COMMITTER_DATE": "@1700000000 +0000"}
+        for args in (("init", "-q"), ("add", "."), ("commit", "-qm", "susfs")):
+            subprocess.run(["git", *args], cwd=dest, env=env, check=True)
+        return dest
+    return checkout
+
+
 class WatchModelTests(unittest.TestCase):
     def test_classification_escalation_contract(self):
         with self.subTest(case='all_classifications_present'):
@@ -394,12 +410,12 @@ class SuSFSWatcherRegressionTests(unittest.TestCase):
                 "kernel_patches/50_add_susfs_in_gki-android14-6.1.patch": "sha256:different",
             },
         }
-        res = self.watcher.check_susfs_authoritative("susfs_sultan", "sultan-android14-6.1", info, fetch_remote=True)
+        with patch("v2.watch.checker.fetch_git_checkout", local_checkout(mock_files.return_value)):
+            res = self.watcher.check_susfs_authoritative("susfs_sultan", "sultan-android14-6.1", info, fetch_remote=True)
         self.assertEqual(res.classification, WatchClassification.SEMANTIC_DRIFT)
         self.assertTrue(res.requires_escalation())
-        self.assertIn("unbundled kernel files", res.details)
+        self.assertIn("unreviewed files in Patch 50", res.details)
         self.assertIn("fs/dcache.c", res.details)
-        self.assertIn("Baseline expansion required", res.details)
 
     @patch("v2.watch.checker.fetch_remote_commit")
     @patch("v2.watch.checker.fetch_git_files")
@@ -425,10 +441,29 @@ class SuSFSWatcherRegressionTests(unittest.TestCase):
                 "kernel_patches/50_add_susfs_in_gki-android16-6.12.patch": "sha256:different",
             },
         }
-        res = self.watcher.check_susfs_authoritative("susfs_gki", "gki-android16-6.12", info, fetch_remote=True)
+        with patch("v2.watch.checker.fetch_git_checkout", local_checkout(mock_files.return_value)):
+            res = self.watcher.check_susfs_authoritative("susfs_gki", "gki-android16-6.12", info, fetch_remote=True)
         self.assertEqual(res.classification, WatchClassification.SEMANTIC_DRIFT)
         self.assertTrue(res.requires_escalation())
-        self.assertIn("failed strict application", res.details)
+        self.assertIn("Candidate Patch 51 generation failed", res.details)
+
+    @patch("v2.watch.checker.fetch_remote_commit", return_value="f" * 40)
+    def test_susfs_core_only_revision_is_safe_with_production_generator(self, _):
+        p50 = "kernel_patches/50_add_susfs_in_gki-android14-6.1.patch"
+        old = {p50: (REPO_ROOT / ".github/fixtures/sultan" / Path(p50).name).read_text(),
+               "kernel_patches/fs/susfs.c": "old core\n"}
+        new = {**old, "kernel_patches/fs/susfs.c": "new core\n"}
+        info = json.loads(STATE_FILE.read_text())["sources"]["authoritative"]["susfs_sultan"]
+        info["tracked_files"] = {p: "sha256:" + hashlib.sha256(v.encode()).hexdigest() for p, v in old.items()}
+        info["relevant_content_hash"] = compute_composite_hash(info["tracked_files"])
+        def fetch(url, commit, paths):
+            values = old if commit == info["commit"] else new
+            return {p: values[p] for p in paths}
+        with patch("v2.watch.checker.fetch_git_files", side_effect=fetch), \
+             patch("v2.watch.checker.fetch_git_checkout", local_checkout(new)):
+            res = self.watcher.check_susfs_authoritative("susfs_sultan", "sultan-android14-6.1", info)
+        self.assertEqual(res.classification, WatchClassification.SAFE_REGEN_CANDIDATE, res.details)
+        self.assertIn("Date: Tue, 14 Nov 2023 22:13:20 +0000", res.candidate_patch)
 
     @patch("v2.watch.checker.fetch_remote_commit")
     @patch("v2.watch.checker.fetch_git_files")

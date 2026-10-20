@@ -21,24 +21,15 @@ from ..adapters.xxksu import (
     generate_patch11,
     get_patch11_operation_specs,
 )
-from ..engine.diff_parser import parse_patch
 from ..policy.model import PolicyIncomplete
 from ..policy.patch11 import classify_patch11
 from ..policy.patch51 import classify_patch51
 from ..semantic import SemanticInventory, SemanticKind, inventory_patch
 from ..semantic.gate import evaluate_semantic_gate
-from ..source.baseline import load_authoritative_bundle
 from ..source.bundle import SourceBundle, create_source_bundle
 from ..source.patch_apply import SourceBundlePatchError, apply_patch_to_bundle
-from ..validation.exact_patch import substantive_patch_text, validate_patch_syntax
+from ..validation.exact_patch import substantive_patch_text
 from .model import SourceResult, WatchClassification, WatchReport
-
-try:
-    from deinline_50_to_51 import deinline_patch_content
-except ImportError:
-    import sys
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-    from deinline_50_to_51 import deinline_patch_content
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +104,12 @@ def fetch_git_files(
         if missing_files:
             raise FileNotFoundError(f"Missing required tracked files at {commit}: {', '.join(missing_files)}")
         return results
+
+
+def fetch_git_checkout(repo_url: str, commit: str, dest: Path) -> Path:
+    """Shallow detached checkout of one exact commit."""
+    from ..clean_room import fetch_git
+    return fetch_git({"repository": repo_url, "commit": commit}, dest)
 
 
 def fetch_url_content(url: str, timeout: int = 30) -> tuple[str, str]:
@@ -475,13 +472,15 @@ class UpstreamWatcher:
                 reproduction_command=repro_cmd,
             )
 
-        # 1. Regenerate candidate Patch 51 from the NEW immutable upstream input
+        # Production generator on the discovered checkout: exact reviewed preimages,
+        # fail-closed ownership, authenticated commit Date.
         try:
-            candidate_patch_text = deinline_patch_content(fetched_contents[patch50_file], target=target_id)
-            syntax_errors = validate_patch_syntax(candidate_patch_text)
-            if syntax_errors:
-                raise ValueError("Syntax errors in candidate patch: " + "; ".join(syntax_errors))
-            parsed_candidate = parse_patch(candidate_patch_text)
+            from ..policy.patch51_source import generate
+            patch_id = ("sultan-android14-6.1-patch51" if "sultan" in target_id
+                        else "gki-android16-6.12-r38-patch51")
+            with tempfile.TemporaryDirectory(prefix="susfs-watch-") as td:
+                checkout = fetch_git_checkout(repo_url, new_commit, Path(td) / "susfs")
+                candidate_patch_text = generate(patch_id, checkout, self.repo_root, advance=True)[0]
         except Exception as exc:
             return SourceResult(
                 source_id=source_id,
@@ -495,52 +494,6 @@ class UpstreamWatcher:
                 details=f"Candidate Patch 51 generation failed on {target_id}: {exc}",
                 reproduction_command=repro_cmd,
             )
-
-        # 2. Check for missing newly-required source files in authoritative bundle (e.g. Sultan fs/super.c)
-        bundle = load_authoritative_bundle(target_id, self.repo_root)
-        if bundle is not None:
-            bundle_files = {entry.path for entry in bundle.files}
-            candidate_files = {
-                f.new_path[2:] if (f.new_path and f.new_path.startswith(("a/", "b/"))) else (f.new_path or f.old_path or "")
-                for f in parsed_candidate.files
-            }
-            candidate_files.discard("")
-            missing_files = sorted(candidate_files - bundle_files)
-            if missing_files:
-                return SourceResult(
-                    source_id=source_id,
-                    source_type="authoritative",
-                    classification=WatchClassification.SEMANTIC_DRIFT,
-                    old_identity=old_commit,
-                    new_identity=new_commit,
-                    old_content_hash=old_hash,
-                    new_content_hash=new_hash,
-                    affected_files=tuple(affected_files),
-                    affected_semantics=tuple(f"unbundled_file:{f}" for f in missing_files),
-                    details=(
-                        f"Upstream SuSFS update requires unbundled kernel files on {target_id}: "
-                        f"{', '.join(missing_files)}. Baseline expansion required."
-                    ),
-                    reproduction_command=repro_cmd,
-                )
-
-        # 3. Strict application of candidate patch against authoritative target source
-        if bundle is not None:
-            try:
-                apply_patch_to_bundle(bundle, candidate_patch_text)
-            except Exception as exc:
-                return SourceResult(
-                    source_id=source_id,
-                    source_type="authoritative",
-                    classification=WatchClassification.SEMANTIC_DRIFT,
-                    old_identity=old_commit,
-                    new_identity=new_commit,
-                    old_content_hash=old_hash,
-                    new_content_hash=new_hash,
-                    affected_files=tuple(affected_files),
-                    details=f"Candidate Patch 51 failed strict application on {target_id}: {exc}",
-                    reproduction_command=repro_cmd,
-                )
 
         return SourceResult(
             source_id=source_id,

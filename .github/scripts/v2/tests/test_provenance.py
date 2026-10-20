@@ -223,7 +223,8 @@ class ProvenanceTests(unittest.TestCase):
             values = old if commit == info["commit"] else new
             return {p: values[p] for p in paths}
         with patch("v2.watch.checker.fetch_remote_commit", return_value="f" * 40), \
-             patch("v2.watch.checker.fetch_git_files", side_effect=fetch) as fetched:
+             patch("v2.watch.checker.fetch_git_files", side_effect=fetch) as fetched, \
+             patch("v2.watch.checker.fetch_git_checkout", side_effect=OSError("offline")):
             result = UpstreamWatcher(repo_root=ROOT, state_path=ROOT / ".github/upstream-state.json").check_susfs_authoritative(
                 "susfs_gki", "gki-android16-6.12", info)
         self.assertTrue(any(p10 in call.args[2] for call in fetched.call_args_list))

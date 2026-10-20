@@ -102,8 +102,10 @@ jobs:
               )
           if data.get("dispatch_51"):
               print("🚀 Auto-dispatching generate-51-kernel-patches.yml...")
+              inputs = [x for key in ("sultan_susfs_commit", "gki_susfs_commit")
+                        if data.get(key) for x in ("-f", f"{key}={data[key]}")]
               subprocess.run(
-                  ["gh", "workflow", "run", "generate-51-kernel-patches.yml"],
+                  ["gh", "workflow", "run", "generate-51-kernel-patches.yml", *inputs],
                   check=True,
               )
           PY

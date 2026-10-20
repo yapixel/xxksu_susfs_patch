@@ -205,8 +205,62 @@ def _accepted_blob(source_tree: Path, rel: str) -> bytes:
     """Clean committed bytes; the working tree may already carry the applied candidate."""
     proc = subprocess.run(["git", "show", f"HEAD:{rel}"], cwd=source_tree, capture_output=True)
     if proc.returncode != 0:
-        raise PromotionError(f"accepted xxKSU commit lacks tracked file {rel}")
+        raise PromotionError(f"accepted source commit lacks tracked file {rel}")
     return proc.stdout
+
+
+SUSFS_ACCEPTANCE = "susfs-acceptance.json"
+
+
+def _susfs_context(patch_id: str, repo_root: Path):
+    from .policy.patch51_source import get_adapter
+    adapter = get_adapter(patch_id)
+    baseline = json.loads((repo_root / "patches" / adapter.target_dir / "BASELINE.json").read_text())
+    state = json.loads((repo_root / ".github/upstream-state.json").read_text())
+    return adapter, baseline["susfs"]["patch_50"], state["sources"]["authoritative"][adapter.source_state_key]
+
+
+def _write_susfs_acceptance(patch_id: str, upstream_input: Path, repo_root: Path, candidate_dir: Path) -> None:
+    """Validator-side evidence for advancing the accepted SuSFS revision."""
+    from .policy.patch51_source import input_commit
+    adapter, patch_50, state = _susfs_context(patch_id, repo_root)
+    commit, raw = input_commit(upstream_input)
+    tracked = {rel: "sha256:" + hashlib.sha256(_accepted_blob(upstream_input, rel)).hexdigest()
+               for rel in state["tracked_files"]}
+    (candidate_dir / adapter.commit_fixture_relpath.name).write_bytes(raw)
+    (candidate_dir / patch_50).write_bytes(_accepted_blob(upstream_input, "kernel_patches/" + patch_50))
+    (candidate_dir / SUSFS_ACCEPTANCE).write_text(
+        json.dumps({"commit": commit, "tracked_files": tracked}, indent=2, sort_keys=True) + "\n")
+
+
+def _read_susfs_acceptance(patch_id: str, candidate_dir: Path, repo_root: Path):
+    """Re-authenticate validator evidence; returns (commit, tracked_files, fixture updates)."""
+    from .policy.patch51_source import source_commit_date
+    adapter, patch_50, state = _susfs_context(patch_id, repo_root)
+    record = json.loads((candidate_dir / SUSFS_ACCEPTANCE).read_text())
+    commit, tracked = record["commit"], record["tracked_files"]
+    raw = (candidate_dir / adapter.commit_fixture_relpath.name).read_bytes()
+    patch_bytes = (candidate_dir / patch_50).read_bytes()
+    try:
+        source_commit_date(raw, commit)
+    except ValueError as exc:
+        raise PromotionError(f"{patch_id} SuSFS commit object: {exc}") from exc
+    if set(tracked) != set(state["tracked_files"]):
+        raise PromotionError(f"{patch_id} SuSFS tracked file set changed")
+    if tracked["kernel_patches/" + patch_50] != "sha256:" + hashlib.sha256(patch_bytes).hexdigest():
+        raise PromotionError(f"{patch_id} Patch 50 evidence does not match its tracked hash")
+    folder = adapter.commit_fixture_relpath.parent
+    fixtures = {adapter.commit_fixture_relpath: raw, folder / patch_50: patch_bytes}
+    provenance = folder / "stat-compile/provenance.json"
+    if (repo_root / provenance).is_file():
+        header = "kernel_patches/include/linux/susfs_def.h"
+        # The captured header archive embeds susfs_def.h; a new header needs a fresh capture.
+        if tracked[header] != state["tracked_files"][header]:
+            raise PromotionError(f"{patch_id}: susfs_def.h changed; recapture {provenance.parent}")
+        data = json.loads((repo_root / provenance).read_text())
+        data["susfs_commit"] = commit
+        fixtures[provenance] = (json.dumps(data, indent=2) + "\n").encode()
+    return commit, tracked, fixtures
 
 
 def _archive_sha256(url: str) -> str:
@@ -225,15 +279,22 @@ def _archive_sha256(url: str) -> str:
 def _plan_metadata_updates(
     candidate_shas: Mapping[str, str], upstream_commits: Mapping[str, str],
     repo_root: Path, source_tree: Optional[Path] = None,
+    susfs_dirs: Optional[Mapping[str, Path]] = None,
 ) -> dict[Path, bytes]:
     """Read-only plan for the existing baseline/provenance synchronization fields.
 
     Commits are supplied only after the caller's validation gates. Equality of
     patch bytes does not imply equality of accepted source provenance. For Patch 11,
     ``source_tree`` is the clean accepted xxKSU checkout; the source bundle and
-    tracked hashes advance with the accepted commit.
+    tracked hashes advance with the accepted commit. ``susfs_dirs`` maps Patch 51
+    ids to validated candidate directories carrying SuSFS acceptance evidence.
     """
     updates = {}
+    susfs = {pid: _read_susfs_acceptance(pid, d, repo_root) for pid, d in (susfs_dirs or {}).items()}
+    upstream_commits = {**upstream_commits, **{pid: rec[0] for pid, rec in susfs.items()}}
+    for _, _, fixtures in susfs.values():
+        updates.update({rel: raw for rel, raw in fixtures.items()
+                        if not (repo_root / rel).is_file() or (repo_root / rel).read_bytes() != raw})
     sync_xxksu = source_tree is not None and bool(upstream_commits.get("xxksu-patch11"))
     for patch_id, candidate_sha in candidate_shas.items():
         path = TARGET_REL_PATHS[patch_id].parent / "BASELINE.json"
@@ -298,6 +359,10 @@ def _plan_metadata_updates(
                 for rel in tracked:
                     tracked[rel] = "sha256:" + hashlib.sha256(_accepted_blob(source_tree, rel)).hexdigest()
                 authoritative[key]["relevant_content_hash"] = compute_composite_hash(tracked)
+            if patch_id in susfs and key in authoritative:
+                from .watch.checker import compute_composite_hash
+                authoritative[key]["tracked_files"] = dict(susfs[patch_id][1])
+                authoritative[key]["relevant_content_hash"] = compute_composite_hash(susfs[patch_id][1])
         if data != before:
             updates[state_path] = (json.dumps(data, indent=2) + "\n").encode()
     return updates
@@ -602,7 +667,10 @@ def deliver_multi_candidates(
         if public_bytes != cand_bytes:
             changed_targets[patch_id] = (cand_path, cand_bytes, cand_sha)
 
-    metadata_updates = _plan_metadata_updates(candidate_shas, upstream_commits or {}, repo_root)
+    susfs_dirs = {pid: path.parent for pid, path in candidate_targets.items()
+                  if (path.parent / SUSFS_ACCEPTANCE).is_file()}
+    metadata_updates = _plan_metadata_updates(candidate_shas, upstream_commits or {}, repo_root,
+                                              susfs_dirs=susfs_dirs)
     if not changed_targets and not metadata_updates and _manifest_is_current(repo_root):
         # FULL_STATE_NOOP: validation is complete; no publication work is needed.
         if write_back and verify_raw_url:
@@ -805,16 +873,21 @@ def run_pipeline(
 
     # Step 1: Deterministic candidate generation (writes ONLY to candidate path)
     postimages = None
+    head = _extract_git_commit(upstream_input) if patch_id.endswith("patch51") else None
+    advance = head is not None and head != _susfs_context(patch_id, repo_root)[2]["commit"]
+    if advance and promote:
+        raise PromotionError("SuSFS revision advancement is delivered only through --deliver-candidates")
+    (candidate_dir / SUSFS_ACCEPTANCE).unlink(missing_ok=True)
     if patch_id.endswith("patch51") and target_tree is not None:
         from .policy.patch51_source import generate
-        candidate_text_1, postimages = generate(patch_id, upstream_input, repo_root, target_tree)
+        candidate_text_1, postimages = generate(patch_id, upstream_input, repo_root, target_tree, advance)
     else:
         candidate_text_1 = generate_candidate_patch(patch_id, upstream_input, repo_root)
     candidate_path.write_text(candidate_text_1, encoding="utf-8")
 
     # Step 2: Deterministic regeneration equality verification
     if postimages is not None:
-        candidate_text_2, reproduced = generate(patch_id, upstream_input, repo_root, target_tree)
+        candidate_text_2, reproduced = generate(patch_id, upstream_input, repo_root, target_tree, advance)
         if reproduced != postimages:
             raise RegenerationMismatchError("independent source reconstruction differs")
     else:
@@ -861,6 +934,8 @@ def run_pipeline(
                 if hashes["applied"] != hashes["postimage"]:
                     raise CandidateValidationError(f"postimage round-trip mismatch: {path}")
             (candidate_dir / "postimages.json").write_text(json.dumps(postimages, indent=2))
+            if advance:
+                _write_susfs_acceptance(patch_id, upstream_input, repo_root, candidate_dir)
 
         # For Patch 11 on real KernelSU tree: verify exactly 8 modified files if applied
         if patch_id == "xxksu-patch11" and not check_only:

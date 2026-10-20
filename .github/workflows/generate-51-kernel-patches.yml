@@ -7,6 +7,14 @@ on:
         description: "Exact reviewed KernelSU candidate SHA (empty: accepted revision)"
         required: false
         default: ""
+      sultan_susfs_commit:
+        description: "Exact discovered Sultan SuSFS SHA (empty: accepted revision)"
+        required: false
+        default: ""
+      gki_susfs_commit:
+        description: "Exact discovered GKI SuSFS SHA (empty: accepted revision)"
+        required: false
+        default: ""
       test_fail_validation:
         description: "Simulate validation failure for atomicity test (sultan | gki | none)"
         required: false
@@ -60,6 +68,8 @@ jobs:
       - name: Freeze accepted upstream identities
         env:
           KSU_OVERRIDE: ${{ github.event.inputs.ksu_branch || '' }}
+          SULTAN_SUSFS_OVERRIDE: ${{ github.event.inputs.sultan_susfs_commit || '' }}
+          GKI_SUSFS_OVERRIDE: ${{ github.event.inputs.gki_susfs_commit || '' }}
         run: |
           set -euo pipefail
           echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
@@ -71,8 +81,11 @@ jobs:
           if not re.fullmatch(r"[0-9a-f]{40}", ksu):
               raise ValueError("KernelSU override must be an exact reviewed candidate SHA, not a moving ref")
           print("KSU_COMMIT=" + ksu)
-          print("SULTAN_SUSFS_COMMIT=" + sources["susfs_sultan"]["commit"])
-          print("GKI_SUSFS_COMMIT=" + sources["susfs_gki"]["commit"])
+          for name, key in (("SULTAN", "susfs_sultan"), ("GKI", "susfs_gki")):
+              susfs = os.environ.get(name + "_SUSFS_OVERRIDE") or sources[key]["commit"]
+              if not re.fullmatch(r"[0-9a-f]{40}", susfs):
+                  raise ValueError("SuSFS override must be an exact discovered SHA, not a moving ref")
+              print(f"{name}_SUSFS_COMMIT={susfs}")
           target = json.load(open("patches/sultan-android14-6.1/BASELINE.json"))["upstream"]
           print("SULTAN_KERNEL_COMMIT=" + target["resolved_commit"])
           print("SULTAN_KERNEL_REPO=" + target["repository"])
@@ -92,6 +105,7 @@ jobs:
           git remote add origin "${{ env.SUSFS_REPO_URL }}"
           git fetch --depth=1 origin "$SULTAN_SUSFS_COMMIT"
           git checkout FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$SULTAN_SUSFS_COMMIT"
 
       - name: Prepare Clean Kernel Source Tree (Sultan 6.1)
         run: |
@@ -175,6 +189,8 @@ jobs:
       - name: Freeze accepted upstream identities
         env:
           KSU_OVERRIDE: ${{ github.event.inputs.ksu_branch || '' }}
+          SULTAN_SUSFS_OVERRIDE: ${{ github.event.inputs.sultan_susfs_commit || '' }}
+          GKI_SUSFS_OVERRIDE: ${{ github.event.inputs.gki_susfs_commit || '' }}
         run: |
           set -euo pipefail
           echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
@@ -186,8 +202,11 @@ jobs:
           if not re.fullmatch(r"[0-9a-f]{40}", ksu):
               raise ValueError("KernelSU override must be an exact reviewed candidate SHA, not a moving ref")
           print("KSU_COMMIT=" + ksu)
-          print("SULTAN_SUSFS_COMMIT=" + sources["susfs_sultan"]["commit"])
-          print("GKI_SUSFS_COMMIT=" + sources["susfs_gki"]["commit"])
+          for name, key in (("SULTAN", "susfs_sultan"), ("GKI", "susfs_gki")):
+              susfs = os.environ.get(name + "_SUSFS_OVERRIDE") or sources[key]["commit"]
+              if not re.fullmatch(r"[0-9a-f]{40}", susfs):
+                  raise ValueError("SuSFS override must be an exact discovered SHA, not a moving ref")
+              print(f"{name}_SUSFS_COMMIT={susfs}")
           target = json.load(open("patches/sultan-android14-6.1/BASELINE.json"))["upstream"]
           print("SULTAN_KERNEL_COMMIT=" + target["resolved_commit"])
           print("SULTAN_KERNEL_REPO=" + target["repository"])
@@ -207,6 +226,7 @@ jobs:
           git remote add origin "${{ env.SUSFS_REPO_URL }}"
           git fetch --depth=1 origin "$GKI_SUSFS_COMMIT"
           git checkout FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$GKI_SUSFS_COMMIT"
 
       - name: Prepare Clean Kernel Source Tree (android16-6.12-2025-09_r38)
         run: |

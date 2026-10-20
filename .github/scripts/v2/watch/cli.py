@@ -70,6 +70,8 @@ def main(argv: list[str] | None = None) -> int:
         "dispatch_11": False,
         "ksu_commit": None,
         "dispatch_51": False,
+        "sultan_susfs_commit": None,
+        "gki_susfs_commit": None,
     }
     for r in report.results:
         if r.classification == WatchClassification.SAFE_REGEN_CANDIDATE:
@@ -78,6 +80,7 @@ def main(argv: list[str] | None = None) -> int:
                 dispatch_plan["ksu_commit"] = r.new_identity
             elif r.source_id in ("susfs_sultan", "susfs_gki"):
                 dispatch_plan["dispatch_51"] = True
+                dispatch_plan[r.source_id.removeprefix("susfs_") + "_susfs_commit"] = r.new_identity
 
     if dispatch_plan["dispatch_11"] or dispatch_plan["dispatch_51"]:
         args.candidate_dir.mkdir(parents=True, exist_ok=True)

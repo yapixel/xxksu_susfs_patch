@@ -169,9 +169,20 @@ def get_adapter(patch_id: str) -> Patch51TargetAdapter:
     raise ValueError(f"unsupported Patch 51 target: {patch_id}")
 
 
-def reconstruct_postimages(patch_id: str, upstream_input: Path, root: Path):
+def input_commit(upstream_input: Path) -> tuple[str, bytes]:
+    """Authenticated HEAD identity and raw commit object of a SuSFS checkout."""
+    commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=upstream_input, text=True).strip()
+    raw = subprocess.check_output(["git", "cat-file", "commit", commit], cwd=upstream_input)
+    source_commit_date(raw, commit)
+    return commit, raw
+
+
+def reconstruct_postimages(patch_id: str, upstream_input: Path, root: Path, advance: bool = False):
     """Shared Patch 51 generation engine: orchestrates preimages, Patch 50
     interpretation, shared ownership decisions, target adaptation, and postimages.
+
+    ``advance`` is set only after the semantic gate passed on a discovered
+    checkout: its own authenticated commit replaces the accepted identity.
     """
     adapter = get_adapter(patch_id)
 
@@ -193,12 +204,14 @@ def reconstruct_postimages(patch_id: str, upstream_input: Path, root: Path):
         raise ValueError(f"Upstream SuSFS 50 patch missing: {patch_50_name}")
 
     raw_patch_50 = patch_50_file.read_bytes()
-    expected_patch_sha = state["tracked_files"]["kernel_patches/" + patch_50_name].removeprefix("sha256:")
-    if hashlib.sha256(raw_patch_50).hexdigest() != expected_patch_sha:
-        raise ValueError(f"unreviewed {adapter.target_id} Patch 50 content")
-
-    commit_bytes = (root / adapter.commit_fixture_relpath).read_bytes()
-    date = source_commit_date(commit_bytes, state["commit"])
+    if advance:
+        commit, commit_bytes = input_commit(upstream_input)
+    else:
+        expected_patch_sha = state["tracked_files"]["kernel_patches/" + patch_50_name].removeprefix("sha256:")
+        if hashlib.sha256(raw_patch_50).hexdigest() != expected_patch_sha:
+            raise ValueError(f"unreviewed {adapter.target_id} Patch 50 content")
+        commit, commit_bytes = state["commit"], (root / adapter.commit_fixture_relpath).read_bytes()
+    date = source_commit_date(commit_bytes, commit)
 
     before = adapter.load_preimages(root, baseline)
 
@@ -236,12 +249,12 @@ GIT_DIFF = ("-c", "core.quotePath=false", "diff", "--no-ext-diff", "--no-textcon
             "--no-color", "--no-renames", "--full-index")
 
 
-def generate(patch_id: str, upstream_input: Path, root: Path, target_tree=None):
+def generate(patch_id: str, upstream_input: Path, root: Path, target_tree=None, advance: bool = False):
     """Production supplies the authenticated full target; local unit checks may
     use authenticated complete-file source snapshots. Neither reads Patch 51.
     Each call creates its own generation tree, index and source reconstruction.
     """
-    before, after, date, target = reconstruct_postimages(patch_id, upstream_input, root)
+    before, after, date, target = reconstruct_postimages(patch_id, upstream_input, root, advance)
     env = {**os.environ, "LC_ALL": "C", "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1"}
     with tempfile.TemporaryDirectory(prefix="patch51-git-") as tmp:
         tree = Path(tmp) / "tree"

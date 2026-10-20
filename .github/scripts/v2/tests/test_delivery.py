@@ -322,6 +322,66 @@ class TestPipelineDelivery(unittest.TestCase):
                 self.assertFalse(rerun.committed or rerun.pushed)
 
 
+    def test_susfs_revision_advances_atomically_through_writer(self):
+        import tarfile
+        from v2.policy.patch51_source import generate
+        real_root = Path(__file__).resolve().parents[4]
+        patch_id = "sultan-android14-6.1-patch51"
+        work = tempfile.TemporaryDirectory()
+        self.addCleanup(work.cleanup)
+        src, tree = Path(work.name) / "susfs", Path(work.name) / "kernel"
+        with tarfile.open(real_root / ".github/fixtures/sultan/stat-compile/headers.tar.gz") as tar:
+            susfs_def = tar.extractfile("include/linux/susfs_def.h").read()
+        files = {"kernel_patches/50_add_susfs_in_gki-android14-6.1.patch":
+                 (real_root / ".github/fixtures/sultan/50_add_susfs_in_gki-android14-6.1.patch").read_bytes(),
+                 "kernel_patches/fs/susfs.c": b"new core\n", "kernel_patches/include/linux/susfs.h": b"hdr\n",
+                 "kernel_patches/include/linux/susfs_def.h": susfs_def}
+        for rel, raw in files.items():
+            (src / rel).parent.mkdir(parents=True, exist_ok=True)
+            (src / rel).write_bytes(raw)
+        env = {"GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1", "GIT_AUTHOR_NAME": "t",
+               "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t",
+               "GIT_AUTHOR_DATE": "@1700000000 +0000", "GIT_COMMITTER_DATE": "@1700000000 +0000"}
+        for args in (("init", "-q"), ("add", "."), ("commit", "-qm", "susfs")):
+            subprocess.run(["git", *args], cwd=src, env=env, check=True)
+        head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=src, text=True).strip()
+        for entry in load_authoritative_bundle("sultan-android14-6.1", self.repo_root).files:
+            (tree / entry.path).parent.mkdir(parents=True, exist_ok=True)
+            (tree / entry.path).write_text(entry.content)
+
+        res = run_pipeline(patch_id, src, target_tree=tree, candidate_dir=Path(work.name) / "out",
+                           repo_root=self.repo_root)
+        self.assertIn("Date: Tue, 14 Nov 2023 22:13:20 +0000", res.candidate_path.read_text())
+        commit_fixture = res.candidate_path.parent / "susfs-source-commit.txt"
+        good = commit_fixture.read_bytes()
+        commit_fixture.write_bytes(good + b"tampered\n")
+        with self.assertRaises(pipeline.PromotionError):
+            deliver_multi_candidates({patch_id: res.candidate_path}, repo_root=self.repo_root)
+        commit_fixture.write_bytes(good)
+
+        _, pushed, commit_sha, _ = deliver_multi_candidates(
+            {patch_id: res.candidate_path}, repo_root=self.repo_root, write_back=True, verify_raw_url=False)
+        self.assertTrue(pushed)
+        state = json.loads((self.repo_root / ".github/upstream-state.json").read_text())
+        accepted = state["sources"]["authoritative"]["susfs_sultan"]
+        self.assertEqual(accepted["commit"], head)
+        self.assertEqual(accepted["tracked_files"]["kernel_patches/fs/susfs.c"],
+                         "sha256:" + hashlib.sha256(b"new core\n").hexdigest())
+        baseline = json.loads((self.repo_root / "patches/sultan-android14-6.1/BASELINE.json").read_text())
+        self.assertEqual(baseline["susfs"]["resolved_commit"], head)
+        self.assertEqual((self.repo_root / ".github/fixtures/sultan/susfs-source-commit.txt").read_bytes(),
+                         subprocess.check_output(["git", "cat-file", "commit", "HEAD"], cwd=src))
+        provenance = json.loads((self.repo_root / ".github/fixtures/sultan/stat-compile/provenance.json").read_text())
+        self.assertEqual(provenance["susfs_commit"], head)
+        committed = subprocess.check_output(["git", "show", "--name-only", "--format=", commit_sha],
+                                            cwd=self.repo_root, text=True).split()
+        self.assertIn(".github/fixtures/sultan/susfs-source-commit.txt", committed)
+        self.assertIn(".github/upstream-state.json", committed)
+        # Accepted records are now coherent: the ordinary accepted path reproduces the candidate.
+        self.assertEqual(generate(patch_id, src, self.repo_root)[0], res.candidate_path.read_text())
+        self.assertFalse(run_pipeline(patch_id, src, target_tree=None, repo_root=self.repo_root,
+                                      check_only=True).candidate_path.with_name("susfs-acceptance.json").exists())
+
     def test_11_multi_candidate_both_changed_single_commit(self):
         """Invariant: Both Sultan and GKI candidates changing produces exactly ONE delivery commit."""
         real_root = Path(__file__).resolve().parents[4]
