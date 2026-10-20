@@ -769,8 +769,10 @@ def sync_dashboard_issue(
         existing_body = matching_issues[0].get("body", "")
         existing_events = parse_dashboard_events(existing_body)
 
-    # 3. Query open escalations
-    open_escalations = fetch_open_escalations(repo)
+    # 3. Query open escalations; the issue list lags the watcher's own just-closed resolutions.
+    current = {r.source_id for r in report.results if r.classification in
+               (WatchClassification.NO_CHANGE, WatchClassification.IRRELEVANT_CHANGE)}
+    open_escalations = [e for e in fetch_open_escalations(repo) if e["source_id"] not in current]
 
     # 4. Extract new transition events from this run
     date_str = report.timestamp[:10] if report.timestamp else datetime.now(timezone.utc).strftime("%Y-%m-%d")

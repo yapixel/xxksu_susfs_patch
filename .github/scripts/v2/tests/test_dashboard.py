@@ -81,6 +81,17 @@ class DashboardTests(unittest.TestCase):
         self.assertIn("# 📡 Upstream Watch Status", call_body)
         self.assertIn("🟢 HEALTHY", call_body)
 
+    @patch("v2.watch.dashboard.find_dashboard_issues", return_value=[])
+    @patch("v2.watch.dashboard.create_dashboard_issue", return_value="https://github.com/yapixel/xxksu_susfs_patch/issues/100")
+    @patch("v2.watch.dashboard.ensure_label_exists")
+    @patch("v2.watch.dashboard.fetch_open_escalations", return_value=[
+        {"number": 19, "title": "t", "url": "u", "source_id": "susfs_sultan", "classification": "SEMANTIC_DRIFT"}])
+    def test_01b_just_resolved_escalation_does_not_mark_action_required(self, mock_esc, mock_lbl, mock_create, mock_find):
+        sync_dashboard_issue(report=make_clean_report(), repo="yapixel/xxksu_susfs_patch", repo_root=REPO_ROOT)
+        body = mock_create.call_args[0][1]
+        self.assertIn("🟢 HEALTHY", body)
+        self.assertNotIn("#19", body)
+
     # 2. update-in-place when exactly one exists
     @patch("v2.watch.dashboard.find_dashboard_issues")
     @patch("v2.watch.dashboard.update_dashboard_issue", return_value="https://github.com/yapixel/xxksu_susfs_patch/issues/42")
