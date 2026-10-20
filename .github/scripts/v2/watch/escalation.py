@@ -120,9 +120,10 @@ def escalate_issue(
 
 
 def close_resolved_issues(result: SourceResult, repo: str = "yapixel/xxksu_susfs_patch") -> list[int]:
-    """Close open escalations for a source whose accepted commit is the upstream head again."""
+    """Close open escalations for a source whose upstream tracked content equals accepted state."""
     from .model import WatchClassification
-    if result.classification != WatchClassification.NO_CHANGE or not shutil.which("gh"):
+    if result.classification not in (WatchClassification.NO_CHANGE, WatchClassification.IRRELEVANT_CHANGE) \
+            or not shutil.which("gh"):
         return []
     closed = []
     try:
@@ -132,8 +133,8 @@ def close_resolved_issues(result: SourceResult, repo: str = "yapixel/xxksu_susfs
             if f"Upstream Drift: {result.source_id} (" not in issue.get("title", ""):
                 continue
             subprocess.run(["gh", "issue", "close", str(issue["number"]), "--repo", repo, "--comment",
-                            f"Resolved: accepted `{result.source_id}` revision `{result.new_identity}` "
-                            "matches the upstream tracking ref."], capture_output=True, text=True, check=True)
+                            f"Resolved: upstream `{result.source_id}` at `{result.new_identity}` "
+                            "matches the accepted tracked content."], capture_output=True, text=True, check=True)
             closed.append(issue["number"])
     except Exception as exc:
         logger.warning("Error closing resolved issues via gh: %s", exc)
