@@ -3,19 +3,19 @@
   "sources": {
     "authoritative": {
       "backslashxx_kernelsu": {
-        "commit": "bd0d99c925af73689afb198d4f79fbeafc16794a",
+        "commit": "46dd08a49d32c93d32d993074eb364af2d2fef21",
         "ref": "master",
-        "relevant_content_hash": "sha256:90e0171477373b825ca4099faff2c80d55ccda831730f59309f9b31f886ded4c",
+        "relevant_content_hash": "sha256:f5dd12b091d6c1516dff967812a15918ab38bf34d37f275f6c1a9f493212b979",
         "repository": "https://github.com/backslashxx/KernelSU.git",
         "tracked_files": {
           "kernel/Kconfig": "sha256:3a30954bbff10ec57c9897fd17d856877c0b9db9f71692b3e0430639c99c9ec8",
           "kernel/downstream/ksu_hostsredirect.h": "sha256:9dbaf73b1edcb515ca98ca0cfe9f12dc4fa3c264041aba70398061fe897cf4e9",
           "kernel/feature/kernel_umount.c": "sha256:05c8335c8cc3140bc6a867b464c5d5556a5b32d99aa92f5c144e4da01b461a13",
-          "kernel/feature/sucompat.c": "sha256:52d60722ff9517dbf2d40f4604667be0fc61caf2a7cab8a948b337f41d107fda",
+          "kernel/feature/sucompat.c": "sha256:c554a04b175001833b43179052ddb79fc34c7685958188b468e1ca6f0aaa4424",
           "kernel/hook/lsm_hooks_list.c": "sha256:c9dc1793d1d14bef2de767f63a2e7281bfa6ed0f9bd78b211fe8a4a4666c2d41",
           "kernel/hook/setuid_hook.c": "sha256:dd7f40fa454fdea2d997ee219f3aed2892a71efa8ad2b69a5f2d6aca86ada1e5",
           "kernel/hook/syscall_table_hook_arm64.c": "sha256:9e0b0c3ce4935455032888ec9c7c6102664aa360767f607372835103fb42fa5d",
-          "kernel/kernel_compat.h": "sha256:4da3eae8a7c39fad2712b24dcfbe5a2626a121d31fa48b2c7c035c007914b9f3",
+          "kernel/kernel_compat.h": "sha256:cac9948b941231d34ba187dbe864edf3f27b7722590dab6e900cc00ef665a75d",
           "kernel/kernel_includes.h": "sha256:fc0a8fa777a1a1d2bf94cf30d32f7bf98394c753d1fba2953ff4493f99a8703d",
           "kernel/ksu.c": "sha256:02f585467223af1c8de278824f6a45afae98535b537992b538a404dcf73a5d3f",
           "kernel/runtime/ksud_integration.c": "sha256:b2396ab76e03c293791178eba8ce6b4cf9252ec0fde1e1855e85aa84f5ea6a61",
