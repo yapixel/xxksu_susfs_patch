@@ -16,7 +16,7 @@ into correctness evidence. Keep README downstream-facing and HANDOVER a dated sn
 
 ## Environment, commits, and cleanup
 
-- On Windows Codex hosts use local WSL for repository work, audits, Git, and tests.
+- On Windows hosts use local WSL for repository work, audits, Git, and tests.
   Do not rely on VPS, AGY/Pi, or developer scratch state.
 - Keep the actual working repository persistent. Put all disposable clones,
   archives, extracted kernels, candidates, comparisons, and temporary caches under
@@ -26,7 +26,7 @@ into correctness evidence. Keep README downstream-facing and HANDOVER a dated sn
   shared caches, or system files. Report cleanup failures without killing unrelated processes.
 - Verify working-tree status before and after work. Read-only audits leave it unchanged.
 - Follow the user's signing instruction. Otherwise commit with `--no-gpg-sign`; do not
-  record commit hashes in `.codex/HANDOFF.md`. Never change GPG configuration
+  record commit hashes in `.claude/HANDOFF.md`. Never change GPG configuration
   or rewrite commits solely to sign them later.
 - Documentation-only closeouts may use `[skip ci]`; do not dispatch production
   publication or expensive reconstruction merely for prose changes.

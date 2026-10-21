@@ -65,7 +65,7 @@ marked illegal. All reproduction/reference/history entries were retained.
 | `.github/fixtures/r38/README.md` | `1f4434f742478c4ab28b2818e32fd0a606908d18` | HISTORICAL_PROVENANCE | No | Correct for this role |
 | `patches/gki-android16-6.12/PROVENANCE.md` | `2528bdb0e2e76d26b9b174a8314ac115c9f00b3c` | HISTORICAL_PROVENANCE | No | Correct for this role |
 | `.github/scripts/v2/tests/test_dashboard.py` | `2528bdb0e2e76d26b9b174a8314ac115c9f00b3c` | TEST_FIXTURE_IDENTITY | No | Correct for this role |
-| `.codex/TEST_ORACLE_REPORT.md` | `2d4ee0302b6106d25f91471fbbdf83bdc5cf7f6e` | HISTORICAL_PROVENANCE | No | Correct for this role |
+| `.claude/TEST_ORACLE_REPORT.md` | `2d4ee0302b6106d25f91471fbbdf83bdc5cf7f6e` | HISTORICAL_PROVENANCE | No | Correct for this role |
 | `.github/scripts/v2/tests/test_watch.py` | `30e66dc3a5c65954de865afd8f44682866887544` | TEST_FIXTURE_IDENTITY | No | Correct for this role |
 | `.github/scripts/v2/adapters/xxksu.py`<br>`patches/xxksu/11_enable_susfs_for_ksu.patch` | `37eee69d83424bba4b2ae3d3dd38cbbbb1ef9824` | HISTORICAL_PROVENANCE | No | Correct for this role |
 | `.github/fixtures/sultan/susfs-source-commit.txt` | `3cdb78f89752b3123c3efd8d72bc4a491c1b3684` | REPRODUCIBILITY_RECORD | No; review/authentication may require coherent data updates | Correct for this role |
@@ -118,7 +118,7 @@ marked illegal. All reproduction/reference/history entries were retained.
 | `PATCH51_CORRECTIONS.md` | `da8c2d00995cfcafb82a583b602e1e3949026744` | HISTORICAL_PROVENANCE | No | Correct for this role |
 | `.github/fixtures/r38/susfs-source-commit.txt` | `ebbc112e84d21e31ab2aca9aee8aa972ee92ec72` | REPRODUCIBILITY_RECORD | No; review/authentication may require coherent data updates | Correct for this role |
 | `HANDOVER.md` | `eeadeb8b62508ba8fb9e088f6fad8a7e8542383a` | HISTORICAL_PROVENANCE | No | Correct for this role |
-| `.codex/TEST_ORACLE_REPORT.md` | `f83efeb5ca7b9ec3ce34eb17aa2b91975004e453` | HISTORICAL_PROVENANCE | No | Correct for this role |
+| `.claude/TEST_ORACLE_REPORT.md` | `f83efeb5ca7b9ec3ce34eb17aa2b91975004e453` | HISTORICAL_PROVENANCE | No | Correct for this role |
 | `.github/scripts/v2/tests/test_watch.py` | `ffffffffffffffffffffffffffffffffffffffff` | TEST_FIXTURE_IDENTITY | No | Correct for this role |
 
 ## Regression evidence

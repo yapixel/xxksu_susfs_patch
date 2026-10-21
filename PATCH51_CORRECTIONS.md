@@ -113,7 +113,7 @@ Final status refresh run [36284739196](https://github.com/yapixel/xxksu_susfs_pa
 
 Final post-publication clean-checkout test result at `bb72cfe5e197e8f3342d4bbc2902d26dbb949b4c`: **Ran 331 tests in 363.333s — OK; zero skips**. Source/test revisions also passed full clean discovery (327 tests, then 328 tests, and 331 tests in 362.886s) and all focused regressions. The first run against published outputs exposed one test-setup failure in `test_13_multi_candidate_both_unchanged_noop`: historical generator fixtures were assumed to equal current production bytes. The related one-changed test had the same assumption. Both now use the actual initial delivery bytes; no-op still requires no commit/push, and added assertions verify unchanged GKI bytes and local/remote HEAD. Both focused tests pass. No production logic was weakened or changed for this failure.
 
-Signing: interactive GPG access blocked; commits used the user-authorized `--no-gpg-sign` fallback. No Git identity/signing configuration or history was rewritten. Unsigned local commit hashes are recorded in the intentionally ignored local `.codex/HANDOFF.md` ledger. Final evidence-only documentation follows the delivery commit and does not alter production bytes.
+Signing: interactive GPG access blocked; commits used the user-authorized `--no-gpg-sign` fallback. No Git identity/signing configuration or history was rewritten. Unsigned local commit hashes are recorded in the intentionally ignored local `.claude/HANDOFF.md` ledger. Final evidence-only documentation follows the delivery commit and does not alter production bytes.
 
 Reproduction command (WSL Debian, clean detached checkout of the final delivery):
 
