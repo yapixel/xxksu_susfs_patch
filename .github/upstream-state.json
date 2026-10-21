@@ -3,15 +3,15 @@
   "sources": {
     "authoritative": {
       "backslashxx_kernelsu": {
-        "commit": "9273a81a73ecfb941f2718ffd4c5a418bc07f269",
+        "commit": "b32a8de8395b4042912304853cae57570ebd4e6d",
         "ref": "master",
-        "relevant_content_hash": "sha256:492288e4233605370ed7591f78ddebb7fb3712df9388055390e9aa60c205c3a5",
+        "relevant_content_hash": "sha256:563e7428d5b3c038eebd6b710aa23dbef1fdf038356e0624e5e6cd8ece17d9b5",
         "repository": "https://github.com/backslashxx/KernelSU.git",
         "tracked_files": {
           "kernel/Kconfig": "sha256:3a30954bbff10ec57c9897fd17d856877c0b9db9f71692b3e0430639c99c9ec8",
           "kernel/downstream/ksu_hostsredirect.h": "sha256:9dbaf73b1edcb515ca98ca0cfe9f12dc4fa3c264041aba70398061fe897cf4e9",
           "kernel/feature/kernel_umount.c": "sha256:05c8335c8cc3140bc6a867b464c5d5556a5b32d99aa92f5c144e4da01b461a13",
-          "kernel/feature/sucompat.c": "sha256:0784b3b3d1ceb7d495c9c3715e370dfae1bb52cc13d963908df46a510ad7dbb8",
+          "kernel/feature/sucompat.c": "sha256:b2a27e3ea5a5b274ffaca90d5af9297e823ef0bbfca970a33a65b498ae01a095",
           "kernel/hook/lsm_hooks_list.c": "sha256:c9dc1793d1d14bef2de767f63a2e7281bfa6ed0f9bd78b211fe8a4a4666c2d41",
           "kernel/hook/setuid_hook.c": "sha256:dd7f40fa454fdea2d997ee219f3aed2892a71efa8ad2b69a5f2d6aca86ada1e5",
           "kernel/hook/syscall_table_hook_arm64.c": "sha256:9e0b0c3ce4935455032888ec9c7c6102664aa360767f607372835103fb42fa5d",

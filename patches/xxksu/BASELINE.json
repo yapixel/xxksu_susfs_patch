@@ -32,7 +32,7 @@
     "kernel/Kconfig": "sha256:3a30954bbff10ec57c9897fd17d856877c0b9db9f71692b3e0430639c99c9ec8",
     "kernel/downstream/ksu_hostsredirect.h": "sha256:9dbaf73b1edcb515ca98ca0cfe9f12dc4fa3c264041aba70398061fe897cf4e9",
     "kernel/feature/kernel_umount.c": "sha256:05c8335c8cc3140bc6a867b464c5d5556a5b32d99aa92f5c144e4da01b461a13",
-    "kernel/feature/sucompat.c": "sha256:0784b3b3d1ceb7d495c9c3715e370dfae1bb52cc13d963908df46a510ad7dbb8",
+    "kernel/feature/sucompat.c": "sha256:b2a27e3ea5a5b274ffaca90d5af9297e823ef0bbfca970a33a65b498ae01a095",
     "kernel/hook/setuid_hook.c": "sha256:dd7f40fa454fdea2d997ee219f3aed2892a71efa8ad2b69a5f2d6aca86ada1e5",
     "kernel/hook/syscall_table_hook_arm64.c": "sha256:9e0b0c3ce4935455032888ec9c7c6102664aa360767f607372835103fb42fa5d",
     "kernel/ksu.c": "sha256:02f585467223af1c8de278824f6a45afae98535b537992b538a404dcf73a5d3f",
@@ -47,17 +47,17 @@
   "source_bundle": {
     "artifact_path": ".github/fixtures/v2/v29-baselines/xxksu.json",
     "file_count": 13,
-    "identity": "sha256:69c83cf00a6bfa063b0c29a9b1be38093177703cf394f692ea0b6d7a2ce7331b",
+    "identity": "sha256:ff8816d0afe7f777d446d49c7fc9fbe8856a99a0a1ca0320374036388909d043",
     "schema": "xxksu-susfs-source-bundle/v1"
   },
   "status": "VERIFIED",
   "target_id": "xxksu",
   "upstream": {
-    "archive_sha256": "01b0f5675898072471c2d14c89778e3facf161167337d3a21f947feef0c65fd3",
-    "archive_url": "https://codeload.github.com/backslashxx/KernelSU/tar.gz/9273a81a73ecfb941f2718ffd4c5a418bc07f269",
+    "archive_sha256": "f5eed52fe48ec6dbaa98c53b578419ac086e18d0d1b4a406330b0aced41a4cc7",
+    "archive_url": "https://codeload.github.com/backslashxx/KernelSU/tar.gz/b32a8de8395b4042912304853cae57570ebd4e6d",
     "ref": "master",
     "repository": "https://github.com/backslashxx/KernelSU",
-    "resolved_commit": "9273a81a73ecfb941f2718ffd4c5a418bc07f269",
-    "tree": "05bfc1fddd22d5c1c700b1155517c84c277db424"
+    "resolved_commit": "b32a8de8395b4042912304853cae57570ebd4e6d",
+    "tree": "89584361fcef6b2b4195fc6faebdf964cb199a1d"
   }
 }
