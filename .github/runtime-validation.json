@@ -52,9 +52,9 @@
       "text": "UPSTREAM_RECONCILED: reconciled susfs_sultan upstream to sultan-shiba-susfs-minimal 665e5d1; candidate Patch 51 verified with exact application."
     },
     {
-      "timestamp": "2026-10-13",
+      "timestamp": "2026-10-24",
       "source_id": "backslashxx_kernelsu",
-      "text": "UPSTREAM_RECONCILED: reconciled xxKSU upstream to master 12cdc2bf (v3.3.1+); candidate Patch 11 regenerated and verified with exact application across all 8 files."
+      "text": "UPSTREAM_RECONCILED: reconciled xxKSU upstream to master e1b07948; regenerated Patch 11 across all 9 files with pkg_observer renew hook and SuSFS Priority UID Filter parity."
     },
     {
       "timestamp": "2026-10-02",
