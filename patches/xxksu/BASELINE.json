@@ -15,7 +15,7 @@
   },
   "patch_11": {
     "patch_file": "patches/xxksu/11_enable_susfs_for_ksu.patch",
-    "patch_sha256": "sha256:63039d3e4ef82f1fe6b74e8bb5e8f74caf9e81144aa88798c02bdd2dd0e8e6ae",
+    "patch_sha256": "sha256:d9c55d92b9b53da9163713757a171be37aa3636c00f0efbfc30659ddaf5a77d5",
     "size": 16856,
     "strict_apply": "PASS"
   },
@@ -24,7 +24,7 @@
     "reviewed_revision": {
       "commit_object": ".github/fixtures/v2/patch11-policy-commit.txt",
       "repository": "https://github.com/yapixel/xxksu_susfs_patch",
-      "resolved_commit": "c31d16395c794bf81bdf784391ae234db8d911be"
+      "resolved_commit": "89921791529db389d9912e48a219d10d31cac87e"
     },
     "v27_policy_identity": "v2.policy.patch11"
   },

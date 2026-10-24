@@ -1,6 +1,6 @@
-tree b6f536fe15a42ff0a1a9e624aae99d344663e111
-parent 0fe24492fcc914ac75eac72cf699ef2553c68f12
-author debiansid <9624961+debiansid@users.noreply.github.com> 1791949833 -0700
-committer debiansid <9624961+debiansid@users.noreply.github.com> 1791949833 -0700
+tree 7becadbc733d59d941f4e54c1fb254307dab465f
+parent 3d47c01c73e47f77beaa31ae839e36089576b40e
+author debiansid <9624961+debiansid@users.noreply.github.com> 1792884388 -0700
+committer debiansid <9624961+debiansid@users.noreply.github.com> 1792884388 -0700
 
-fix(xxksu): reconcile backslashxx/KernelSU to 12cdc2bf (v3.3.1+)
+feat(xxksu): add pkg_observer renew hook and priority uid filter supercall
