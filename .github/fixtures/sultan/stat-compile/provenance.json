@@ -1,7 +1,7 @@
 {
   "target_commit": "af5c65b9547a9f33c5f566430d0434aecab5a8b5",
   "target_archive_sha256": "a029eeff4237ceb7092a3699d5a944c6e4e68f1b89fbb38c5f2d7b5ff3570895",
-  "susfs_commit": "5299bd91dd4769702be0d80f1b2c2e2f0a46bff7",
+  "susfs_commit": "7f5a5ddc4666c64bb476986435ec82eb629c069b",
   "archive_sha256": "b9848cb43f4cca3e67f20240a1421814af2b3396a5230bc08cba776010a4b936",
   "compiler_flags": [
     "-nostdinc",

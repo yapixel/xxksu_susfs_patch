@@ -12,7 +12,7 @@ from .patch51_source import (
     KERNEL_FILES, apply_retained, generate, reconstruct_postimages as shared_reconstruct
 )
 
-FILES = KERNEL_FILES
+FILES = KERNEL_FILES + ("block/ioprio.c",)
 _apply_retained = apply_retained
 
 
@@ -103,6 +103,7 @@ def _adapt(path: str, source: str) -> str:
 
 
 class GkiR38Patch51Adapter:
+    kernel_files = KERNEL_FILES + ("block/ioprio.c",)
     """Target adapter for GKI Android 16 / Linux 6.12 r38 Patch 51."""
     target_id = "gki-android16-6.12-r38"
     patch_id = "gki-android16-6.12-r38-patch51"

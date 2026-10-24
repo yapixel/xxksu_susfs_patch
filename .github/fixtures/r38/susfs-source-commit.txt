@@ -1,8 +1,12 @@
-tree a08ab77b4c725a6ceeaa00449964935b66d2cb69
-parent 1ac091c4f261420361db208194d48929786215d7
-author simonpunk <simonpunk2016@gmail.com> 1792425596 +0800
-committer simonpunk <simonpunk2016@gmail.com> 1792425596 +0800
+tree e2e455c6bd96241e34839bdf0787547d39959e03
+parent 97cbbaf7ad1c3ec5ddb7d893a50eb24d27c1ed61
+author simonpunk <simonpunk2016@gmail.com> 1792842271 +0800
+committer simonpunk <simonpunk2016@gmail.com> 1792842271 +0800
 
-KernelSU: Sync with the official KernelSU main repo
+kernel & KernelSU: Sync with upstream
 
-- See https://github.com/tiann/KernelSU/commit/469c4282e72382388b4598fa022fe8ca91dc9ab5
+[KernelSU]
+- Revert changes in KernelSU side, see https://github.com/tiann/KernelSU/commit/528bafc5696196f3a9500cee2e7e18497421cd32
+
+[kernel]
+- Apply changes in sel_open_handle_status().

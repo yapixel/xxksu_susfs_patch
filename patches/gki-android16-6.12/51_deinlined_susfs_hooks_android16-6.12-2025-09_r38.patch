@@ -1,8 +1,9 @@
 From: yapixel <yapixel@users.noreply.github.com>
-Date: Mon, 19 Oct 2026 15:59:56 +0000
+Date: Sat, 24 Oct 2026 11:44:31 +0000
 Subject: [PATCH] SUSFS de-inlined hooks for android16-6.12-2025-09_r38
 
 ---
+ block/ioprio.c       |  22 +++-
  fs/Makefile          |   2 +
  fs/namei.c           | 237 +++++++++++++++++++++++++++++++++++++++
  fs/namespace.c       | 305 ++++++++++++++++++++++++++++++++++++++++++++++++++-
@@ -17,10 +18,59 @@ Subject: [PATCH] SUSFS de-inlined hooks for android16-6.12-2025-09_r38
  fs/statfs.c          |  81 ++++++++++++++
  fs/super.c           |  24 ++++
  kernel/kallsyms.c    |  31 ++++++
- kernel/sys.c         |   8 ++
+ kernel/sys.c         |  21 ++++
  mm/memory.c          |  14 +++
- 16 files changed, 1360 insertions(+), 1 deletion(-)
+ 17 files changed, 1393 insertions(+), 3 deletions(-)
 
+diff --git a/block/ioprio.c b/block/ioprio.c
+index 73301a261429ff9e04a166aefa5c72df55eaee57..10ebc4a9b07bb765b7dd598f58a166fcb7fe85a0 100644
+--- a/block/ioprio.c
++++ b/block/ioprio.c
+@@ -66,6 +66,10 @@ int ioprio_check_cap(int ioprio)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_KSU_SUSFS
++extern bool susfs_is_priority_uid_filtered(uid_t uid);
++#endif // #ifdef CONFIG_KSU_SUSFS
++
+ SYSCALL_DEFINE3(ioprio_set, int, which, int, who, int, ioprio)
+ {
+ 	struct task_struct *p, *g;
+@@ -113,8 +117,15 @@ SYSCALL_DEFINE3(ioprio_set, int, which, int, who, int, ioprio)
+ 			if (!who)
+ 				user = current_user();
+ 			else
++#ifdef CONFIG_KSU_SUSFS
++			{
++				if (current_uid().val >= 10000 && susfs_is_priority_uid_filtered(uid.val))
++					break;
+ 				user = find_user(uid);
+-
++			}
++#else
++				user = find_user(uid);
++#endif // #ifdef CONFIG_KSU_SUSFS
+ 			if (!user)
+ 				break;
+ 
+@@ -223,8 +234,15 @@ SYSCALL_DEFINE2(ioprio_get, int, which, int, who)
+ 			if (!who)
+ 				user = current_user();
+ 			else
++#ifdef CONFIG_KSU_SUSFS
++			{
++				if (current_uid().val >= 10000 && susfs_is_priority_uid_filtered(uid.val))
++					break;
+ 				user = find_user(uid);
+-
++			}
++#else
++				user = find_user(uid);
++#endif // #ifdef CONFIG_KSU_SUSFS
+ 			if (!user)
+ 				break;
+ 
 diff --git a/fs/Makefile b/fs/Makefile
 index 9f5d06f4a1a1e3c1bd418986a4e639e2be8002c2..eeea6b70b47aa4c22cfad3548205ae234664d6dc 100644
 --- a/fs/Makefile
@@ -2176,10 +2226,43 @@ index a9a0ca605d4a8c82c5575706443287120ee6edc4..a6308f3f5017df134d568a2c2435f9ae
  }
  
 diff --git a/kernel/sys.c b/kernel/sys.c
-index 4a87dc5fa8679d5e0e37ca1e746f2abe2369c6b6..b3e62ed0639a9ac3c18498a9905952447fda0b71 100644
+index 4a87dc5fa8679d5e0e37ca1e746f2abe2369c6b6..a228c2303bed2a62659d00c8fd14a3ac0f5ec498 100644
 --- a/kernel/sys.c
 +++ b/kernel/sys.c
-@@ -1326,12 +1326,20 @@ static int override_release(char __user *release, size_t len)
+@@ -226,6 +226,10 @@ static int set_one_prio(struct task_struct *p, int niceval, int error)
+ 	return error;
+ }
+ 
++#ifdef CONFIG_KSU_SUSFS
++extern bool susfs_is_priority_uid_filtered(uid_t uid);
++#endif // #ifdef CONFIG_KSU_SUSFS
++
+ SYSCALL_DEFINE3(setpriority, int, which, int, who, int, niceval)
+ {
+ 	struct task_struct *g, *p;
+@@ -272,6 +276,10 @@ SYSCALL_DEFINE3(setpriority, int, which, int, who, int, niceval)
+ 		if (!who)
+ 			uid = cred->uid;
+ 		else if (!uid_eq(uid, cred->uid)) {
++#ifdef CONFIG_KSU_SUSFS
++			if (cred->uid.val >= 10000 && susfs_is_priority_uid_filtered(uid.val))
++				goto out_unlock;
++#endif // #ifdef CONFIG_KSU_SUSFS
+ 			user = find_user(uid);
+ 			if (!user)
+ 				goto out_unlock;	/* No processes for this user */
+@@ -340,6 +348,10 @@ SYSCALL_DEFINE2(getpriority, int, which, int, who)
+ 		if (!who)
+ 			uid = cred->uid;
+ 		else if (!uid_eq(uid, cred->uid)) {
++#ifdef CONFIG_KSU_SUSFS
++			if (cred->uid.val >= 10000 && susfs_is_priority_uid_filtered(uid.val))
++				goto out_unlock;
++#endif // #ifdef CONFIG_KSU_SUSFS
+ 			user = find_user(uid);
+ 			if (!user)
+ 				goto out_unlock;	/* No processes for this user */
+@@ -1326,12 +1338,21 @@ static int override_release(char __user *release, size_t len)
  	return ret;
  }
  
@@ -2187,6 +2270,7 @@ index 4a87dc5fa8679d5e0e37ca1e746f2abe2369c6b6..b3e62ed0639a9ac3c18498a990595244
 +extern struct static_key_false susfs_is_uname_spoof_buffer_set;
 +extern void susfs_spoof_uname(struct new_utsname* tmp);
 +#endif
++
  SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)
  {
  	struct new_utsname tmp;

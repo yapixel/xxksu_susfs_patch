@@ -12,17 +12,18 @@
         "archive_url": "https://github.com/yapixel/gki-build-assets/releases/download/android16-6.12-2025-09_r38/common-android16-6.12-2025-09_r38.tar.gz",
         "compatibility_target": "android16-6.12-2025-09_r38 (GKI 6.12)",
         "patch_file": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
-        "patch_sha256": "sha256:f4fec81dd588048cf1f7ae3d33e10d1e8826d4eee5c21239822f1df408843329"
+        "patch_sha256": "sha256:58df2ca6956bfebefc412b0e5fb4ace2b7701747ef5d340a1ef3fce3cf0b0c0e"
       }
     }
   },
   "patch_51": {
     "patch_file": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
-    "patch_sha256": "sha256:f4fec81dd588048cf1f7ae3d33e10d1e8826d4eee5c21239822f1df408843329",
+    "patch_sha256": "sha256:58df2ca6956bfebefc412b0e5fb4ace2b7701747ef5d340a1ef3fce3cf0b0c0e",
     "retired_internal_patch": "51_deinlined_susfs_hooks_gki-android16-6.12.patch",
     "strict_apply": "PASS"
   },
   "retained_file_hashes": {
+    "block/ioprio.c": "sha256:e0d1c86213a444ff74f6056839aefb83a3f46ecc63fe04551ac5e71b74bb944f",
     "drivers/input/input.c": "sha256:117d587a0fa0cbbe30e104602ff3e5eecd4c7a9263bb5fbaf2d4915441b36036",
     "fs/Makefile": "sha256:ecf3e37cca0203de36a13719098fed0cd69537e24972daf5fa45d70521b9f176",
     "fs/exec.c": "sha256:1f3a1ba299229052290230ae095182d108679b3d6d7bcf0d6ac56c6b4dad2ee3",
@@ -49,8 +50,8 @@
   "schema": "xxksu-susfs-baseline/v1",
   "source_bundle": {
     "artifact_path": ".github/fixtures/v2/v29-baselines/gki-android16-6.12.json",
-    "file_count": 22,
-    "identity": "sha256:5777d7c799707340bc0b373b9e478a484b2ba99085a438fbef1d53e1c5dbb5dc",
+    "file_count": 23,
+    "identity": "sha256:b4e67703c64aaf534cf73120f138fbbc459fd1c905090917518bc2676995a91f",
     "schema": "xxksu-susfs-source-bundle/v1"
   },
   "status": "VERIFIED",
@@ -58,7 +59,7 @@
     "patch_50": "50_add_susfs_in_gki-android16-6.12.patch",
     "ref": "gki-android16-6.12",
     "repository": "https://gitlab.com/simonpunk/susfs4ksu",
-    "resolved_commit": "9c9f19d8395693327c78df36569b44e94c187b8a"
+    "resolved_commit": "3ff9fd3fac5bb01b71b2cfe96c612d469710fb74"
   },
   "target_id": "gki-android16-6.12",
   "upstream": {

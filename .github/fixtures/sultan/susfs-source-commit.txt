@@ -1,8 +1,12 @@
-tree 9cfd5312a87b5fa8f86328b88b739b2d8b3c96f6
-parent bb797266b517f8a7f0b5bcebcf6e7741c1d955f1
-author simonpunk <simonpunk2016@gmail.com> 1792820776 +0800
-committer simonpunk <simonpunk2016@gmail.com> 1792820776 +0800
+tree 2136fa325fb452f0eff30069ba6dd03e903b2504
+parent 5299bd91dd4769702be0d80f1b2c2e2f0a46bff7
+author simonpunk <simonpunk2016@gmail.com> 1792837283 +0800
+committer simonpunk <simonpunk2016@gmail.com> 1792837283 +0800
 
-kernel: Apply priority uid filter for two more syscalls - ioprio_get and ioprio_set
+kernel & KernelSU: Sync with upstream
 
-- Since these two syscalls are also vulnerable to hidden uid same as getpriority and setpriority, so they need to be taken care.
+[KernelSU]
+- Revert changes in KernelSU side, see https://github.com/tiann/KernelSU/commit/528bafc5696196f3a9500cee2e7e18497421cd32
+
+[kernel]
+- Apply changes in sel_open_handle_status().
