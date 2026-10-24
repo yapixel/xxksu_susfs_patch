@@ -45,7 +45,7 @@ env:
 jobs:
   validate_sultan:
     name: "Validate Sultan 6.1 (Android 14)"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     permissions:
       contents: read
     env:
@@ -166,7 +166,7 @@ jobs:
 
   validate_gki_r38:
     name: "Validate GKI 6.12 (Android 16 r38 Compatibility)"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     permissions:
       contents: read
     env:
