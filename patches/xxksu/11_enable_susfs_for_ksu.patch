@@ -1,4 +1,4 @@
-From 2963199645834ba7a5072a7e4e46dfad30355ba3 Mon Sep 17 00:00:00 2001
+From 0350336ae28af99dd1408afdf22c8f78fda32440 Mon Sep 17 00:00:00 2001
 From: yapixel <yapixel@users.noreply.github.com>
 Date: Wed, 14 Oct 2026 03:50:33 +0000
 Subject: [PATCH] Enable SUSFS for backslashxx KernelSU
@@ -7,12 +7,12 @@ Subject: [PATCH] Enable SUSFS for backslashxx KernelSU
  kernel/Kconfig                        |  90 +++++++++++++++
  kernel/hook/setuid_hook.c             |  40 +++++++++++++++++-
  kernel/ksu.c                          |   8 ++
- kernel/selinux/rules.c                |   7 ++
- kernel/selinux/selinux.c              | 103 ++++++++++++++++
- kernel/selinux/selinux.h              |  14 +++
- kernel/supercall/dispatch.c           |   9 +++
- kernel/supercall/supercall.c          |  93 +++++++++++++++
- 8 files changed, 363 insertions(+), 1 deletion(-)
+ kernel/selinux/rules.c                |   3 +
+ kernel/selinux/selinux.c              | 120 ++++++++++++++++++++++++++++++++++
+ kernel/selinux/selinux.h              |  15 +++
+ kernel/supercall/dispatch.c           |   7 ++
+ kernel/supercall/supercall.c          |  91 ++++++++++++++++++++++++++++++++
+ 8 files changed, 373 insertions(+), 1 deletion(-)
 
 diff --git a/kernel/Kconfig b/kernel/Kconfig
 index 45e09d1..bf7a578 100644
@@ -157,7 +157,7 @@ index 9257980..d42a673 100644
  	// Handle kernel umount
 -	ksu_handle_umount(new, old);
 +#ifdef CONFIG_KSU_SUSFS
-+	if (susfs_is_current_zygote_domain()) {
++	if (susfs_is_current_zygote_domain() || new_uid == WEBVIEW_ZYGOTE_UID) {
 +		handle_zygote_setresuid(new, old, new_uid, false);
 +	} else if (susfs_is_current_zygote_next_domain()) {
 +		handle_zygote_setresuid(new, old, new_uid, true);
@@ -198,25 +198,21 @@ diff --git a/kernel/selinux/rules.c b/kernel/selinux/rules.c
 index a9d4f67..9351318 100644
 --- a/kernel/selinux/rules.c
 +++ b/kernel/selinux/rules.c
-@@ -210,6 +210,13 @@ out_flush:
- 	smp_mb();
- 	reset_avc_cache();
+@@ -23,6 +23,9 @@ static void reset_avc_cache()
+ 	selinux_status_update_policyload(&selinux_state, 0);
  #endif
-+
+ 	selinux_xfrm_notify_policyload();
 +#ifdef CONFIG_KSU_SUSFS
-+	susfs_set_priv_app_sid();
-+	susfs_set_init_sid();
-+	susfs_set_ksu_sid();
-+	susfs_set_zygote_sid();
-+#endif
++	susfs_set_batch_sid();
++#endif // #ifdef CONFIG_KSU_SUSFS
  }
  
- #define KSU_SEPOLICY_MAX_BATCH_SIZE (8U * 1024U * 1024U)
+ #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 diff --git a/kernel/selinux/selinux.c b/kernel/selinux/selinux.c
 index 04e5ffe..e3bd796 100644
 --- a/kernel/selinux/selinux.c
 +++ b/kernel/selinux/selinux.c
-@@ -241,3 +241,106 @@ void escape_to_root_for_adb_root(void)
+@@ -241,3 +241,123 @@ void escape_to_root_for_adb_root(void)
  	}
  	commit_creds(cred);
  }
@@ -227,11 +223,11 @@ index 04e5ffe..e3bd796 100644
 +#define KERNEL_ZYGOTE_NEXT_DOMAIN "u:r:zygote_next:s0"
 +#define KERNEL_PRIV_APP_DOMAIN "u:r:priv_app:s0:c512,c768"
 +
-+u32 susfs_ksu_sid = 0;
-+u32 susfs_init_sid = 0;
-+u32 susfs_zygote_sid = 0;
-+u32 susfs_zygote_next_sid = 0;
-+u32 susfs_priv_app_sid = 0;
++u32 susfs_ksu_sid __read_mostly = 0;
++u32 susfs_init_sid __read_mostly = 0;
++u32 susfs_zygote_sid __read_mostly = 0;
++u32 susfs_zygote_next_sid __read_mostly = 0;
++u32 susfs_priv_app_sid __read_mostly = 0;
 +
 +static inline void susfs_set_sid(const char *secctx_name, u32 *out_sid)
 +{
@@ -251,17 +247,14 @@ index 04e5ffe..e3bd796 100644
 +    pr_info("sid '%u' is set for secctx_name '%s'\n", *out_sid, secctx_name);
 +}
 +
-+bool susfs_is_sid_equal(const struct cred *cred, u32 sid2) {
++bool susfs_is_sid_equal(const struct cred *cred, u32 sid2)
++{
 +#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 18, 0)
 +    const struct task_security_struct *tsec = selinux_cred(cred);
 +#else
 +    const struct cred_security_struct *tsec = selinux_cred(cred);
 +#endif
-+
-+    if (!tsec) {
-+        return false;
-+    }
-+    return tsec->sid == sid2;
++    return tsec ? (tsec->sid == sid2) : false;
 +}
 +
 +u32 susfs_get_sid_from_name(const char *secctx_name)
@@ -282,8 +275,44 @@ index 04e5ffe..e3bd796 100644
 +    return out_sid;
 +}
 +
-+u32 susfs_get_current_sid(void) {
-+    return current_sid();
++u32 susfs_get_current_sid(void)
++{
++    const struct cred *cred = current_cred();
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 18, 0)
++    const struct task_security_struct *tsec = selinux_cred(cred);
++#else
++    const struct cred_security_struct *tsec = selinux_cred(cred);
++#endif
++    return tsec ? tsec->sid : 0;
++}
++
++bool susfs_is_current_zygote_domain(void)
++{
++    return unlikely(susfs_is_sid_equal(current_cred(), susfs_zygote_sid));
++}
++
++bool susfs_is_current_zygote_next_domain(void)
++{
++    return unlikely(susfs_is_sid_equal(current_cred(), susfs_zygote_next_sid));
++}
++
++bool susfs_is_current_ksu_domain(void)
++{
++    return unlikely(susfs_is_sid_equal(current_cred(), susfs_ksu_sid));
++}
++
++bool susfs_is_current_init_domain(void)
++{
++    return unlikely(susfs_is_sid_equal(current_cred(), susfs_init_sid));
++}
++
++void susfs_set_batch_sid(void)
++{
++    susfs_set_sid(KERNEL_ZYGOTE_DOMAIN, &susfs_zygote_sid);
++    susfs_set_sid(KERNEL_ZYGOTE_NEXT_DOMAIN, &susfs_zygote_next_sid);
++    susfs_set_sid(KERNEL_SU_CONTEXT, &susfs_ksu_sid);
++    susfs_set_sid(KERNEL_INIT_DOMAIN, &susfs_init_sid);
++    susfs_set_sid(KERNEL_PRIV_APP_DOMAIN, &susfs_priv_app_sid);
 +}
 +
 +void susfs_set_zygote_sid(void)
@@ -292,30 +321,14 @@ index 04e5ffe..e3bd796 100644
 +    susfs_set_sid(KERNEL_ZYGOTE_NEXT_DOMAIN, &susfs_zygote_next_sid);
 +}
 +
-+bool susfs_is_current_zygote_domain(void) {
-+    return unlikely(current_sid() == susfs_zygote_sid);
-+}
-+
 +void susfs_set_ksu_sid(void)
 +{
 +    susfs_set_sid(KERNEL_SU_CONTEXT, &susfs_ksu_sid);
 +}
 +
-+bool susfs_is_current_zygote_next_domain(void) {
-+    return unlikely(current_sid() == susfs_zygote_next_sid);
-+}
-+
-+bool susfs_is_current_ksu_domain(void) {
-+    return unlikely(current_sid() == susfs_ksu_sid);
-+}
-+
 +void susfs_set_init_sid(void)
 +{
 +    susfs_set_sid(KERNEL_INIT_DOMAIN, &susfs_init_sid);
-+}
-+
-+bool susfs_is_current_init_domain(void) {
-+    return unlikely(current_sid() == susfs_init_sid);
 +}
 +
 +void susfs_set_priv_app_sid(void)
@@ -327,7 +340,7 @@ diff --git a/kernel/selinux/selinux.h b/kernel/selinux/selinux.h
 index cbeac55..42bdf73 100644
 --- a/kernel/selinux/selinux.h
 +++ b/kernel/selinux/selinux.h
-@@ -14,6 +14,20 @@
+@@ -14,6 +14,21 @@
  #define INIT_CONTEXT "u:r:init:s0"
  #define ADBD_CONTEXT "u:r:adbd:s0"
  
@@ -335,6 +348,7 @@ index cbeac55..42bdf73 100644
 +bool susfs_is_sid_equal(const struct cred *cred, u32 sid2);
 +u32 susfs_get_sid_from_name(const char *secctx_name);
 +u32 susfs_get_current_sid(void);
++void susfs_set_batch_sid(void);
 +void susfs_set_zygote_sid(void);
 +bool susfs_is_current_zygote_domain(void);
 +bool susfs_is_current_zygote_next_domain(void);
@@ -352,22 +366,20 @@ diff --git a/kernel/supercall/dispatch.c b/kernel/supercall/dispatch.c
 index fe628e3..b4c6386 100644
 --- a/kernel/supercall/dispatch.c
 +++ b/kernel/supercall/dispatch.c
-@@ -1,3 +1,9 @@
+@@ -1,3 +1,7 @@
 +#ifdef CONFIG_KSU_SUSFS
-+#include <linux/namei.h>
 +#include <linux/susfs.h>
-+#include "objsec.h"
 +#endif // #ifdef CONFIG_KSU_SUSFS
 +
  static int do_grant_root(void __user *arg)
  {
  	int ret;
-@@ -93,6 +99,9 @@ static int do_report_event(void __user *arg)
+@@ -93,6 +97,9 @@ static int do_report_event(void __user *arg)
  			boot_complete_lock = true;
  			pr_info("boot_complete triggered\n");
  			on_boot_completed();
 +#ifdef CONFIG_KSU_SUSFS
-+        	susfs_start_sdcard_monitor_fn();
++			susfs_start_sdcard_monitor_fn();
 +#endif // #ifdef CONFIG_KSU_SUSFS
  		}
  		break;
@@ -376,20 +388,18 @@ diff --git a/kernel/supercall/supercall.c b/kernel/supercall/supercall.c
 index 59ec582..6e8a1a1 100644
 --- a/kernel/supercall/supercall.c
 +++ b/kernel/supercall/supercall.c
-@@ -4,6 +4,12 @@ struct ksu_driver_context {
+@@ -4,6 +4,10 @@ struct ksu_driver_context {
  	unsigned long permissions;
  };
  
 +#ifdef CONFIG_KSU_SUSFS
-+#include <linux/namei.h>
 +#include <linux/susfs.h>
-+#include "objsec.h"
 +#endif // #ifdef CONFIG_KSU_SUSFS
 +
  static int anon_ksu_release(struct inode *inode, struct file *filp)
  {
  	kfree(filp->private_data);
-@@ -82,6 +88,93 @@ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user
+@@ -82,6 +86,93 @@ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user
  {
  	if (magic1 != KSU_INSTALL_MAGIC1)
  		return 0;
