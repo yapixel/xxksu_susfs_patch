@@ -1,8 +1,8 @@
 {
   "target_commit": "af5c65b9547a9f33c5f566430d0434aecab5a8b5",
   "target_archive_sha256": "a029eeff4237ceb7092a3699d5a944c6e4e68f1b89fbb38c5f2d7b5ff3570895",
-  "susfs_commit": "75d60eb68c95ee7df6c0380da64b2ba817a1644d",
-  "archive_sha256": "472cd7f3a0c4a43dc53d6e28323ed6d64c7170f283e7e19ae59c534aa4a56cfa",
+  "susfs_commit": "5299bd91dd4769702be0d80f1b2c2e2f0a46bff7",
+  "archive_sha256": "b9848cb43f4cca3e67f20240a1421814af2b3396a5230bc08cba776010a4b936",
   "compiler_flags": [
     "-nostdinc",
     "-I../arch/arm64/include",
@@ -610,7 +610,7 @@
     "include/linux/string_helpers.h": "cc833a43355008b78ed62bc52af3dfd4b2424dbb1e931797aaadd4c41463064b",
     "include/linux/stringhash.h": "d5516b7211c9c44dbec9aa3aff42515eefaaa24afb7a130496c483262cc1891f",
     "include/linux/stringify.h": "9d9338c8b13be2cc1da4e0343afb52345ba4370b3403f0a8584a1df065f3f159",
-    "include/linux/susfs_def.h": "db7f98dcf8119a4eb5c45c05205b6c1065766047d6f803b0e86f3d14b1a251f0",
+    "include/linux/susfs_def.h": "c515e11107088161b70e3bb7d4c49cdd3b882808c2e374a9a5237e5b8f19844b",
     "include/linux/swab.h": "0256ce360a3c5b3f65fd341df2857505334f60889eb83c72cdf8fe3dde338de6",
     "include/linux/swait.h": "498e247ba0768998a8688ffa3a1f7f3957b145a654e9ae29d02c5c49096fa3a2",
     "include/linux/swap.h": "bf841fc5094e6c4a35a9ac6ee8ccf85c7287fb7b8438017421f1d92e7b563ff4",

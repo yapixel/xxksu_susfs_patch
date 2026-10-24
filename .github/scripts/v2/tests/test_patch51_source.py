@@ -92,11 +92,13 @@ class Patch51SourceTests(unittest.TestCase):
         ):
             raw = (ROOT / ".github/fixtures" / folder / patch_name).read_text()
             files = {f.old_path.removeprefix("a/") for f in parse_patch(raw).files}
-            all_classified = REMOVE_FILES | MIXED_FILES | KEEP_FILES
+            adapter = get_adapter("sultan-android14-6.1-patch51" if folder == "sultan" else "gki-android16-6.12-r38-patch51")
+            kernel_files = getattr(adapter, "kernel_files", KERNEL_FILES)
+            all_classified = REMOVE_FILES | MIXED_FILES | frozenset(kernel_files)
             self.assertTrue(files.issubset(all_classified),
                             f"unclassified files in {patch_name}: {files - all_classified}")
             self.assertTrue(MIXED_FILES.issubset(files))
-            self.assertTrue(KEEP_FILES.issubset(files))
+            self.assertTrue((frozenset(kernel_files) - MIXED_FILES).issubset(files))
 
     def test_unreviewed_patch50_file_fails_closed(self):
         source = ROOT / ".github/fixtures/sultan"
@@ -118,7 +120,7 @@ class Patch51SourceTests(unittest.TestCase):
 
     def test_target_adapters_interface_and_metadata(self):
         for pid, expected_target, expected_file_count in (
-            ("sultan-android14-6.1-patch51", "sultan-android14-6.1", 16),
+            ("sultan-android14-6.1-patch51", "sultan-android14-6.1", 17),
             ("gki-android16-6.12-r38-patch51", "android16-6.12-2025-09_r38", 16),
         ):
             adapter = get_adapter(pid)

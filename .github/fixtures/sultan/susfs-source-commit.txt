@@ -1,8 +1,8 @@
-tree 48806df5d7fae32b7177957c106151fd6b5e412b
-parent 0754ac81e21de16fd33cadd403c29bbecc2acd26
-author simonpunk <simonpunk2016@gmail.com> 1792425495 +0800
-committer simonpunk <simonpunk2016@gmail.com> 1792425495 +0800
+tree 9cfd5312a87b5fa8f86328b88b739b2d8b3c96f6
+parent bb797266b517f8a7f0b5bcebcf6e7741c1d955f1
+author simonpunk <simonpunk2016@gmail.com> 1792820776 +0800
+committer simonpunk <simonpunk2016@gmail.com> 1792820776 +0800
 
-KernelSU: Sync with the official KernelSU main repo
+kernel: Apply priority uid filter for two more syscalls - ioprio_get and ioprio_set
 
-- See https://github.com/tiann/KernelSU/commit/469c4282e72382388b4598fa022fe8ca91dc9ab5
+- Since these two syscalls are also vulnerable to hidden uid same as getpriority and setpriority, so they need to be taken care.

@@ -218,14 +218,17 @@ def reconstruct_postimages(patch_id: str, upstream_input: Path, root: Path, adva
     parsed_patch = parse_patch(raw_patch_50.decode())
     upstream = {f.old_path.removeprefix("a/"): f for f in parsed_patch.files}
 
+    # Target or shared kernel files to retain and adapt
+    kernel_files = getattr(adapter, "kernel_files", KERNEL_FILES)
+
     # Shared ownership classification and fail-closed validation of Patch 50 files
-    all_reviewed = REMOVE_FILES | MIXED_FILES | KEEP_FILES
+    all_reviewed = REMOVE_FILES | MIXED_FILES | frozenset(kernel_files)
     unreviewed = set(upstream.keys()) - all_reviewed
     if unreviewed:
         raise ValueError(f"unreviewed files in Patch 50: {sorted(unreviewed)}")
 
     after = {}
-    for path in KERNEL_FILES:
+    for path in kernel_files:
         diff_file = upstream[path]
         if hasattr(adapter, "apply_retained"):
             retained_source = adapter.apply_retained(path, before[path], diff_file)

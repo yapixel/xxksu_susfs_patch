@@ -103,7 +103,7 @@ class AuthoritativeBundleVerificationTests(unittest.TestCase):
     """Verify loading and quality-gate verification of authoritative bundles."""
 
     def test_authoritative_bundles(self):
-        for target, version, count in (("gki-android16-6.12","6.12",22), ("sultan-android14-6.1","6.1.25",23), ("xxksu","main",13)):
+        for target, version, count in (("gki-android16-6.12","6.12",22), ("sultan-android14-6.1","6.1.25",24), ("xxksu","main",13)):
             with self.subTest(target=target):
                 bundle = load_authoritative_bundle(target, REPO_ROOT)
                 self.assertIsInstance(bundle, SourceBundle)

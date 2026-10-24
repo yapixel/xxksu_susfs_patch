@@ -4,6 +4,7 @@ These rules preserve the accepted postimages; no final Patch 51 supplies their c
 """
 from pathlib import Path
 from .lifecycle import fix_namespace, fix_task_mmu, fix_remote_memory
+from .patch51_source import KERNEL_FILES
 from ..source.baseline import load_authoritative_bundle
 
 
@@ -14,6 +15,7 @@ class SultanPatch51Adapter:
     target_dir = "sultan-android14-6.1"
     source_state_key = "susfs_sultan"
     commit_fixture_relpath = Path(".github/fixtures/sultan/susfs-source-commit.txt")
+    kernel_files = KERNEL_FILES + ("block/ioprio.c",)
 
     def load_preimages(self, root: Path, baseline: dict) -> dict[str, str]:
         bundle = load_authoritative_bundle(self.target_dir, root)

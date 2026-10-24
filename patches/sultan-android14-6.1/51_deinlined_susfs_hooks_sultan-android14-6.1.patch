@@ -1,8 +1,9 @@
 From: yapixel <yapixel@users.noreply.github.com>
-Date: Mon, 19 Oct 2026 15:58:15 +0000
+Date: Sat, 24 Oct 2026 05:46:16 +0000
 Subject: [PATCH] SUSFS de-inlined hooks for sultan-android14-6.1
 
 ---
+ block/ioprio.c       |  22 ++++-
  fs/Makefile          |   2 +
  fs/namei.c           | 238 ++++++++++++++++++++++++++++++++++++++++++++++
  fs/namespace.c       | 261 ++++++++++++++++++++++++++++++++++++++++++++++++++-
@@ -17,10 +18,59 @@ Subject: [PATCH] SUSFS de-inlined hooks for sultan-android14-6.1
  fs/statfs.c          |  81 ++++++++++++++++
  fs/super.c           |  24 +++++
  kernel/kallsyms.c    |  31 ++++++
- kernel/sys.c         |  26 ++---
+ kernel/sys.c         |  38 ++++----
  mm/memory.c          |   9 ++
- 16 files changed, 1407 insertions(+), 18 deletions(-)
+ 17 files changed, 1439 insertions(+), 20 deletions(-)
 
+diff --git a/block/ioprio.c b/block/ioprio.c
+index 32a456b458049f45baf30be663cdfe63bcde2a55..ea1e2b4d032b5db3eb5dcf144534f638438dc4ab 100644
+--- a/block/ioprio.c
++++ b/block/ioprio.c
+@@ -65,6 +65,10 @@ int ioprio_check_cap(int ioprio)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_KSU_SUSFS
++extern bool susfs_is_priority_uid_filtered(uid_t uid);
++#endif // #ifdef CONFIG_KSU_SUSFS
++
+ SYSCALL_DEFINE3(ioprio_set, int, which, int, who, int, ioprio)
+ {
+ 	struct task_struct *p, *g;
+@@ -112,8 +116,15 @@ SYSCALL_DEFINE3(ioprio_set, int, which, int, who, int, ioprio)
+ 			if (!who)
+ 				user = current_user();
+ 			else
++#ifdef CONFIG_KSU_SUSFS
++			{
++				if (current_uid().val >= 10000 && susfs_is_priority_uid_filtered(uid.val))
++					break;
+ 				user = find_user(uid);
+-
++			}
++#else
++				user = find_user(uid);
++#endif // #ifdef CONFIG_KSU_SUSFS
+ 			if (!user)
+ 				break;
+ 
+@@ -248,8 +259,15 @@ SYSCALL_DEFINE2(ioprio_get, int, which, int, who)
+ 			if (!who)
+ 				user = current_user();
+ 			else
++#ifdef CONFIG_KSU_SUSFS
++			{
++				if (current_uid().val >= 10000 && susfs_is_priority_uid_filtered(uid.val))
++					break;
+ 				user = find_user(uid);
+-
++			}
++#else
++				user = find_user(uid);
++#endif // #ifdef CONFIG_KSU_SUSFS
+ 			if (!user)
+ 				break;
+ 
 diff --git a/fs/Makefile b/fs/Makefile
 index 469ce6ec14920cbec0ac24ac692bcfe3ee9cb701..6e3c743e5d3bfb4387cce4734f084cecc5c0ad80 100644
 --- a/fs/Makefile
@@ -2263,10 +2313,43 @@ index 824bcc7b5dbc3acc056f828659e3b6220b5b7137..99c75339022a745e02ea7d7052e589e1
  }
  
 diff --git a/kernel/sys.c b/kernel/sys.c
-index 7595dc25d67e7de25dda14ccc7d862e816dc9557..681809b39ad21f52a788bcd465202a980a1f422f 100644
+index 7595dc25d67e7de25dda14ccc7d862e816dc9557..95f19bdb30f1fb1435bb40f552559b17efb84e8f 100644
 --- a/kernel/sys.c
 +++ b/kernel/sys.c
-@@ -1298,29 +1298,23 @@ static int override_release(char __user *release, size_t len)
+@@ -210,6 +210,10 @@ static int set_one_prio(struct task_struct *p, int niceval, int error)
+ 	return error;
+ }
+ 
++#ifdef CONFIG_KSU_SUSFS
++extern bool susfs_is_priority_uid_filtered(uid_t uid);
++#endif // #ifdef CONFIG_KSU_SUSFS
++
+ SYSCALL_DEFINE3(setpriority, int, which, int, who, int, niceval)
+ {
+ 	struct task_struct *g, *p;
+@@ -256,6 +260,10 @@ SYSCALL_DEFINE3(setpriority, int, which, int, who, int, niceval)
+ 		if (!who)
+ 			uid = cred->uid;
+ 		else if (!uid_eq(uid, cred->uid)) {
++#ifdef CONFIG_KSU_SUSFS
++			if (cred->uid.val >= 10000 && susfs_is_priority_uid_filtered(uid.val))
++				goto out_unlock;
++#endif // #ifdef CONFIG_KSU_SUSFS
+ 			user = find_user(uid);
+ 			if (!user)
+ 				goto out_unlock;	/* No processes for this user */
+@@ -324,6 +332,10 @@ SYSCALL_DEFINE2(getpriority, int, which, int, who)
+ 		if (!who)
+ 			uid = cred->uid;
+ 		else if (!uid_eq(uid, cred->uid)) {
++#ifdef CONFIG_KSU_SUSFS
++			if (cred->uid.val >= 10000 && susfs_is_priority_uid_filtered(uid.val))
++				goto out_unlock;
++#endif // #ifdef CONFIG_KSU_SUSFS
+ 			user = find_user(uid);
+ 			if (!user)
+ 				goto out_unlock;	/* No processes for this user */
+@@ -1298,29 +1310,23 @@ static int override_release(char __user *release, size_t len)
  	return ret;
  }
  
