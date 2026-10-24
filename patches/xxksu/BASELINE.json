@@ -15,8 +15,8 @@
   },
   "patch_11": {
     "patch_file": "patches/xxksu/11_enable_susfs_for_ksu.patch",
-    "patch_sha256": "sha256:be89f0de8c8677ab72b8cc951067057afc69cc58879e076d1067ececd547e6a3",
-    "size": 16138,
+    "patch_sha256": "sha256:63039d3e4ef82f1fe6b74e8bb5e8f74caf9e81144aa88798c02bdd2dd0e8e6ae",
+    "size": 16856,
     "strict_apply": "PASS"
   },
   "policy": {
@@ -36,6 +36,7 @@
     "kernel/hook/setuid_hook.c": "sha256:dd7f40fa454fdea2d997ee219f3aed2892a71efa8ad2b69a5f2d6aca86ada1e5",
     "kernel/hook/syscall_table_hook_arm64.c": "sha256:9e0b0c3ce4935455032888ec9c7c6102664aa360767f607372835103fb42fa5d",
     "kernel/ksu.c": "sha256:0377775f2627cae3cac34fa85488be36cc8174f748a003cc8a3ca9ffe5ed8ba3",
+    "kernel/manager/pkg_observer.c": "sha256:1e4dc1fce8c534f84fc114985f840ec3330623762ea6f1a077f507461d8ec596",
     "kernel/runtime/ksud_integration.c": "sha256:b2396ab76e03c293791178eba8ce6b4cf9252ec0fde1e1855e85aa84f5ea6a61",
     "kernel/selinux/rules.c": "sha256:ff2371426688bf160d9b13a230f9863679b58b858ad86a5f696a3538511cdc04",
     "kernel/selinux/selinux.c": "sha256:c22331a2db5ee3bbb53234e51c04e98054281cb1a4d06550bb1413c817b985dc",
@@ -46,8 +47,8 @@
   "schema": "xxksu-susfs-baseline/v1",
   "source_bundle": {
     "artifact_path": ".github/fixtures/v2/v29-baselines/xxksu.json",
-    "file_count": 13,
-    "identity": "sha256:19be83eed7cc065cbcca0ae1d20391204cfc08e26338839af8a49d1a3cc6e345",
+    "file_count": 14,
+    "identity": "sha256:015e3b9a47c79c142d18ad5d5e648e8483575a8711f82d28728865309d39e8d2",
     "schema": "xxksu-susfs-source-bundle/v1"
   },
   "status": "VERIFIED",

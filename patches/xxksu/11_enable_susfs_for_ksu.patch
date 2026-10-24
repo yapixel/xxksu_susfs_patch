@@ -1,4 +1,4 @@
-From 0350336ae28af99dd1408afdf22c8f78fda32440 Mon Sep 17 00:00:00 2001
+From 2dbfb2406dc76f9db5cf1e53f472cf06da6a934b Mon Sep 17 00:00:00 2001
 From: yapixel <yapixel@users.noreply.github.com>
 Date: Wed, 14 Oct 2026 03:50:33 +0000
 Subject: [PATCH] Enable SUSFS for backslashxx KernelSU
@@ -7,12 +7,13 @@ Subject: [PATCH] Enable SUSFS for backslashxx KernelSU
  kernel/Kconfig                        |  90 +++++++++++++++
  kernel/hook/setuid_hook.c             |  40 +++++++++++++++++-
  kernel/ksu.c                          |   8 ++
+ kernel/manager/pkg_observer.c         |   3 +
  kernel/selinux/rules.c                |   3 +
  kernel/selinux/selinux.c              | 120 ++++++++++++++++++++++++++++++++++
  kernel/selinux/selinux.h              |  15 +++
  kernel/supercall/dispatch.c           |   7 ++
- kernel/supercall/supercall.c          |  91 ++++++++++++++++++++++++++++++++
- 8 files changed, 373 insertions(+), 1 deletion(-)
+ kernel/supercall/supercall.c          |  95 ++++++++++++++++++++++++++++++++++
+ 9 files changed, 380 insertions(+), 1 deletion(-)
 
 diff --git a/kernel/Kconfig b/kernel/Kconfig
 index 45e09d1..bf7a578 100644
@@ -194,6 +195,20 @@ index 06df055..77210ba 100644
  	ksu_ksud_init();
  	ksu_file_wrapper_init();
  	ksu_preinit_init();
+diff --git a/kernel/manager/pkg_observer.c b/kernel/manager/pkg_observer.c
+index 8a7d780..055f741 100644
+--- a/kernel/manager/pkg_observer.c
++++ b/kernel/manager/pkg_observer.c
+@@ -52,6 +52,9 @@ static void ksu_rename_observer_slow(struct dentry *old_dentry, struct dentry *new_dentry)
+ 		return;
+ 
+ 	pr_info("renameat: %s -> %s, new path: %s\n", old_dentry->d_iname, new_dentry->d_iname, buf);
++#ifdef CONFIG_KSU_SUSFS
++	susfs_parse_priority_app_strings();
++#endif // #ifdef CONFIG_KSU_SUSFS
+ 	track_throne(false);
+ 	return;
+ }
 diff --git a/kernel/selinux/rules.c b/kernel/selinux/rules.c
 index a9d4f67..9351318 100644
 --- a/kernel/selinux/rules.c
@@ -385,7 +400,7 @@ index fe628e3..b4c6386 100644
  		break;
  	}
 diff --git a/kernel/supercall/supercall.c b/kernel/supercall/supercall.c
-index 59ec582..6e8a1a1 100644
+index 59ec582..6149aed 100644
 --- a/kernel/supercall/supercall.c
 +++ b/kernel/supercall/supercall.c
 @@ -4,6 +4,10 @@ struct ksu_driver_context {
@@ -399,7 +414,7 @@ index 59ec582..6e8a1a1 100644
  static int anon_ksu_release(struct inode *inode, struct file *filp)
  {
  	kfree(filp->private_data);
-@@ -82,6 +86,93 @@ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user
+@@ -82,6 +86,97 @@ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user
  {
  	if (magic1 != KSU_INSTALL_MAGIC1)
  		return 0;
@@ -471,6 +486,10 @@ index 59ec582..6e8a1a1 100644
 +            return 0;
 +        }
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
++        if (cmd == CMD_SUSFS_SET_PRIORITY_UID_FILTER) {
++            susfs_set_priority_uid_filter(arg);
++            return 0;
++        }
 +        if (cmd == CMD_SUSFS_ENABLE_AVC_LOG_SPOOFING) {
 +            susfs_set_avc_log_spoofing(arg);
 +            return 0;

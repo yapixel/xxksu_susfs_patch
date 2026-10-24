@@ -74,7 +74,7 @@ and free provenance, pagemap VMA/caller behavior, smaps lock-reacquire guards, a
 literal integrity. A source/API change needs focused source review.
 
 Patch 11 modifies exactly: `kernel/Kconfig`, `kernel/hook/setuid_hook.c`,
-`kernel/ksu.c`, `kernel/selinux/rules.c`, `kernel/selinux/selinux.c`,
+`kernel/ksu.c`, `kernel/manager/pkg_observer.c`, `kernel/selinux/rules.c`, `kernel/selinux/selinux.c`,
 `kernel/selinux/selinux.h`, `kernel/supercall/dispatch.c`, and
 `kernel/supercall/supercall.c`. Do not modify `kernel/feature/kernel_umount.c` or
 `kernel/downstream/ksu_hostsredirect.h`; native try-umount/task-mark ownership remains.
