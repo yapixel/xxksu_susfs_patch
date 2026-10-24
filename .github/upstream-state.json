@@ -5,7 +5,7 @@
       "backslashxx_kernelsu": {
         "commit": "e1b0794888f007f7a59ffd43fa8716c52214f5e6",
         "ref": "master",
-        "relevant_content_hash": "sha256:882c4b7598f2918ebd111859c7a68f3a576cf6d30760405a4ca1acbcc859ea4e",
+        "relevant_content_hash": "sha256:32320391c469188a0e74c1d61add4790c3db98715115e306052df41b79ea0c72",
         "repository": "https://github.com/backslashxx/KernelSU.git",
         "tracked_files": {
           "kernel/Kconfig": "sha256:f1cbd212a81c3da348d9c751df0a09044b426b71864275c122c70def5040fbfd",
