@@ -145,7 +145,7 @@ class AuthoritativeBundleVerificationTests(unittest.TestCase):
             patch_text = patch_path.read_text(encoding="utf-8")
             patched = apply_patch_to_bundle(bundle, patch_text)
             self.assertIsInstance(patched, SourceBundle)
-            self.assertEqual(len(patched.files), 13)
+            self.assertEqual(len(patched.files), 14)
 
             adapted = apply_patch11_to_bundle(bundle)
             for f in bundle.files:
