@@ -94,19 +94,19 @@ jobs:
             --promote \
             --write-back
 
-      - name: Verify Single-Pass Mutation (Clean 8 Files Modified)
+      - name: Verify Single-Pass Mutation (Clean 9 Files Modified)
         run: |
           set -euo pipefail
           cd clean_ksu
           find . -type f \( -name "*.orig" -o -name "*~" \) -delete
           MOD_COUNT="$(git diff --name-only | wc -l)"
           echo "Total modified files: $MOD_COUNT"
-          if [ "$MOD_COUNT" -ne 8 ]; then
-            echo "❌ Expected exactly 8 modified files, found $MOD_COUNT"
+          if [ "$MOD_COUNT" -ne 9 ]; then
+            echo "❌ Expected exactly 9 modified files, found $MOD_COUNT"
             git diff --name-only
             exit 1
           fi
-          echo "✅ Patch 11 applied cleanly on clean KernelSU with 0 rejects across 8 files!"
+          echo "✅ Patch 11 applied cleanly on clean KernelSU with 0 rejects across 9 files!"
 
       - name: Generate 11 Patch Statistics Report
         run: |

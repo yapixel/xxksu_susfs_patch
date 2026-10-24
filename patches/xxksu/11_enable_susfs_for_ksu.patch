@@ -1,4 +1,4 @@
-From 2dbfb2406dc76f9db5cf1e53f472cf06da6a934b Mon Sep 17 00:00:00 2001
+From c83e7fde640554c10597ffe6dae4bc6c500c07c1 Mon Sep 17 00:00:00 2001
 From: yapixel <yapixel@users.noreply.github.com>
 Date: Sat, 24 Oct 2026 23:26:28 +0000
 Subject: [PATCH] Enable SUSFS for backslashxx KernelSU
@@ -170,20 +170,20 @@ index 9257980..d42a673 100644
  
  install_ksu_fd:
 diff --git a/kernel/ksu.c b/kernel/ksu.c
-index 06df055..77210ba 100644
+index 06df055..c7cc340 100644
 --- a/kernel/ksu.c
 +++ b/kernel/ksu.c
-@@ -183,6 +183,10 @@
- #include "hook/kp_ksud.c"
+@@ -32,6 +32,10 @@
+ #include "avc.h"
  #endif
  
 +#ifdef CONFIG_KSU_SUSFS
 +#include <linux/susfs.h>
 +#endif // #ifdef CONFIG_KSU_SUSFS
 +
- // track backports and other quirks here
- // ref: kernel_compat.c, Makefile
- // yes looks nasty
+ // uapi
+ #include "include/uapi/app_profile.h"
+ #include "include/uapi/feature.h"
 @@ -291,6 +295,10 @@ static int __init kernelsu_init(void)
  
  	ksu_allowlist_init();

@@ -49,7 +49,7 @@ PATCH11_CANONICAL_FILES: Tuple[str, ...] = (
 PATCH11_FILE_INDEXES: Mapping[str, str] = {
     "kernel/Kconfig": "index 45e09d1..bf7a578 100644",
     "kernel/hook/setuid_hook.c": "index 9257980..d42a673 100644",
-    "kernel/ksu.c": "index 06df055..77210ba 100644",
+    "kernel/ksu.c": "index 06df055..c7cc340 100644",
     "kernel/manager/pkg_observer.c": "index 8a7d780..055f741 100644",
     "kernel/selinux/rules.c": "index a9d4f67..9351318 100644",
     "kernel/selinux/selinux.c": "index 04e5ffe..e3bd796 100644",
@@ -189,7 +189,7 @@ def get_patch11_operation_specs() -> Tuple[XxksuOperationSpec, ...]:
         XxksuOperationSpec(
             operation_id='xxksu.kernel_ksu_c.hunk_0',
             file_path='kernel/ksu.c',
-            spec=AnchorSpec('kernel/ksu.c', '// track backports and other quirks here\n', context_before=('#include "hook/kp_ksud.c"', '#endif'), context_after=()),
+            spec=AnchorSpec('kernel/ksu.c', '// uapi\n', context_before=('#include "avc.h"', '#endif'), context_after=('#include "include/uapi/app_profile.h"',)),
             placement=Placement.BEFORE,
             payload='#ifdef CONFIG_KSU_SUSFS\n#include <linux/susfs.h>\n#endif // #ifdef CONFIG_KSU_SUSFS\n\n',
             section_context='',

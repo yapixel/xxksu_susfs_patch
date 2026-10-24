@@ -937,14 +937,15 @@ def run_pipeline(
             if advance:
                 _write_susfs_acceptance(patch_id, upstream_input, repo_root, candidate_dir)
 
-        # For Patch 11 on real KernelSU tree: verify exactly 8 modified files if applied
+        # For Patch 11 on real KernelSU tree: verify canonical modified files if applied
         if patch_id == "xxksu-patch11" and not check_only:
+            from .adapters.xxksu import PATCH11_CANONICAL_FILES
             proc = subprocess.run(["git", "diff", "--name-only"], cwd=target_tree, capture_output=True, text=True)
             if proc.returncode == 0:
                 mod_files = [f.strip() for f in proc.stdout.splitlines() if f.strip()]
-                if len(mod_files) != 8:
+                if len(mod_files) != len(PATCH11_CANONICAL_FILES):
                     raise CandidateValidationError(
-                        f"Expected exactly 8 modified files for Patch 11 on KernelSU, got {len(mod_files)}: {mod_files}"
+                        f"Expected exactly {len(PATCH11_CANONICAL_FILES)} modified files for Patch 11 on KernelSU, got {len(mod_files)}: {mod_files}"
                     )
 
 
