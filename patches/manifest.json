@@ -7,14 +7,14 @@
       "name": "Shared xxKSU Patch 11",
       "patch_apply_target": "master",
       "relative_path": "patches/xxksu/11_enable_susfs_for_ksu.patch",
-      "sha256": "2b21cf361680650509b39d9dbf722d912d3ceef866a5cf6bb142349e76144edc",
+      "sha256": "7349879d37ec0bf2552ed82c5c62d9fb424c71284d949e3f1aa927cf4ceea7b3",
       "susfs_lineage": {
         "commit": "c8f64e41e3dea2cd44754d7472d3cd0bc0b40784",
         "ref": "gki-android16-6.12",
         "repository": "https://gitlab.com/simonpunk/susfs4ksu"
       },
       "target_lineage": {
-        "commit": "e1b0794888f007f7a59ffd43fa8716c52214f5e6",
+        "commit": "aad0cb47bc6c9def15335dc9813b6a3fdb7032ee",
         "ref": "master",
         "repository": "https://github.com/backslashxx/KernelSU"
       },
