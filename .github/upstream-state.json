@@ -3,12 +3,12 @@
   "sources": {
     "authoritative": {
       "backslashxx_kernelsu": {
-        "commit": "aad0cb47bc6c9def15335dc9813b6a3fdb7032ee",
+        "commit": "79ed296bef1dbbdbf404307026b54a17bd4eb608",
         "ref": "master",
-        "relevant_content_hash": "sha256:893d5cdf494bc957133ea8ac9f7378530e0732e44aabf358e7c3fb14c62a591d",
+        "relevant_content_hash": "sha256:6086afce5561d5a6da0b46cd77b389ba083f87f9f8070dae6e2172e2f8d97a19",
         "repository": "https://github.com/backslashxx/KernelSU.git",
         "tracked_files": {
-          "kernel/Kconfig": "sha256:f1cbd212a81c3da348d9c751df0a09044b426b71864275c122c70def5040fbfd",
+          "kernel/Kconfig": "sha256:3a30954bbff10ec57c9897fd17d856877c0b9db9f71692b3e0430639c99c9ec8",
           "kernel/downstream/ksu_hostsredirect.h": "sha256:9dbaf73b1edcb515ca98ca0cfe9f12dc4fa3c264041aba70398061fe897cf4e9",
           "kernel/feature/kernel_umount.c": "sha256:54a025e2e67624bc7fedcb4e967e1bb469f7fd7ad2b5c0efd6bd485a831eaa8b",
           "kernel/feature/sucompat.c": "sha256:b2a27e3ea5a5b274ffaca90d5af9297e823ef0bbfca970a33a65b498ae01a095",
@@ -17,7 +17,7 @@
           "kernel/hook/syscall_table_hook_arm64.c": "sha256:9e0b0c3ce4935455032888ec9c7c6102664aa360767f607372835103fb42fa5d",
           "kernel/kernel_compat.h": "sha256:cac9948b941231d34ba187dbe864edf3f27b7722590dab6e900cc00ef665a75d",
           "kernel/kernel_includes.h": "sha256:fc0a8fa777a1a1d2bf94cf30d32f7bf98394c753d1fba2953ff4493f99a8703d",
-          "kernel/ksu.c": "sha256:fc52fd4e60d1a9352d86c95c4eb719bae27331285cea7017f0a1ff1852bca5c8",
+          "kernel/ksu.c": "sha256:02f585467223af1c8de278824f6a45afae98535b537992b538a404dcf73a5d3f",
           "kernel/manager/pkg_observer.c": "sha256:1e4dc1fce8c534f84fc114985f840ec3330623762ea6f1a077f507461d8ec596",
           "kernel/runtime/ksud_integration.c": "sha256:b2396ab76e03c293791178eba8ce6b4cf9252ec0fde1e1855e85aa84f5ea6a61",
           "kernel/selinux/rules.c": "sha256:ff2371426688bf160d9b13a230f9863679b58b858ad86a5f696a3538511cdc04",
