@@ -29,12 +29,19 @@ def command(*args, cwd=None):
     return subprocess.check_output(args, cwd=cwd, text=True).strip()
 
 
-def fetch_git(info, dest):
+def fetch_git(info, dest, retries=3):
     dest.mkdir()
     command("git", "init", "-q", str(dest))
     command("git", "-C", str(dest), "remote", "add", "origin", info["repository"])
     commit = info.get("resolved_commit", info.get("commit"))
-    command("git", "-C", str(dest), "fetch", "--depth=1", "origin", commit)
+    for attempt in range(retries):
+        try:
+            command("git", "-C", str(dest), "fetch", "--depth=1", "origin", commit)
+            break
+        except subprocess.CalledProcessError:
+            if attempt == retries - 1:
+                raise
+            time.sleep(2 ** attempt)
     command("git", "-C", str(dest), "checkout", "-q", "--detach", "FETCH_HEAD")
     require(command("git", "-C", str(dest), "rev-parse", "HEAD") == commit,
             f"source identity mismatch: {dest.name}")
