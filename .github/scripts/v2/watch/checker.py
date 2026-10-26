@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 import subprocess
 import tempfile
+import time
 from typing import Any, Mapping, Optional, Sequence, Tuple
 import urllib.request
 
@@ -41,56 +42,70 @@ def compute_composite_hash(file_hashes: Mapping[str, str]) -> str:
     return f"sha256:{digest}"
 
 
-def fetch_remote_commit(repo_url: str, ref: str) -> str:
+def fetch_remote_commit(repo_url: str, ref: str, retries: int = 3) -> str:
     """Fetch latest remote commit SHA for a git repository and ref."""
-    try:
-        candidates = []
-        if ref:
-            candidates.extend([f"refs/heads/{ref}", f"refs/tags/{ref}", ref])
-        proc = subprocess.run(
-            ["git", "ls-remote", repo_url] + candidates,
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=30,
-        )
-        lines = [line.strip() for line in proc.stdout.strip().splitlines() if line.strip()]
-        for line in lines:
-            parts = line.split()
-            if len(parts) >= 2:
-                commit = parts[0]
-                target_ref = parts[1]
-                if target_ref in (f"refs/heads/{ref}", f"refs/tags/{ref}", ref):
-                    return commit
-
-        # If ref is main/master/HEAD or empty, fallback to querying HEAD
-        if ref in ("main", "master", "HEAD", ""):
-            proc_head = subprocess.run(
-                ["git", "ls-remote", repo_url, "HEAD"],
+    last_exc = None
+    candidates = []
+    if ref:
+        candidates.extend([f"refs/heads/{ref}", f"refs/tags/{ref}", ref])
+    for attempt in range(retries):
+        try:
+            # Use protocol.version=0 to avoid GitLab/Gitaly protocol v2 overload errors
+            proc = subprocess.run(
+                ["git", "-c", "protocol.version=0", "ls-remote", repo_url] + candidates,
                 capture_output=True,
                 text=True,
                 check=True,
                 timeout=30,
             )
-            head_lines = [l.strip() for l in proc_head.stdout.strip().splitlines() if l.strip()]
-            if head_lines:
-                return head_lines[0].split()[0]
+            lines = [line.strip() for line in proc.stdout.strip().splitlines() if line.strip()]
+            for line in lines:
+                parts = line.split()
+                if len(parts) >= 2:
+                    commit = parts[0]
+                    target_ref = parts[1]
+                    if target_ref in (f"refs/heads/{ref}", f"refs/tags/{ref}", ref):
+                        return commit
 
-        raise ValueError(f"no remote commit found for {repo_url} @ {ref}")
-    except Exception as exc:
-        raise RuntimeError(f"failed to fetch remote commit from {repo_url} @ {ref}: {exc}") from exc
+            # If ref is main/master/HEAD or empty, fallback to querying HEAD
+            if ref in ("main", "master", "HEAD", ""):
+                proc_head = subprocess.run(
+                    ["git", "-c", "protocol.version=0", "ls-remote", repo_url, "HEAD"],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                    timeout=30,
+                )
+                head_lines = [l.strip() for l in proc_head.stdout.strip().splitlines() if l.strip()]
+                if head_lines:
+                    return head_lines[0].split()[0]
+
+            raise ValueError(f"no remote commit found for {repo_url} @ {ref}")
+        except Exception as exc:
+            last_exc = exc
+            if attempt < retries - 1:
+                time.sleep(2 ** attempt)
+    raise RuntimeError(f"failed to fetch remote commit from {repo_url} @ {ref}: {last_exc}") from last_exc
 
 
 def fetch_git_files(
     repo_url: str,
     commit: str,
     file_paths: Sequence[str],
+    retries: int = 3,
 ) -> dict[str, str]:
     """Fetch specific file contents from git repository at given commit."""
     with tempfile.TemporaryDirectory() as td:
         subprocess.run(["git", "init", td], check=True, capture_output=True)
         subprocess.run(["git", "-C", td, "remote", "add", "origin", repo_url], check=True, capture_output=True)
-        subprocess.run(["git", "-C", td, "fetch", "--depth=1", "origin", commit], check=True, capture_output=True, timeout=60)
+        for attempt in range(retries):
+            try:
+                subprocess.run(["git", "-C", td, "fetch", "--depth=1", "origin", commit], check=True, capture_output=True, timeout=60)
+                break
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                if attempt == retries - 1:
+                    raise
+                time.sleep(2 ** attempt)
 
         results: dict[str, str] = {}
         missing_files: list[str] = []
