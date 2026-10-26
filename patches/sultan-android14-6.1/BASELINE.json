@@ -27,8 +27,8 @@
     "fs/stat.c": "sha256:42518bc30ac17bd3c9d177a76fe5266c3e8ab7822459adf9581b5bfbf20f48dc",
     "fs/statfs.c": "sha256:100e9195fd0654480062620b018a9a2cdfb5106ab61207e1a8205ee85d6028f8",
     "fs/super.c": "sha256:8143cd1dce322e7c968ae0d6178a00a0dc30fe0cb1460a287f5c2e6eba48d516",
-    "fs/susfs.c": "sha256:5521aa600f6df698e1d5e31df72e3557a36d33c161bd65dcafe5788fb56a7fa7",
-    "include/linux/susfs.h": "sha256:fafff787b8856bd37a6736c2f0bbc5a57fd1f36232be267936f892fb57bc5120",
+    "fs/susfs.c": "sha256:5d1b17dd7d20e4893b82b82a9f36e791558e3ddd735666b2b71f7839001dcb24",
+    "include/linux/susfs.h": "sha256:e06f190fe480ab6725851780b022b472b9b28c56132a54656495388ff8437c50",
     "kernel/kallsyms.c": "sha256:e9126cbecfc154849b404b3d4942925c22575af8f3776b4dc4472c25239c40a5",
     "kernel/reboot.c": "sha256:2ac6cc43f7b33f0153b031e441de7aa126c1c89936c544226fe8706fcb01913a",
     "kernel/sys.c": "sha256:274c7f7d945eb91b34421732420641e9ed511f173ffc08847f4b43400feb03a3",
@@ -39,7 +39,7 @@
   "source_bundle": {
     "artifact_path": ".github/fixtures/v2/v29-baselines/sultan-android14-6.1.json",
     "file_count": 24,
-    "identity": "sha256:599e86a93001f90cf03239269374c84a1e611d15361f4baae69ec32f317ece5f",
+    "identity": "sha256:19fe9e8806ff3475b01ab6e3eb3f1c0b3796ee1467aa29bac79ac5d956a1007f",
     "schema": "xxksu-susfs-source-bundle/v1"
   },
   "status": "VERIFIED",
