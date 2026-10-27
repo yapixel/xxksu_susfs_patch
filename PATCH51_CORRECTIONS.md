@@ -57,7 +57,7 @@ The workflow's unauthenticated `curl | tar` is replaced with download-to-file, p
 
 ### P2 lifecycle reference approval and identity — CONFIRMED + FIXED
 
-The previous matching-files/symbols heuristic permitted dangerous changes. Sensitive file differences now block as `REVIEW_REQUIRED` unless both exact file-diff hashes match the explicitly reviewed pair in `reference_cross_check.py`. Tests mutate name restoration, mount free condition and pagemap progression without changing helper symbols and confirm blocking. The original defective production candidate is blocked too.
+The previous matching-files/symbols heuristic permitted dangerous changes. Sensitive file differences now block as `REVIEW_REQUIRED` unless both exact file-diff hashes match the explicitly reviewed pair in `reference_cross_check.py`. Tests mutate name restoration, mount free condition and pagemap progression without changing helper symbols and confirm blocking. The original defective production candidate is blocked too. (Superseded: this `reference_cross_check.py` gate and its tests were removed in `b6a2383`; it no longer runs.)
 
 Reference URLs now contain actual commit IDs, with expected byte SHA checks before conversion. Override inputs are labeled `OVERRIDE`, not falsely pinned. Reference outages remain `REFERENCE_UNAVAILABLE`, never semantic success or production authority. This bounded policy is not a C semantic analyzer; non-sensitive-file heuristics remain diagnostic and do not replace authoritative validation.
 

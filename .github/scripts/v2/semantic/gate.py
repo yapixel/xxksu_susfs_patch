@@ -322,13 +322,6 @@ def evaluate_semantic_gate(
             details=f"Semantic inventory verification failed for {target_id}: {exc}",
         )
 
-    # 2C. Check Patch 10 in SuSFS tree if present
-    patch10_key = None
-    for k in upstream_contents:
-        if "10_enable_susfs_for_ksu" in k and k.endswith(".patch"):
-            patch10_key = k
-            break
-
     # 2C. Check Patch 10 in SuSFS tree if present and baseline comparison is requested
     patch10_key = None
     for k in upstream_contents:
