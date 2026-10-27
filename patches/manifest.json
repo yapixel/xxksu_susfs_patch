@@ -7,7 +7,7 @@
       "name": "Shared xxKSU Patch 11",
       "patch_apply_target": "master",
       "relative_path": "patches/xxksu/11_enable_susfs_for_ksu.patch",
-      "sha256": "4d26d91affa6b1f5b4bbf6d28901dd067715b0de19e6393b5f00114c4cf6cd6b",
+      "sha256": "658de93ab2b8a8942b056562814e72fe825ff74bc5fdb4cb129f57e623772c8d",
       "susfs_lineage": {
         "commit": "c8f64e41e3dea2cd44754d7472d3cd0bc0b40784",
         "ref": "gki-android16-6.12",

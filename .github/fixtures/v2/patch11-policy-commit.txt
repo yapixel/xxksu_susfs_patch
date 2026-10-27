@@ -1,6 +1,18 @@
-tree 7becadbc733d59d941f4e54c1fb254307dab465f
-parent 3d47c01c73e47f77beaa31ae839e36089576b40e
-author debiansid <9624961+debiansid@users.noreply.github.com> 1792884388 -0700
-committer debiansid <9624961+debiansid@users.noreply.github.com> 1792884388 -0700
+tree 9c3f9b589be4035ccf5054b6fd22cc077b1267fc
+parent 9244a8b5b2544aa92f48ba9566c14e36f2c04a08
+author debiansid <9624961+debiansid@users.noreply.github.com> 1793073168 +0900
+committer debiansid <9624961+debiansid@users.noreply.github.com> 1793073168 +0900
 
-feat(xxksu): add pkg_observer renew hook and priority uid filter supercall
+fix(xxksu): restrict Patch 11 setresuid hook to zygote domains
+
+Drop the outer `|| new_uid == WEBVIEW_ZYGOTE_UID` bypass. Real webview
+zygote children are still in the zygote domain at setresuid, so it was
+redundant for them; its only effect was letting a non-zygote root
+process calling setresuid(1053) get TIF_PROC_UMOUNTED/NO_SU while
+native ksu_handle_umount() refuses to umount (is_zygote(old) false).
+Upstream Patch 10 (3ff9fd3) matches zygote/zygote_next SIDs only.
+The should_umount webview case (native kernel_umount.c case 4) stays.
+
+Deterministically regenerate Patch 11 and update BASELINE.json & manifest.json.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
