@@ -168,7 +168,7 @@ def get_patch11_operation_specs() -> Tuple[XxksuOperationSpec, ...]:
                 context_after=('\treturn;', 'install_ksu_fd:'),
             ),
             placement=Placement.REPLACE,
-            payload='#ifdef CONFIG_KSU_SUSFS\n\tif (susfs_is_current_zygote_domain() || new_uid == WEBVIEW_ZYGOTE_UID) {\n\t\thandle_zygote_setresuid(new, old, new_uid, false);\n\t} else if (susfs_is_current_zygote_next_domain()) {\n\t\thandle_zygote_setresuid(new, old, new_uid, true);\n\t}\n#else\n\tksu_handle_umount(new, old);\n#endif // #ifdef CONFIG_KSU_SUSFS\n',
+            payload='#ifdef CONFIG_KSU_SUSFS\n\tif (susfs_is_current_zygote_domain()) {\n\t\thandle_zygote_setresuid(new, old, new_uid, false);\n\t} else if (susfs_is_current_zygote_next_domain()) {\n\t\thandle_zygote_setresuid(new, old, new_uid, true);\n\t}\n#else\n\tksu_handle_umount(new, old);\n#endif // #ifdef CONFIG_KSU_SUSFS\n',
             section_context='static __always_inline void ksu_handle_setresuid_cred(struct cred *new, const st',
             context_before_count=3,
             context_after_count=3,
@@ -176,7 +176,7 @@ def get_patch11_operation_specs() -> Tuple[XxksuOperationSpec, ...]:
             diff_body=(
                 ('-', '\tksu_handle_umount(new, old);'),
                 ('+', '#ifdef CONFIG_KSU_SUSFS'),
-                ('+', '\tif (susfs_is_current_zygote_domain() || new_uid == WEBVIEW_ZYGOTE_UID) {'),
+                ('+', '\tif (susfs_is_current_zygote_domain()) {'),
                 ('+', '\t\thandle_zygote_setresuid(new, old, new_uid, false);'),
                 ('+', '\t} else if (susfs_is_current_zygote_next_domain()) {'),
                 ('+', '\t\thandle_zygote_setresuid(new, old, new_uid, true);'),

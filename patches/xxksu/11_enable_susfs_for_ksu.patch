@@ -1,4 +1,4 @@
-From a9f771f713fe830574ec56e2f24be40289e2c29b Mon Sep 17 00:00:00 2001
+From 7d910d0c797e7dc45312eb0589704fcd64973bcd Mon Sep 17 00:00:00 2001
 From: yapixel <yapixel@users.noreply.github.com>
 Date: Sat, 24 Oct 2026 23:26:28 +0000
 Subject: [PATCH] Enable SUSFS for backslashxx KernelSU
@@ -158,7 +158,7 @@ index 9257980..d42a673 100644
  	// Handle kernel umount
 -	ksu_handle_umount(new, old);
 +#ifdef CONFIG_KSU_SUSFS
-+	if (susfs_is_current_zygote_domain() || new_uid == WEBVIEW_ZYGOTE_UID) {
++	if (susfs_is_current_zygote_domain()) {
 +		handle_zygote_setresuid(new, old, new_uid, false);
 +	} else if (susfs_is_current_zygote_next_domain()) {
 +		handle_zygote_setresuid(new, old, new_uid, true);
