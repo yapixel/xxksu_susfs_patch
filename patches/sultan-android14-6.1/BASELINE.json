@@ -6,7 +6,7 @@
   "kernel_version": "6.1",
   "patch_51": {
     "patch_file": "patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch",
-    "patch_sha256": "sha256:3f6b58b2a5c0b0613066b2594d0c7e635e89407634f719c42879ca97976860c8",
+    "patch_sha256": "sha256:eece4f56201c66f6ff9c73330156fafa36ed4f034e825b8db61153b0a94e930b",
     "strict_apply": "PASS"
   },
   "retained_file_hashes": {
@@ -47,7 +47,7 @@
     "patch_50": "50_add_susfs_in_gki-android14-6.1.patch",
     "ref": "sultan-shiba-susfs-minimal",
     "repository": "https://gitlab.com/simonpunk/susfs4ksu",
-    "resolved_commit": "7f5a5ddc4666c64bb476986435ec82eb629c069b"
+    "resolved_commit": "ffe29895779d724a87f01b4cf5275f19bc3eb999"
   },
   "target_id": "sultan-android14-6.1",
   "upstream": {

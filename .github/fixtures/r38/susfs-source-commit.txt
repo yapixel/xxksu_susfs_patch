@@ -1,12 +1,10 @@
-tree e2e455c6bd96241e34839bdf0787547d39959e03
-parent 97cbbaf7ad1c3ec5ddb7d893a50eb24d27c1ed61
-author simonpunk <simonpunk2016@gmail.com> 1792842271 +0800
-committer simonpunk <simonpunk2016@gmail.com> 1792842271 +0800
+tree 4381267d79bf21915c530a958db98112f89984a3
+parent 3ff9fd3fac5bb01b71b2cfe96c612d469710fb74
+author simonpunk <simonpunk2016@gmail.com> 1793105415 +0800
+committer simonpunk <simonpunk2016@gmail.com> 1793105415 +0800
 
-kernel & KernelSU: Sync with upstream
+kernel & Kernel: priority uid filter: Fix UAF bugs and worker not able to run
 
-[KernelSU]
-- Revert changes in KernelSU side, see https://github.com/tiann/KernelSU/commit/528bafc5696196f3a9500cee2e7e18497421cd32
+- Two synchronize_rcu(); are missing in susfs_set_priority_uid_filter() and susfs_priority_app_strings_worker() that could lead to UAF.
 
-[kernel]
-- Apply changes in sel_open_handle_status().
+- For "susfs_priority_app_strings_worker()" kworker, it should be run after "track_throne();", See comments above the "ksu_defer_track_throne()".
