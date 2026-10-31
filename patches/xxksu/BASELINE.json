@@ -41,24 +41,24 @@
     "kernel/selinux/rules.c": "sha256:ff2371426688bf160d9b13a230f9863679b58b858ad86a5f696a3538511cdc04",
     "kernel/selinux/selinux.c": "sha256:c22331a2db5ee3bbb53234e51c04e98054281cb1a4d06550bb1413c817b985dc",
     "kernel/selinux/selinux.h": "sha256:d2477e1f5c208554246ade801a039a459fe401a86f7077bca71b225c40ba566d",
-    "kernel/supercall/dispatch.c": "sha256:6797eb62148fe33808427fc8bd0c836ac0a757c0219a9324b7acc8343900bbf2",
+    "kernel/supercall/dispatch.c": "sha256:2b34e2e90c8ca1cdf3f66c712f004430d956a66a60f8ab8e857dbf7c461065a6",
     "kernel/supercall/supercall.c": "sha256:7fcf757a0a04399312365556be47120d7ce95d8c6229d08534d1c9559449f01e"
   },
   "schema": "xxksu-susfs-baseline/v1",
   "source_bundle": {
     "artifact_path": ".github/fixtures/v2/v29-baselines/xxksu.json",
     "file_count": 14,
-    "identity": "sha256:378fa03cc6c2d93b0e73daa96978ad14d3c765adb83a9ae2ed90087fb819e48f",
+    "identity": "sha256:4345e4d6958f9e40a37a85319cf80791985a23021ab1a650071edbd526c524f1",
     "schema": "xxksu-susfs-source-bundle/v1"
   },
   "status": "VERIFIED",
   "target_id": "xxksu",
   "upstream": {
-    "archive_sha256": "180ef78089aaf4768a17a33ee8cf670ef164dff2690a3cc2162457aeb747584b",
-    "archive_url": "https://codeload.github.com/backslashxx/KernelSU/tar.gz/e6e804702ab117d50038a2d898eb962e545c886e",
+    "archive_sha256": "0b55ca2aeb3fe7ce7164f4aa687c4997811ad89bc400a4af2625a1155e8fc416",
+    "archive_url": "https://codeload.github.com/backslashxx/KernelSU/tar.gz/9b74de40162dea776d461c15946aae4064c85e5f",
     "ref": "master",
     "repository": "https://github.com/backslashxx/KernelSU",
-    "resolved_commit": "e6e804702ab117d50038a2d898eb962e545c886e",
-    "tree": "2b154a9977409098febb9772f12db4672b885994"
+    "resolved_commit": "9b74de40162dea776d461c15946aae4064c85e5f",
+    "tree": "6ca2f1c13bb2a95d6977c1560db44afcf9df0dda"
   }
 }
