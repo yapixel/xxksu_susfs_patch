@@ -1,4 +1,4 @@
-From 7d910d0c797e7dc45312eb0589704fcd64973bcd Mon Sep 17 00:00:00 2001
+From 531a690f3200892c27f9e2b41128c7443226a0d6 Mon Sep 17 00:00:00 2001
 From: yapixel <yapixel@users.noreply.github.com>
 Date: Tue, 27 Oct 2026 03:52:48 +0000
 Subject: [PATCH] Enable SUSFS for backslashxx KernelSU
@@ -214,7 +214,7 @@ index a9d4f67..9351318 100644
 --- a/kernel/selinux/rules.c
 +++ b/kernel/selinux/rules.c
 @@ -23,6 +23,9 @@ static void reset_avc_cache()
- 	selinux_status_update_policyload(&selinux_state, 0);
+ 	selinux_status_update_policyload(&selinux_state, seqno);
  #endif
  	selinux_xfrm_notify_policyload();
 +#ifdef CONFIG_KSU_SUSFS
