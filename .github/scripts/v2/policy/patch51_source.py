@@ -74,6 +74,7 @@ REMOVE_FILES = frozenset({
     "security/selinux/hooks.c",
     "security/selinux/selinuxfs.c",
     "security/selinux/ss/services.c",
+    "security/selinux/status.c",
 })
 
 MIXED_FILES = frozenset({

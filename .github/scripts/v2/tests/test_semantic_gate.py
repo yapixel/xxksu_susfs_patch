@@ -261,6 +261,18 @@ class TestSemanticGateInvariants(unittest.TestCase):
         self.assertIn("removed KSU-owned files (kernel/reboot.c)", ksu.advisories[0])
         self.assertFalse(gate("susfs_new_feature();").passed)
 
+    def test_patch51_selinux_removed_file_drift_ignored_even_with_susfs_reference(self):
+        p50 = "kernel_patches/50_add_susfs_in_gki-android16-6.12.patch"
+        accepted_50 = self.r38_p50_path.read_text(encoding="utf-8")
+        hunk = ("diff --git a/security/selinux/hooks.c b/security/selinux/hooks.c\n--- a/security/selinux/hooks.c\n"
+                "+++ b/security/selinux/hooks.c\n@@ -1,1 +1,2 @@\n int a;\n+susfs_add_sus_type();\n")
+        res = evaluate_semantic_gate("gki-android16-6.12-r38-patch51",
+                                     upstream_contents={p50: accepted_50 + hunk},
+                                     baseline_contents={p50: accepted_50}, repo_root=self.repo_root)
+        self.assertTrue(res.passed)
+        self.assertEqual(res.classification, WatchClassification.SAFE_REGEN_CANDIDATE)
+        self.assertIn("security/selinux/hooks.c", res.advisories[0])
+
     def test_structural_lines_are_not_drift_but_code_lines_are(self):
         from v2.engine.diff_parser import parse_patch
         from v2.semantic.gate import _new_unknowns

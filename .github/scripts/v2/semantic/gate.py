@@ -297,9 +297,11 @@ def evaluate_semantic_gate(
         dropped: list[SemanticUnit] = []
         if "50_add_susfs" in patch_key:
             from ..policy.patch51_source import REMOVE_FILES
-            # Patch 51 drops these KSU-owned files whole; only a SuSFS reference there stays blocking.
-            dropped = [u for u in new_unknowns if u.location.path in REMOVE_FILES and not
-                       _SUSFS_REFERENCE.search("\n".join(u.evidence[0].fingerprint.normalized_statements))]
+            # Patch 51 drops these KSU-owned files whole; only a SuSFS reference in non-SELinux files stays blocking.
+            # SELinux is owned natively by xxKSU, so security/selinux/* changes are dropped unconditionally.
+            dropped = [u for u in new_unknowns if u.location.path in REMOVE_FILES and (
+                       u.location.path.startswith("security/selinux/") or
+                       not _SUSFS_REFERENCE.search("\n".join(u.evidence[0].fingerprint.normalized_statements)))]
             new_unknowns = [u for u in new_unknowns if u not in dropped]
 
         if new_unknowns:
