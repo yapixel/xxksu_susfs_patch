@@ -3,9 +3,9 @@
   "sources": {
     "authoritative": {
       "backslashxx_kernelsu": {
-        "commit": "83e80a7671f19b7acb14c6a029669ce13f49afd4",
+        "commit": "7b24a1bc2f79b1e85ac35e997c28183b0f4e5ed8",
         "ref": "master",
-        "relevant_content_hash": "sha256:b1dd2bbe1e1c5f380cf7cff0d8373ed07d1250e025efe066dd94e1e236d5601a",
+        "relevant_content_hash": "sha256:e45248df5481fcac2da6150c34f340ee723deac02457222f6787553286bc956f",
         "repository": "https://github.com/backslashxx/KernelSU.git",
         "tracked_files": {
           "kernel/Kconfig": "sha256:3a30954bbff10ec57c9897fd17d856877c0b9db9f71692b3e0430639c99c9ec8",
@@ -20,7 +20,7 @@
           "kernel/ksu.c": "sha256:57840a619125fdf302df2210da1f3db68dbc49b06eb64897dfec6a1b023141cc",
           "kernel/manager/pkg_observer.c": "sha256:1e4dc1fce8c534f84fc114985f840ec3330623762ea6f1a077f507461d8ec596",
           "kernel/runtime/ksud_integration.c": "sha256:b2396ab76e03c293791178eba8ce6b4cf9252ec0fde1e1855e85aa84f5ea6a61",
-          "kernel/selinux/rules.c": "sha256:305eb88b19a85aee40eaa113dc8e6f96704ef4cf99065bac0f67c7e0b75eb879",
+          "kernel/selinux/rules.c": "sha256:a18ed06f18df96ed37caecabe3870ef83c20ce14f87f8ecbb5684cbde8ddfc39",
           "kernel/selinux/selinux.c": "sha256:c22331a2db5ee3bbb53234e51c04e98054281cb1a4d06550bb1413c817b985dc",
           "kernel/selinux/selinux.h": "sha256:d2477e1f5c208554246ade801a039a459fe401a86f7077bca71b225c40ba566d",
           "kernel/supercall/dispatch.c": "sha256:2b34e2e90c8ca1cdf3f66c712f004430d956a66a60f8ab8e857dbf7c461065a6",
