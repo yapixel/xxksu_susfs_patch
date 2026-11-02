@@ -1,6 +1,6 @@
-tree d0c77282071f6459f44bb99e5172df8a1bf6340f
-parent 519c86c5d8ad3832ff4a2e1a81dc1b81076f1693
-author simonpunk <simonpunk2016@gmail.com> 1793285604 +0800
-committer simonpunk <simonpunk2016@gmail.com> 1793285604 +0800
+tree 1101d0cf58c0e590788f59c60ca1b78ebc71608a
+parent 2557ea25d9c49722474cd279ef3df9a4e8445be0
+author simonpunk <simonpunk2016@gmail.com> 1793554157 +0800
+committer simonpunk <simonpunk2016@gmail.com> 1793554157 +0800
 
-KernelSU: Fix compiler error
+kernel: priority_uid_filter: Add extra flag O_NOATIME with filp_open() to avoid updating the inode atime.

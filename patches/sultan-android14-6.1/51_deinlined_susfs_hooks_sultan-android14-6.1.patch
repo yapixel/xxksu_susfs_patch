@@ -1,5 +1,5 @@
 From: yapixel <yapixel@users.noreply.github.com>
-Date: Tue, 27 Oct 2026 12:46:47 +0000
+Date: Sun, 01 Nov 2026 17:25:00 +0000
 Subject: [PATCH] SUSFS de-inlined hooks for sultan-android14-6.1
 
 ---
@@ -23,16 +23,16 @@ Subject: [PATCH] SUSFS de-inlined hooks for sultan-android14-6.1
  17 files changed, 1439 insertions(+), 20 deletions(-)
 
 diff --git a/block/ioprio.c b/block/ioprio.c
-index 32a456b458049f45baf30be663cdfe63bcde2a55..ea1e2b4d032b5db3eb5dcf144534f638438dc4ab 100644
+index 32a456b458049f45baf30be663cdfe63bcde2a55..8cae4868dea2c9251e452dd681bbfd4c892b3dab 100644
 --- a/block/ioprio.c
 +++ b/block/ioprio.c
 @@ -65,6 +65,10 @@ int ioprio_check_cap(int ioprio)
  	return 0;
  }
  
-+#ifdef CONFIG_KSU_SUSFS
++#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
 +extern bool susfs_is_priority_uid_filtered(uid_t uid);
-+#endif // #ifdef CONFIG_KSU_SUSFS
++#endif // #ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
 +
  SYSCALL_DEFINE3(ioprio_set, int, which, int, who, int, ioprio)
  {
@@ -41,7 +41,7 @@ index 32a456b458049f45baf30be663cdfe63bcde2a55..ea1e2b4d032b5db3eb5dcf144534f638
  			if (!who)
  				user = current_user();
  			else
-+#ifdef CONFIG_KSU_SUSFS
++#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
 +			{
 +				if (current_uid().val >= 10000 && susfs_is_priority_uid_filtered(uid.val))
 +					break;
@@ -50,7 +50,7 @@ index 32a456b458049f45baf30be663cdfe63bcde2a55..ea1e2b4d032b5db3eb5dcf144534f638
 +			}
 +#else
 +				user = find_user(uid);
-+#endif // #ifdef CONFIG_KSU_SUSFS
++#endif // #ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
  			if (!user)
  				break;
  
@@ -58,7 +58,7 @@ index 32a456b458049f45baf30be663cdfe63bcde2a55..ea1e2b4d032b5db3eb5dcf144534f638
  			if (!who)
  				user = current_user();
  			else
-+#ifdef CONFIG_KSU_SUSFS
++#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
 +			{
 +				if (current_uid().val >= 10000 && susfs_is_priority_uid_filtered(uid.val))
 +					break;
@@ -67,7 +67,7 @@ index 32a456b458049f45baf30be663cdfe63bcde2a55..ea1e2b4d032b5db3eb5dcf144534f638
 +			}
 +#else
 +				user = find_user(uid);
-+#endif // #ifdef CONFIG_KSU_SUSFS
++#endif // #ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
  			if (!user)
  				break;
  
@@ -2313,16 +2313,16 @@ index 824bcc7b5dbc3acc056f828659e3b6220b5b7137..99c75339022a745e02ea7d7052e589e1
  }
  
 diff --git a/kernel/sys.c b/kernel/sys.c
-index 7595dc25d67e7de25dda14ccc7d862e816dc9557..95f19bdb30f1fb1435bb40f552559b17efb84e8f 100644
+index 7595dc25d67e7de25dda14ccc7d862e816dc9557..2cb2e5d23f3143613dbf941e9b261b390527673d 100644
 --- a/kernel/sys.c
 +++ b/kernel/sys.c
 @@ -210,6 +210,10 @@ static int set_one_prio(struct task_struct *p, int niceval, int error)
  	return error;
  }
  
-+#ifdef CONFIG_KSU_SUSFS
++#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
 +extern bool susfs_is_priority_uid_filtered(uid_t uid);
-+#endif // #ifdef CONFIG_KSU_SUSFS
++#endif // #ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
 +
  SYSCALL_DEFINE3(setpriority, int, which, int, who, int, niceval)
  {
@@ -2331,10 +2331,10 @@ index 7595dc25d67e7de25dda14ccc7d862e816dc9557..95f19bdb30f1fb1435bb40f552559b17
  		if (!who)
  			uid = cred->uid;
  		else if (!uid_eq(uid, cred->uid)) {
-+#ifdef CONFIG_KSU_SUSFS
++#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
 +			if (cred->uid.val >= 10000 && susfs_is_priority_uid_filtered(uid.val))
 +				goto out_unlock;
-+#endif // #ifdef CONFIG_KSU_SUSFS
++#endif // #ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
  			user = find_user(uid);
  			if (!user)
  				goto out_unlock;	/* No processes for this user */
@@ -2342,10 +2342,10 @@ index 7595dc25d67e7de25dda14ccc7d862e816dc9557..95f19bdb30f1fb1435bb40f552559b17
  		if (!who)
  			uid = cred->uid;
  		else if (!uid_eq(uid, cred->uid)) {
-+#ifdef CONFIG_KSU_SUSFS
++#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
 +			if (cred->uid.val >= 10000 && susfs_is_priority_uid_filtered(uid.val))
 +				goto out_unlock;
-+#endif // #ifdef CONFIG_KSU_SUSFS
++#endif // #ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
  			user = find_user(uid);
  			if (!user)
  				goto out_unlock;	/* No processes for this user */

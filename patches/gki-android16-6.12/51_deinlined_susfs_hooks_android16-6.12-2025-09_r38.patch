@@ -1,5 +1,5 @@
 From: yapixel <yapixel@users.noreply.github.com>
-Date: Thu, 29 Oct 2026 14:53:24 +0000
+Date: Sun, 01 Nov 2026 17:29:17 +0000
 Subject: [PATCH] SUSFS de-inlined hooks for android16-6.12-2025-09_r38
 
 ---
@@ -23,16 +23,16 @@ Subject: [PATCH] SUSFS de-inlined hooks for android16-6.12-2025-09_r38
  17 files changed, 1393 insertions(+), 3 deletions(-)
 
 diff --git a/block/ioprio.c b/block/ioprio.c
-index 73301a261429ff9e04a166aefa5c72df55eaee57..10ebc4a9b07bb765b7dd598f58a166fcb7fe85a0 100644
+index 73301a261429ff9e04a166aefa5c72df55eaee57..a5fef05639a416dc92dd47b63f075a2c6dda912d 100644
 --- a/block/ioprio.c
 +++ b/block/ioprio.c
 @@ -66,6 +66,10 @@ int ioprio_check_cap(int ioprio)
  	return 0;
  }
  
-+#ifdef CONFIG_KSU_SUSFS
++#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
 +extern bool susfs_is_priority_uid_filtered(uid_t uid);
-+#endif // #ifdef CONFIG_KSU_SUSFS
++#endif // #ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
 +
  SYSCALL_DEFINE3(ioprio_set, int, which, int, who, int, ioprio)
  {
@@ -41,7 +41,7 @@ index 73301a261429ff9e04a166aefa5c72df55eaee57..10ebc4a9b07bb765b7dd598f58a166fc
  			if (!who)
  				user = current_user();
  			else
-+#ifdef CONFIG_KSU_SUSFS
++#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
 +			{
 +				if (current_uid().val >= 10000 && susfs_is_priority_uid_filtered(uid.val))
 +					break;
@@ -50,7 +50,7 @@ index 73301a261429ff9e04a166aefa5c72df55eaee57..10ebc4a9b07bb765b7dd598f58a166fc
 +			}
 +#else
 +				user = find_user(uid);
-+#endif // #ifdef CONFIG_KSU_SUSFS
++#endif // #ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
  			if (!user)
  				break;
  
@@ -58,7 +58,7 @@ index 73301a261429ff9e04a166aefa5c72df55eaee57..10ebc4a9b07bb765b7dd598f58a166fc
  			if (!who)
  				user = current_user();
  			else
-+#ifdef CONFIG_KSU_SUSFS
++#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
 +			{
 +				if (current_uid().val >= 10000 && susfs_is_priority_uid_filtered(uid.val))
 +					break;
@@ -67,7 +67,7 @@ index 73301a261429ff9e04a166aefa5c72df55eaee57..10ebc4a9b07bb765b7dd598f58a166fc
 +			}
 +#else
 +				user = find_user(uid);
-+#endif // #ifdef CONFIG_KSU_SUSFS
++#endif // #ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
  			if (!user)
  				break;
  
@@ -2226,16 +2226,16 @@ index a9a0ca605d4a8c82c5575706443287120ee6edc4..a6308f3f5017df134d568a2c2435f9ae
  }
  
 diff --git a/kernel/sys.c b/kernel/sys.c
-index 4a87dc5fa8679d5e0e37ca1e746f2abe2369c6b6..a228c2303bed2a62659d00c8fd14a3ac0f5ec498 100644
+index 4a87dc5fa8679d5e0e37ca1e746f2abe2369c6b6..411ae6f186408df518ce7f292648189fbc77f9ca 100644
 --- a/kernel/sys.c
 +++ b/kernel/sys.c
 @@ -226,6 +226,10 @@ static int set_one_prio(struct task_struct *p, int niceval, int error)
  	return error;
  }
  
-+#ifdef CONFIG_KSU_SUSFS
++#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
 +extern bool susfs_is_priority_uid_filtered(uid_t uid);
-+#endif // #ifdef CONFIG_KSU_SUSFS
++#endif // #ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
 +
  SYSCALL_DEFINE3(setpriority, int, which, int, who, int, niceval)
  {
@@ -2244,10 +2244,10 @@ index 4a87dc5fa8679d5e0e37ca1e746f2abe2369c6b6..a228c2303bed2a62659d00c8fd14a3ac
  		if (!who)
  			uid = cred->uid;
  		else if (!uid_eq(uid, cred->uid)) {
-+#ifdef CONFIG_KSU_SUSFS
++#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
 +			if (cred->uid.val >= 10000 && susfs_is_priority_uid_filtered(uid.val))
 +				goto out_unlock;
-+#endif // #ifdef CONFIG_KSU_SUSFS
++#endif // #ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
  			user = find_user(uid);
  			if (!user)
  				goto out_unlock;	/* No processes for this user */
@@ -2255,10 +2255,10 @@ index 4a87dc5fa8679d5e0e37ca1e746f2abe2369c6b6..a228c2303bed2a62659d00c8fd14a3ac
  		if (!who)
  			uid = cred->uid;
  		else if (!uid_eq(uid, cred->uid)) {
-+#ifdef CONFIG_KSU_SUSFS
++#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
 +			if (cred->uid.val >= 10000 && susfs_is_priority_uid_filtered(uid.val))
 +				goto out_unlock;
-+#endif // #ifdef CONFIG_KSU_SUSFS
++#endif // #ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
  			user = find_user(uid);
  			if (!user)
  				goto out_unlock;	/* No processes for this user */
