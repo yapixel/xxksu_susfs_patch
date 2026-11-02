@@ -1,10 +1,10 @@
-From 531a690f3200892c27f9e2b41128c7443226a0d6 Mon Sep 17 00:00:00 2001
+From a33b4efa111f3a29bc62acde0350db0060c40cac Mon Sep 17 00:00:00 2001
 From: yapixel <yapixel@users.noreply.github.com>
 Date: Tue, 27 Oct 2026 03:52:48 +0000
 Subject: [PATCH] Enable SUSFS for backslashxx KernelSU
 
 ---
- kernel/Kconfig                        |  90 +++++++++++++++
+ kernel/Kconfig                        |  98 ++++++++++++++++++
  kernel/hook/setuid_hook.c             |  40 +++++++++++++++++-
  kernel/ksu.c                          |   8 ++
  kernel/manager/pkg_observer.c         |   3 +
@@ -12,14 +12,14 @@ Subject: [PATCH] Enable SUSFS for backslashxx KernelSU
  kernel/selinux/selinux.c              | 120 ++++++++++++++++++++++++++++++++++
  kernel/selinux/selinux.h              |  15 +++
  kernel/supercall/dispatch.c           |   7 ++
- kernel/supercall/supercall.c          |  95 ++++++++++++++++++++++++++++++++++
- 9 files changed, 380 insertions(+), 1 deletion(-)
+ kernel/supercall/supercall.c          |  97 ++++++++++++++++++++++++++++++++++
+ 9 files changed, 390 insertions(+), 1 deletion(-)
 
 diff --git a/kernel/Kconfig b/kernel/Kconfig
 index 45e09d1..bf7a578 100644
 --- a/kernel/Kconfig
 +++ b/kernel/Kconfig
-@@ -143,4 +143,94 @@ config KSU_HEURISTIC_IN_TREE_BUILD
+@@ -143,4 +143,102 @@ config KSU_HEURISTIC_IN_TREE_BUILD
  	help
  	  Note: if youre building out-of-tree, configure by editing ksu.c #defines instead.
  
@@ -110,6 +110,14 @@ index 45e09d1..bf7a578 100644
 +        - It does NOT hide any inline hooks or plt hooks cause by the injected library itself.
 +        - It may not be able to evade detections by apps that implement a good injection detection.
 +        - Effective only on zygote spawned umounted user app process.
++
++config KSU_SUSFS_PRIORITY_UID_FILTER
++    bool "Enable to parse and filter priority uids for susfs"
++    depends on KSU_SUSFS
++    default y
++    help
++        - Allow parsing and filtering the priority uids for susfs.
++        - Effective on all processes.
 +
 +endmenu
 +
@@ -203,9 +211,9 @@ index 8a7d780..055f741 100644
  		return;
  
  	pr_info("renameat: %s -> %s, new path: %s\n", old_dentry->d_iname, new_dentry->d_iname, buf);
-+#ifdef CONFIG_KSU_SUSFS
++#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
 +	susfs_parse_priority_app_strings();
-+#endif // #ifdef CONFIG_KSU_SUSFS
++#endif // #ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
  	track_throne(false);
  	return;
  }
@@ -414,7 +422,7 @@ index 59ec582..6149aed 100644
  static int anon_ksu_release(struct inode *inode, struct file *filp)
  {
  	kfree(filp->private_data);
-@@ -82,6 +86,97 @@ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user
+@@ -82,6 +86,99 @@ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user
  {
  	if (magic1 != KSU_INSTALL_MAGIC1)
  		return 0;
@@ -486,10 +494,12 @@ index 59ec582..6149aed 100644
 +            return 0;
 +        }
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
++#ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
 +        if (cmd == CMD_SUSFS_SET_PRIORITY_UID_FILTER) {
 +            susfs_set_priority_uid_filter(arg);
 +            return 0;
 +        }
++#endif // #ifdef CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER
 +        if (cmd == CMD_SUSFS_ENABLE_AVC_LOG_SPOOFING) {
 +            susfs_set_avc_log_spoofing(arg);
 +            return 0;
