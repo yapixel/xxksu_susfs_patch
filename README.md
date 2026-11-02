@@ -102,6 +102,29 @@ Select the appropriate patch for your component:
 
 Check [patches/manifest.json](patches/manifest.json) or each target's `BASELINE.json` for companion SuSFS core files and patch checksums.
 
+### Kernel Configuration (Kconfig)
+
+When compiling your kernel with xxKSU and SuSFS (e.g. in automated kernel workflows such as `wuji_ksu_workflow` or `cheetah_ksu_workflow`), ensure the required and recommended Kconfig options are enabled in your kernel `defconfig` / `.config`:
+
+#### Core Options
+- `CONFIG_KSU=y` — Enables KernelSU core.
+- `CONFIG_KSU_SUSFS=y` — Enables SuSFS support in KernelSU and kernel hooks.
+
+#### Feature Options (Recommended)
+- `CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER=y` — **(Latest)** Enables parsing and filtering of priority UIDs (range 10000–19999 for non-root apps) across kernel syscall hooks and the SuSFS supercall handler (`CMD_SUSFS_SET_PRIORITY_UID_FILTER 0x60030`). Enabled by default (`default y`) in Kconfig; if your workflow explicitly appends config fragments or uses a custom defconfig, ensure this option is present.
+- `CONFIG_KSU_SUSFS_SUS_PATH=y` — Enables hiding suspicious paths and sub-paths from system calls.
+- `CONFIG_KSU_SUSFS_SUS_MOUNT=y` — Enables hiding suspicious mounts from `/proc/self/[mounts|mountinfo|mountstat]`.
+- `CONFIG_KSU_SUSFS_SUS_KSTAT=y` — Enables spoofing suspicious kstat for specified files/directories.
+- `CONFIG_KSU_SUSFS_SUS_MAP=y` — Enables hiding mmapped files from `/proc/<pid>/[maps|smaps|smaps_rollup|pagemap]`.
+- `CONFIG_KSU_SUSFS_SPOOF_UNAME=y` — Enables spoofing uname strings.
+- `CONFIG_KSU_SUSFS_ENABLE_LOG=y` — Enables SuSFS logging to kernel dmesg (disable in production if silent operation is desired).
+- `CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y` — Automatically hides ksu and susfs symbols from `/proc/kallsyms`.
+- `CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y` — Enables spoofing `/proc/bootconfig` (GKI) or `/proc/cmdline` (non-GKI).
+- `CONFIG_KSU_SUSFS_OPEN_REDIRECT=y` — Enables redirecting opened paths to alternative target paths.
+
+> [!IMPORTANT]
+> **Parity Requirement:** xxKSU (Patch 11) and the kernel hooks (Patch 51 / `fs/susfs.c`) must be built with matching SuSFS configuration. Specifically, `CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER` should be enabled on both sides to ensure priority UID filtering functions properly.
+
 ## Upstream Watch
 
 **[Issue #5 — authoritative live upstream-status dashboard](https://github.com/yapixel/xxksu_susfs_patch/issues/5)**

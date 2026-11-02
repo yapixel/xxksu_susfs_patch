@@ -47,9 +47,9 @@
       "text": "UPSTREAM_RECONCILED: reconciled susfs_gki upstream to gki-android16-6.12 291d571; candidate Patch 51 verified with exact application."
     },
     {
-      "timestamp": "2026-10-19",
+      "timestamp": "2026-11-02",
       "source_id": "susfs_sultan",
-      "text": "UPSTREAM_RECONCILED: reconciled susfs_sultan upstream to sultan-shiba-susfs-minimal 665e5d1; candidate Patch 51 verified with exact application."
+      "text": "UPSTREAM_RECONCILED: reconciled susfs_sultan upstream to sultan-shiba-susfs-minimal c7bdc69 with Priority UID Filter parity (CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER); candidate Patch 51 verified with exact application, real Kbuild object compile and symbol closure."
     },
     {
       "timestamp": "2026-10-24",
