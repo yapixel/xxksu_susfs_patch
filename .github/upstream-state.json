@@ -30,26 +30,26 @@
       "susfs_gki": {
         "commit": "6b60a305d418148bd311f4fc9bddedc82d99e1fc",
         "ref": "gki-android16-6.12",
-        "relevant_content_hash": "sha256:7988b80da27424d48f0ccbdd2ecc600415f8a6ba2266d499a667865e251d663c",
+        "relevant_content_hash": "sha256:a890638c0bf89cf3aad2394f4f4d3ae0b2e243897f358a2040273441662c2dd5",
         "repository": "https://gitlab.com/simonpunk/susfs4ksu.git",
         "tracked_files": {
           "kernel_patches/50_add_susfs_in_gki-android16-6.12.patch": "sha256:7255eab8b0977dfe38f57b54912c9bff0b62a8d3c8a8d4b9ae172869b565fd89",
           "kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch": "sha256:241ac55c873713160915f5ffaece11fbb1494e77fdced7b5d635d7d056927419",
           "kernel_patches/fs/susfs.c": "sha256:b8080d0fe99b1c3f76d091c7537fbf0e1a32400f8d4193b362d59c694923a185",
           "kernel_patches/include/linux/susfs.h": "sha256:e06f190fe480ab6725851780b022b472b9b28c56132a54656495388ff8437c50",
-          "kernel_patches/include/linux/susfs_def.h": "sha256:c515e11107088161b70e3bb7d4c49cdd3b882808c2e374a9a5237e5b8f19844b"
+          "kernel_patches/include/linux/susfs_def.h": "sha256:cb441cb566d009bce20c1f4ce43fa10ce3472daafd0f37e144cdf1be87b3f88e"
         }
       },
       "susfs_sultan": {
         "commit": "ffe29895779d724a87f01b4cf5275f19bc3eb999",
         "ref": "sultan-shiba-susfs-minimal",
-        "relevant_content_hash": "sha256:cf722c70c368a38ff5cb633555c0ed81dc28b475c469b2f8a32fdec5b5efebb4",
+        "relevant_content_hash": "sha256:33c73d5351e5f64378ea49e8dfcc9d7d32df15b2443621b77c28b151529137ee",
         "repository": "https://gitlab.com/simonpunk/susfs4ksu.git",
         "tracked_files": {
           "kernel_patches/50_add_susfs_in_gki-android14-6.1.patch": "sha256:2b4dea1162f3cefafb22f0cf7079035a979e0c946742d2c6bba02f0935a1b0f3",
           "kernel_patches/fs/susfs.c": "sha256:b8080d0fe99b1c3f76d091c7537fbf0e1a32400f8d4193b362d59c694923a185",
           "kernel_patches/include/linux/susfs.h": "sha256:e06f190fe480ab6725851780b022b472b9b28c56132a54656495388ff8437c50",
-          "kernel_patches/include/linux/susfs_def.h": "sha256:c515e11107088161b70e3bb7d4c49cdd3b882808c2e374a9a5237e5b8f19844b"
+          "kernel_patches/include/linux/susfs_def.h": "sha256:cb441cb566d009bce20c1f4ce43fa10ce3472daafd0f37e144cdf1be87b3f88e"
         }
       }
     }
