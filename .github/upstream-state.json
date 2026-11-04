@@ -3,19 +3,19 @@
   "sources": {
     "authoritative": {
       "backslashxx_kernelsu": {
-        "commit": "12ff59c2d2c28289b50bb4a1476f7b3c2c9e30bd",
+        "commit": "a68c892392b06942299bf9d2295a9e329571a3e5",
         "ref": "master",
-        "relevant_content_hash": "sha256:0fe7c06c2df5e5afe31726698e6d6c211e8bc49aa52e4037a1ae3ffb5f53fd98",
+        "relevant_content_hash": "sha256:2220a669ace0299915893c7e40d0518661dfe19fe0dcd57ddf8ebac6d52e416e",
         "repository": "https://github.com/backslashxx/KernelSU.git",
         "tracked_files": {
           "kernel/Kconfig": "sha256:3a30954bbff10ec57c9897fd17d856877c0b9db9f71692b3e0430639c99c9ec8",
           "kernel/downstream/ksu_hostsredirect.h": "sha256:49b8c599f3ae488422627147707c244d8dbde7347a1d3514e88526e8bc4c9039",
           "kernel/feature/kernel_umount.c": "sha256:54a025e2e67624bc7fedcb4e967e1bb469f7fd7ad2b5c0efd6bd485a831eaa8b",
           "kernel/feature/sucompat.c": "sha256:b2a27e3ea5a5b274ffaca90d5af9297e823ef0bbfca970a33a65b498ae01a095",
-          "kernel/hook/lsm_hooks_list.c": "sha256:c9dc1793d1d14bef2de767f63a2e7281bfa6ed0f9bd78b211fe8a4a4666c2d41",
+          "kernel/hook/lsm_hooks_list.c": "sha256:dfb7fa824f8cbb631a6a7937f7c8aff25bf2885927745b4dc4ad6feab339a50b",
           "kernel/hook/setuid_hook.c": "sha256:dd7f40fa454fdea2d997ee219f3aed2892a71efa8ad2b69a5f2d6aca86ada1e5",
           "kernel/hook/syscall_table_hook_arm64.c": "sha256:ff020f14cd702ba2ea621890b37d025e31dd21c072eb6a3d0a2c865992eab59f",
-          "kernel/kernel_compat.h": "sha256:fb79536db0af3530ec1996dd3848034a4080b07413da7b6430340dbf0b7fdcc2",
+          "kernel/kernel_compat.h": "sha256:56394210605ebd1cb02164f70b50d5b59bf9d9ef8c14423c40040ec13116d9a7",
           "kernel/kernel_includes.h": "sha256:7bde859d52d1929ad76dd378150ba1d87304bbced39e0a5068ac73a94b4b634e",
           "kernel/ksu.c": "sha256:57840a619125fdf302df2210da1f3db68dbc49b06eb64897dfec6a1b023141cc",
           "kernel/manager/pkg_observer.c": "sha256:1e4dc1fce8c534f84fc114985f840ec3330623762ea6f1a077f507461d8ec596",
