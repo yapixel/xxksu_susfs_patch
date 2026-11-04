@@ -565,6 +565,58 @@ class DashboardTests(unittest.TestCase):
         updated_body = mock_update.call_args[0][2]
         self.assertIn("Reconciled Patch 11 policy", updated_body)
 
+    # 22. Strict reverse chronological ordering invariant for Recent Events
+    def test_22_recent_events_strict_reverse_chronological_invariant(self):
+        from v2.watch.dashboard import event_sort_key
+        import re
+
+        # 1. combine_recent_events sorts scrambled inputs strictly descending
+        scrambled_existing = [
+            {"timestamp": "2026-05-10", "source_id": "src_may", "text": "May event"},
+            {"timestamp": "2026-01-01", "source_id": "src_jan", "text": "Jan event"},
+            {"timestamp": "2026-09-20", "source_id": "src_sep", "text": "Sep event"},
+        ]
+        scrambled_new = [
+            {"timestamp": "2026-11-03", "source_id": "src_nov", "text": "Nov event"},
+            {"timestamp": "2026-07-15", "source_id": "src_jul", "text": "Jul event"},
+        ]
+        combined = combine_recent_events(scrambled_existing, scrambled_new)
+        combined_ts = [e["timestamp"] for e in combined]
+        self.assertEqual(combined_ts, sorted(combined_ts, reverse=True))
+        self.assertEqual(combined[0]["timestamp"], "2026-11-03")
+        self.assertEqual(combined[-1]["timestamp"], "2026-01-01")
+
+        # 2. render_dashboard_body guarantees newest dynamic event is at position 0
+        report = make_clean_report()
+        newer_event = {"timestamp": "2026-12-01", "source_id": "future_src", "text": "Future release"}
+        older_event = {"timestamp": "2026-08-01", "source_id": "past_src", "text": "Past release"}
+        body = render_dashboard_body(report=report, repo_root=REPO_ROOT, recent_events=[older_event, newer_event])
+
+        # Verify parsed events
+        parsed = parse_dashboard_events(body)
+        self.assertGreaterEqual(len(parsed), 3)
+        self.assertEqual(parsed[0]["timestamp"], "2026-12-01")
+        parsed_ts = [e["timestamp"] for e in parsed]
+        self.assertEqual(parsed_ts, sorted(parsed_ts, reverse=True))
+
+        # 3. Directly verify the raw markdown lines under ## Recent Events
+        events_section = body.split("## Recent Events", 1)[1].split("## Quick Links", 1)[0]
+        md_dates = re.findall(r"-\s+\*\*(\d{4}-\d{2}-\d{2})\*\*:", events_section)
+        self.assertTrue(len(md_dates) >= 3)
+        self.assertEqual(md_dates, sorted(md_dates, reverse=True))
+
+        # 4. Invariant: arbitrary permuted input produces deterministic descending output
+        import itertools
+        test_events = [
+            {"timestamp": "2026-11-03", "source_id": "src_3", "text": "E3"},
+            {"timestamp": "2026-11-02", "source_id": "src_2", "text": "E2"},
+            {"timestamp": "2026-11-01", "source_id": "src_1", "text": "E1"},
+        ]
+        reference_order = [e["timestamp"] for e in sorted(test_events, key=event_sort_key)]
+        for perm in itertools.permutations(test_events):
+            res = combine_recent_events([], list(perm))
+            self.assertEqual([e["timestamp"] for e in res], reference_order)
+
 
 if __name__ == "__main__":
     unittest.main()

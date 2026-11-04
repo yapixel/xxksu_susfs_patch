@@ -295,6 +295,14 @@ def extract_transition_events(report: WatchReport, date_str: str) -> list[dict[s
     return events
 
 
+def event_sort_key(event: Mapping[str, Any]) -> tuple[int, str, str]:
+    """Sort key for reverse chronological event ordering (newest date first)."""
+    ts = str(event.get("timestamp", "")).strip()
+    digits = ts.replace("-", "")[:8]
+    date_score = -int(digits) if digits.isdigit() and len(digits) == 8 else 0
+    return (date_score, str(event.get("source_id", "")), str(event.get("text", "")))
+
+
 def combine_recent_events(
     existing_events: Sequence[Mapping[str, str]],
     new_events: Sequence[Mapping[str, str]],
@@ -322,13 +330,7 @@ def combine_recent_events(
             seen.add(key)
             combined.append(dict(e))
 
-    combined.sort(
-        key=lambda e: (
-            -int(str(e.get("timestamp", "1970-01-01"))[:10].replace("-", "") or 0)
-            if str(e.get("timestamp", "")).replace("-", "")[:8].isdigit()
-            else 0
-        )
-    )
+    combined.sort(key=event_sort_key)
 
     return combined[:max_events]
 
@@ -522,7 +524,7 @@ def render_dashboard_body(
     root = get_repo_root(repo_root)
     overall_status = calculate_overall_status(report, open_escalations)
     runtime = load_runtime_validation(root)
-    persistent = sorted(runtime["recent_events"], key=lambda e: (-int(e["timestamp"].replace("-", "")), e["source_id"], e["text"]))
+    persistent = sorted(runtime["recent_events"], key=event_sort_key)
     keys = {(e["timestamp"], e["source_id"]) for e in persistent if "replaces_text" not in e}
     replacements = {(e["timestamp"], e["source_id"], value) for e in persistent
                     for value in (e["text"], e.get("replaces_text", e["text"]))}
@@ -533,13 +535,7 @@ def render_dashboard_body(
         and (e.get("timestamp"), e.get("source_id"), e.get("text")) not in replacements
     ]
     all_events = persistent + [dict(e) for e in extra_events]
-    all_events.sort(
-        key=lambda e: (
-            -int(str(e.get("timestamp", "1970-01-01"))[:10].replace("-", "") or 0)
-            if str(e.get("timestamp", "")).replace("-", "")[:8].isdigit()
-            else 0
-        )
-    )
+    all_events.sort(key=event_sort_key)
     recent_events = all_events[:MAX_RECENT_EVENTS]
 
     if revision is None or branch is None:
@@ -622,10 +618,11 @@ def render_dashboard_body(
     lines.append("")
     lines.append("## Recent Events")
     lines.append("")
-    if not recent_events:
+    display_events = sorted(recent_events[:MAX_RECENT_EVENTS], key=event_sort_key)
+    if not display_events:
         lines.append("*No recent state transitions recorded.*")
     else:
-        for ev in recent_events[:MAX_RECENT_EVENTS]:
+        for ev in display_events:
             ts = ev.get("timestamp", "")
             src = ev.get("source_id", "")
             txt = ev.get("text", "")
@@ -644,7 +641,7 @@ def render_dashboard_body(
     lines.append("")
 
     # 6. Bounded state serialization comment
-    events_json = json.dumps(list(recent_events[:MAX_RECENT_EVENTS]))
+    events_json = json.dumps(list(display_events))
     lines.append(f"<!-- dashboard-events: {events_json} -->")
 
     return "\n".join(lines) + "\n"
@@ -856,6 +853,7 @@ __all__ = [
     "parse_dashboard_events",
     "extract_transition_events",
     "combine_recent_events",
+    "event_sort_key",
     "fetch_open_escalations",
     "find_dashboard_issues",
     "render_dashboard_body",
