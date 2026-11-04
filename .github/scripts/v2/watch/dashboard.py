@@ -322,6 +322,14 @@ def combine_recent_events(
             seen.add(key)
             combined.append(dict(e))
 
+    combined.sort(
+        key=lambda e: (
+            -int(str(e.get("timestamp", "1970-01-01"))[:10].replace("-", "") or 0)
+            if str(e.get("timestamp", "")).replace("-", "")[:8].isdigit()
+            else 0
+        )
+    )
+
     return combined[:max_events]
 
 
@@ -519,9 +527,20 @@ def render_dashboard_body(
     replacements = {(e["timestamp"], e["source_id"], value) for e in persistent
                     for value in (e["text"], e.get("replaces_text", e["text"]))}
     # State-backed events replace stale copies from the previous issue body.
-    recent_events = (persistent + [e for e in recent_events
-                     if (e.get("timestamp"), e.get("source_id")) not in keys
-                     and (e.get("timestamp"), e.get("source_id"), e.get("text")) not in replacements])[:MAX_RECENT_EVENTS]
+    extra_events = [
+        e for e in recent_events
+        if (e.get("timestamp"), e.get("source_id")) not in keys
+        and (e.get("timestamp"), e.get("source_id"), e.get("text")) not in replacements
+    ]
+    all_events = persistent + [dict(e) for e in extra_events]
+    all_events.sort(
+        key=lambda e: (
+            -int(str(e.get("timestamp", "1970-01-01"))[:10].replace("-", "") or 0)
+            if str(e.get("timestamp", "")).replace("-", "")[:8].isdigit()
+            else 0
+        )
+    )
+    recent_events = all_events[:MAX_RECENT_EVENTS]
 
     if revision is None or branch is None:
         rev_val, branch_val = get_git_revision(root)

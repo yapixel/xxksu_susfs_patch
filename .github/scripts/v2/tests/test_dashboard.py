@@ -264,7 +264,7 @@ class DashboardTests(unittest.TestCase):
             self.assertIn("+ 3 additional open escalations", body)
         with self.subTest(case='11_maximum_10_recent_events'):
             events = [
-                {"timestamp": f"2026-09-0{i%9 + 1}", "source_id": f"src_{i}", "text": f"Event {i}"}
+                {"timestamp": f"2026-09-{16-i:02d}", "source_id": f"src_{i}", "text": f"Event {i}"}
                 for i in range(16)
             ]
             combined = combine_recent_events([], events, max_events=MAX_RECENT_EVENTS)
@@ -278,6 +278,9 @@ class DashboardTests(unittest.TestCase):
             self.assertTrue(any(e["source_id"] == "runtime-sultan-6.1" for e in rendered))
             self.assertIn("Event 0", body)
             self.assertNotIn("Event 10", body)
+            # Verify strict reverse chronological order (newest date first)
+            timestamps = [e["timestamp"] for e in rendered]
+            self.assertEqual(timestamps, sorted(timestamps, reverse=True))
 
     # 11. maximum 10 Recent Events
 
