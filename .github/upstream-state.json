@@ -3,9 +3,9 @@
   "sources": {
     "authoritative": {
       "backslashxx_kernelsu": {
-        "commit": "a68c892392b06942299bf9d2295a9e329571a3e5",
+        "commit": "9fe6886b166b018b31fe789f9d93c4fc2b28e05e",
         "ref": "master",
-        "relevant_content_hash": "sha256:2220a669ace0299915893c7e40d0518661dfe19fe0dcd57ddf8ebac6d52e416e",
+        "relevant_content_hash": "sha256:e82d387737fbc447811838592d2a6110fc61195bbdd7998be161c96295c03c47",
         "repository": "https://github.com/backslashxx/KernelSU.git",
         "tracked_files": {
           "kernel/Kconfig": "sha256:3a30954bbff10ec57c9897fd17d856877c0b9db9f71692b3e0430639c99c9ec8",
@@ -16,7 +16,7 @@
           "kernel/hook/setuid_hook.c": "sha256:dd7f40fa454fdea2d997ee219f3aed2892a71efa8ad2b69a5f2d6aca86ada1e5",
           "kernel/hook/syscall_table_hook_arm64.c": "sha256:ff020f14cd702ba2ea621890b37d025e31dd21c072eb6a3d0a2c865992eab59f",
           "kernel/kernel_compat.h": "sha256:56394210605ebd1cb02164f70b50d5b59bf9d9ef8c14423c40040ec13116d9a7",
-          "kernel/kernel_includes.h": "sha256:7bde859d52d1929ad76dd378150ba1d87304bbced39e0a5068ac73a94b4b634e",
+          "kernel/kernel_includes.h": "sha256:97475ba18f642eb46c3be0b149d3a73e759e1b5e14781b1ed187186acd428e33",
           "kernel/ksu.c": "sha256:57840a619125fdf302df2210da1f3db68dbc49b06eb64897dfec6a1b023141cc",
           "kernel/manager/pkg_observer.c": "sha256:1e4dc1fce8c534f84fc114985f840ec3330623762ea6f1a077f507461d8ec596",
           "kernel/runtime/ksud_integration.c": "sha256:b3c62d1d57a733e213fc46ed8d32478e4c2766b2d1930c30482300f4ac932fe1",
