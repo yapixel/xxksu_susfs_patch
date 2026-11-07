@@ -12,13 +12,13 @@
         "archive_url": "https://github.com/yapixel/gki-build-assets/releases/download/android16-6.12-2025-09_r38/common-android16-6.12-2025-09_r38.tar.gz",
         "compatibility_target": "android16-6.12-2025-09_r38 (GKI 6.12)",
         "patch_file": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
-        "patch_sha256": "sha256:f7d71e58728224105daa1c35eb8c4c7e43548edf6376e3171f708f11f37d31a1"
+        "patch_sha256": "sha256:d4f237dd9bec02efe6c9c7fb7c1aa6e1df7d3b828c74f42a43ba69c8866f61f4"
       }
     }
   },
   "patch_51": {
     "patch_file": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
-    "patch_sha256": "sha256:f7d71e58728224105daa1c35eb8c4c7e43548edf6376e3171f708f11f37d31a1",
+    "patch_sha256": "sha256:d4f237dd9bec02efe6c9c7fb7c1aa6e1df7d3b828c74f42a43ba69c8866f61f4",
     "retired_internal_patch": "51_deinlined_susfs_hooks_gki-android16-6.12.patch",
     "strict_apply": "PASS"
   },
@@ -59,7 +59,7 @@
     "patch_50": "50_add_susfs_in_gki-android16-6.12.patch",
     "ref": "gki-android16-6.12",
     "repository": "https://gitlab.com/simonpunk/susfs4ksu",
-    "resolved_commit": "68f62fae75ada3959f816841a3c64299383521ed"
+    "resolved_commit": "c6788e2a21dc717beb7dd3a36b729b58bc909927"
   },
   "target_id": "gki-android16-6.12",
   "upstream": {

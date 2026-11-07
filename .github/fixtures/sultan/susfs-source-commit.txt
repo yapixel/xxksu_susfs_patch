@@ -1,6 +1,8 @@
-tree 3d37d214d6f5aee42a1a4a56731665be59a0db71
-parent 828a4d0e4f8dc832eeddc36b46b569a9b2324a8a
-author simonpunk <simonpunk2016@gmail.com> 1793553900 +0800
-committer simonpunk <simonpunk2016@gmail.com> 1793553900 +0800
+tree 993a5f55114782a780f3668876bbfe4e367707e8
+parent 4fd7f9a91777bc3b224d0ddfa8e25799513f8754
+author simonpunk <simonpunk2016@gmail.com> 1793982988 +0800
+committer simonpunk <simonpunk2016@gmail.com> 1793982988 +0800
 
-kernel: priority_uid_filter: Add extra flag O_NOATIME with filp_open() to avoid updating the inode atime.
+kernel: ratelimit on logging sus selinux type and rule
+
+- There are too many selinux types and rules to add so it is better to just ratelimit them.
