@@ -1,8 +1,8 @@
-tree 993a5f55114782a780f3668876bbfe4e367707e8
-parent 4fd7f9a91777bc3b224d0ddfa8e25799513f8754
-author simonpunk <simonpunk2016@gmail.com> 1793982988 +0800
-committer simonpunk <simonpunk2016@gmail.com> 1793982988 +0800
+tree 2faef3a5ff25cd36f4a2602fb57602a3eaa7ea36
+parent e7be1da8620e3f663a6e439f4a24398b5a70ad1c
+author simonpunk <simonpunk2016@gmail.com> 1794122466 +0800
+committer simonpunk <simonpunk2016@gmail.com> 1794122466 +0800
 
-kernel: ratelimit on logging sus selinux type and rule
+Bump version to 2.4.0
 
-- There are too many selinux types and rules to add so it is better to just ratelimit them.
+- For upstream, please sync up or revert to https://github.com/tiann/KernelSU/commit/019a3c0103a8f8d56675546016c4073d0fd18352 to avoid error patching.

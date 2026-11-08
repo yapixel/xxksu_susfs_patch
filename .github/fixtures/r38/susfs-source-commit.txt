@@ -1,8 +1,44 @@
-tree 9744ca21502f3d2e8715243a8e58026649e29f7c
-parent a3d321a2a32aab945bc279e52a224f7d58f138df
-author simonpunk <simonpunk2016@gmail.com> 1793983093 +0800
-committer simonpunk <simonpunk2016@gmail.com> 1793983093 +0800
+tree 74bd489a38ec866344f53dd7dccba2f31ef6ec41
+parent 2d3d95eb2720fd2b27c93d4209c453c2f76d526f
+author simonpunk <simonpunk2016@gmail.com> 1794124603 +0800
+committer simonpunk <simonpunk2016@gmail.com> 1794124603 +0800
 
-kernel: ratelimit on logging sus selinux type and rule
+Bump version to 2.4.0
 
-- There are too many selinux types and rules to add so it is better to just ratelimit them.
+[Upstream]
+- Sync with the official KernelSU v3.3.1 and later main repo commits
+- Latest synced KernelSU commit: https://github.com/tiann/KernelSU/commit/019a3c0103a8f8d56675546016c4073d0fd18352
+- Users have to use KernelSU manager 32620+ due to UAPI changes
+- For upstream KernelSU, sync up or revert to the above commit to avoid patch errors
+
+[Changes]
+- kernel & KernelSU: Add priority_uid_filter to hide user-selected app uids from getpriority/setpriority/ioprio_get/ioprio_set
+- kernel & KernelSU: priority_uid_filter: Add CMD_SUSFS_SET_PRIORITY_UID_FILTER (0x60030), resolve uids from /data/system/packages.list
+- kernel & KernelSU: priority_uid_filter: Make it a compile-time feature (KSU_SUSFS_PRIORITY_UID_FILTER) and re-resolve package names via the KernelSU package observer
+- kernel: priority_uid_filter: Fix UAF bugs and kworker not able to run; use O_NOATIME when reading packages.list
+- kernel & KernelSU: SUS_MOUNT: Refactor spoofing logic, no longer relies on kernel_umount
+- kernel & KernelSU: SUS_MOUNT, SUS_KSTAT and OPEN_REDIRECT now work independently and can be combined
+- kernel: SUS_MOUNT: Always effective for TIF_PROC_UMOUNTED processes and spoof __lookup_mnt() for zygote-spawned apps
+- kernel: SUS_MOUNT: Fix potential mount minor dev gap detection by raising the default dev minor to (1 << 12)
+- kernel: SUS_MOUNT: Fix race condition in clone_mnt()
+- kernel: SUS_KSTAT: Always effective for app uids ((uid % 100000) >= 10000)
+- kernel: SUS_KSTAT: Expand hash buckets to 14 bits and improve cache locality
+- kernel: SUS_KSTAT: Log target_dev and spoofed_mnt_id for new entries
+- kernel: SUS_KSTAT: Fix spoofing when combining add_sus_kstat and update_sus_kstat
+- kernel: SUS_KSTAT: Fix wrong spoofing logic in vfs_statfs(), wrong KSTAT_SPOOF_CTIME_TV_SEC bit, zeroed f_flags and is_statically type
+- kernel: SUS_KSTAT: Fix memory leak in update_sus_kstat() when no entry matches
+- kernel: SUS_KSTAT: Skip mount_lock in the non-sus fast path
+- kernel: OPEN_REDIRECT: Refactor and make it independent; SUS_KSTAT is required for redirected paths visible to apps
+- kernel: OPEN_REDIRECT: Expand hash buckets to 14 bits and improve cache locality
+- kernel: OPEN_REDIRECT: Fix dangling nd->name in do_o_path()/do_tmpfile()
+- kernel & KernelSU: Refactor selinux_hide (partially done) with recorded type/rule lookups and full tuple comparison
+- kernel: Fix SELinux leaks in sel_open_handle_status() and sync the global sidtab; reuse upstream selinux_hide code
+- kernel: Rate limit logging of sus SELinux types and rules
+- kernel & KernelSU: sucompat: Imitate upstream execveat logic
+- kernel & KernelSU: Fix [ksu_driver_su] being wrongly installed before the su session
+- kernel: Fix spoofed /proc/cmdline being emitted twice under seqlock retry
+- kernel: Fix NULL deref in susfs_get_enabled_features()
+- kernel: Rebase patches onto android16-6.12.92 and improve compatibility with newer/older GKI kernel sources
+- kernel & KernelSU: Remove unused code
+- ksu_susfs: Add set_priority_uid_filter command, update CLI description and prebuilt binary
+- ksu_module_susfs: Update boot-completed.sh template
