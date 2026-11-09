@@ -229,12 +229,15 @@ def _write_susfs_acceptance(patch_id: str, upstream_input: Path, repo_root: Path
                for rel in state["tracked_files"]}
     (candidate_dir / adapter.commit_fixture_relpath.name).write_bytes(raw)
     (candidate_dir / patch_50).write_bytes(_accepted_blob(upstream_input, "kernel_patches/" + patch_50))
+    if patch_id == "sultan-android14-6.1-patch51":
+        (candidate_dir / "fs_susfs.c").write_bytes(_accepted_blob(upstream_input, "kernel_patches/fs/susfs.c"))
+        (candidate_dir / "include_susfs.h").write_bytes(_accepted_blob(upstream_input, "kernel_patches/include/linux/susfs.h"))
     (candidate_dir / SUSFS_ACCEPTANCE).write_text(
         json.dumps({"commit": commit, "tracked_files": tracked}, indent=2, sort_keys=True) + "\n")
 
 
 def _read_susfs_acceptance(patch_id: str, candidate_dir: Path, repo_root: Path):
-    """Re-authenticate validator evidence; returns (commit, tracked_files, fixture updates)."""
+    """Re-authenticate validator evidence; returns (commit, tracked_files, fixture updates, bundle_files)."""
     from .policy.patch51_source import source_commit_date
     adapter, patch_50, state = _susfs_context(patch_id, repo_root)
     record = json.loads((candidate_dir / SUSFS_ACCEPTANCE).read_text())
@@ -260,7 +263,14 @@ def _read_susfs_acceptance(patch_id: str, candidate_dir: Path, repo_root: Path):
         data = json.loads((repo_root / provenance).read_text())
         data["susfs_commit"] = commit
         fixtures[provenance] = (json.dumps(data, indent=2) + "\n").encode()
-    return commit, tracked, fixtures
+    sultan_bundle_files = {}
+    if patch_id == "sultan-android14-6.1-patch51":
+        c_path = candidate_dir / "fs_susfs.c"
+        h_path = candidate_dir / "include_susfs.h"
+        if c_path.is_file() and h_path.is_file():
+            sultan_bundle_files["fs/susfs.c"] = c_path.read_text(encoding="utf-8")
+            sultan_bundle_files["include/linux/susfs.h"] = h_path.read_text(encoding="utf-8")
+    return commit, tracked, fixtures, sultan_bundle_files
 
 
 def _archive_sha256(url: str) -> str:
@@ -292,7 +302,7 @@ def _plan_metadata_updates(
     updates = {}
     susfs = {pid: _read_susfs_acceptance(pid, d, repo_root) for pid, d in (susfs_dirs or {}).items()}
     upstream_commits = {**upstream_commits, **{pid: rec[0] for pid, rec in susfs.items()}}
-    for _, _, fixtures in susfs.values():
+    for _, _, fixtures, _ in susfs.values():
         updates.update({rel: raw for rel, raw in fixtures.items()
                         if not (repo_root / rel).is_file() or (repo_root / rel).read_bytes() != raw})
     sync_xxksu = source_tree is not None and bool(upstream_commits.get("xxksu-patch11"))
@@ -312,6 +322,22 @@ def _plan_metadata_updates(
         if commit:
             lineage = "upstream" if patch_id == "xxksu-patch11" else "susfs"
             data.setdefault(lineage, {})["resolved_commit"] = commit
+        if patch_id == "sultan-android14-6.1-patch51" and patch_id in susfs and susfs[patch_id][3]:
+            sultan_files = susfs[patch_id][3]
+            bundle_rel = Path(data["source_bundle"]["artifact_path"])
+            raw = json.loads((repo_root / bundle_rel).read_bytes())
+            contents = {item["path"]: item["content"] for item in raw["files"]}
+            contents["fs/susfs.c"] = sultan_files["fs/susfs.c"]
+            contents["include/linux/susfs.h"] = sultan_files["include/linux/susfs.h"]
+            bundle = create_source_bundle(raw["target_id"], raw["kernel_version"], contents, raw["metadata"])
+            raw["files"] = [dict(f.to_dict(), content=f.content) for f in bundle.files]
+            raw["identity"] = str(bundle.identity)
+            text = (json.dumps(raw, indent=2, sort_keys=True) + "\n").encode()
+            if text != (repo_root / bundle_rel).read_bytes():
+                updates[bundle_rel] = text
+            data["retained_file_hashes"]["fs/susfs.c"] = str(bundle.get_file("fs/susfs.c").content_hash)
+            data["retained_file_hashes"]["include/linux/susfs.h"] = str(bundle.get_file("include/linux/susfs.h").content_hash)
+            data["source_bundle"]["identity"] = str(bundle.identity)
         if patch_id == "xxksu-patch11" and sync_xxksu:
             bundle_rel = Path(data["source_bundle"]["artifact_path"])
             raw = json.loads((repo_root / bundle_rel).read_bytes())
@@ -485,6 +511,7 @@ def deliver_promotion(
         allowed_paths.append(Path(".github/fixtures/v2/v29-baselines/xxksu.json"))
     elif patch_id == "sultan-android14-6.1-patch51":
         allowed_paths.append(Path("patches/sultan-android14-6.1/BASELINE.json"))
+        allowed_paths.append(Path(".github/fixtures/v2/v29-baselines/sultan-android14-6.1.json"))
     elif patch_id == "gki-android16-6.12-r38-patch51":
         allowed_paths.append(Path("patches/gki-android16-6.12/BASELINE.json"))
 
