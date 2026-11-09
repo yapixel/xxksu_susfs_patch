@@ -1,4 +1,4 @@
-From a33b4efa111f3a29bc62acde0350db0060c40cac Mon Sep 17 00:00:00 2001
+From 4e83c2cfc887a3b95723ce9133b244354a21ba69 Mon Sep 17 00:00:00 2001
 From: yapixel <yapixel@users.noreply.github.com>
 Date: Mon, 02 Nov 2026 03:28:16 +0000
 Subject: [PATCH] Enable SUSFS for backslashxx KernelSU
@@ -397,7 +397,7 @@ index fe628e3..b4c6386 100644
  static int do_grant_root(void __user *arg)
  {
  	int ret;
-@@ -93,6 +97,9 @@ static int do_report_event(void __user *arg)
+@@ -96,6 +100,9 @@ static int do_report_event(void __user *arg)
  			boot_complete_lock = true;
  			pr_info("boot_complete triggered\n");
  			on_boot_completed();
