@@ -35,7 +35,7 @@
     "kernel/feature/sucompat.c": "sha256:b2a27e3ea5a5b274ffaca90d5af9297e823ef0bbfca970a33a65b498ae01a095",
     "kernel/hook/setuid_hook.c": "sha256:dd7f40fa454fdea2d997ee219f3aed2892a71efa8ad2b69a5f2d6aca86ada1e5",
     "kernel/hook/syscall_table_hook_arm64.c": "sha256:ff020f14cd702ba2ea621890b37d025e31dd21c072eb6a3d0a2c865992eab59f",
-    "kernel/ksu.c": "sha256:9945202a4ba1e1831219491b59380636687497445824559b7e15d7aa46e8fb36",
+    "kernel/ksu.c": "sha256:eb51a7b6589bf11692300105efee1d9ccf3c8d6f287b97d7df3d7931486c54c4",
     "kernel/manager/pkg_observer.c": "sha256:1e4dc1fce8c534f84fc114985f840ec3330623762ea6f1a077f507461d8ec596",
     "kernel/runtime/ksud_integration.c": "sha256:b3c62d1d57a733e213fc46ed8d32478e4c2766b2d1930c30482300f4ac932fe1",
     "kernel/selinux/rules.c": "sha256:a18ed06f18df96ed37caecabe3870ef83c20ce14f87f8ecbb5684cbde8ddfc39",
@@ -48,17 +48,17 @@
   "source_bundle": {
     "artifact_path": ".github/fixtures/v2/v29-baselines/xxksu.json",
     "file_count": 14,
-    "identity": "sha256:a19ed9d2b0b1067db5c57b8eb902a026922802517c67da0006cceb02da1762cc",
+    "identity": "sha256:568bc1ad90814c115f26962d76bd2bb6c6fc314c39d8c87f2f2b112147241835",
     "schema": "xxksu-susfs-source-bundle/v1"
   },
   "status": "VERIFIED",
   "target_id": "xxksu",
   "upstream": {
-    "archive_sha256": "e7eac9b24f0a2acf17b2a549ea9e32d44533fcc41035577da53f1d2d5302980c",
-    "archive_url": "https://codeload.github.com/backslashxx/KernelSU/tar.gz/a52e3267fdea126a2564ec265ea2b0cd3c74bffe",
+    "archive_sha256": "2e6c5156e6311edebfa2bb7712387b5eb7353ef7419effd7d6c9c8244fcafe2f",
+    "archive_url": "https://codeload.github.com/backslashxx/KernelSU/tar.gz/f043b81c3759c850461701124693847e9fb060e3",
     "ref": "master",
     "repository": "https://github.com/backslashxx/KernelSU",
-    "resolved_commit": "a52e3267fdea126a2564ec265ea2b0cd3c74bffe",
-    "tree": "8d0d808051e3844b5b0e317954f94e50fd213937"
+    "resolved_commit": "f043b81c3759c850461701124693847e9fb060e3",
+    "tree": "c974061b11d06626b570ac0cdda59b6e8d634bcd"
   }
 }
