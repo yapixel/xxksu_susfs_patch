@@ -1,4 +1,4 @@
-From 4e83c2cfc887a3b95723ce9133b244354a21ba69 Mon Sep 17 00:00:00 2001
+From df6f6183be4f37b0941b86f8c503e22ee65996ff Mon Sep 17 00:00:00 2001
 From: yapixel <yapixel@users.noreply.github.com>
 Date: Mon, 02 Nov 2026 03:28:16 +0000
 Subject: [PATCH] Enable SUSFS for backslashxx KernelSU
@@ -192,7 +192,7 @@ index 06df055..c7cc340 100644
  // uapi
  #include "include/uapi/app_profile.h"
  #include "include/uapi/feature.h"
-@@ -285,6 +289,10 @@ static int __init kernelsu_init(void)
+@@ -283,6 +287,10 @@ static int __init kernelsu_init(void)
  
  	ksu_allowlist_init();
  	ksu_throne_tracker_init();
