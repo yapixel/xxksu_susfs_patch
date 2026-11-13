@@ -3,15 +3,15 @@
   "sources": {
     "authoritative": {
       "backslashxx_kernelsu": {
-        "commit": "372948b9f65f02bead33f54b88a4b8322c3217b8",
+        "commit": "742045bfaac071ee595bc2bcc08d6c1f9da766b1",
         "ref": "master",
-        "relevant_content_hash": "sha256:976bf1efaddb6ad4b68843ac0d7153b9cc0228e12e7a9551f17343bc6c86ebbd",
+        "relevant_content_hash": "sha256:f3ec07d123f85d4535ffe4663bfffa5c40a8700025225e46f7fa1f393b599de2",
         "repository": "https://github.com/backslashxx/KernelSU.git",
         "tracked_files": {
           "kernel/Kconfig": "sha256:3a30954bbff10ec57c9897fd17d856877c0b9db9f71692b3e0430639c99c9ec8",
           "kernel/downstream/ksu_hostsredirect.h": "sha256:1888892bebf9c1555c1b48296cf363ed1dc568da24ff03e51fd9e0693233e908",
           "kernel/feature/kernel_umount.c": "sha256:ba964ec6c27fcbfe348a333fec94073c9cb0843b8604a94c7ef66c0823e89790",
-          "kernel/feature/sucompat.c": "sha256:3bc176f042e429a2691744bcf83a11ccd63bf44e1211c5f6b4798c92c2105d91",
+          "kernel/feature/sucompat.c": "sha256:a55797e93a0991bba7b5bc66ab28d2c6875f02e7824c626558260694b397a519",
           "kernel/hook/lsm_hooks_list.c": "sha256:d37f5b47fb79fc5e1e18a2afe1553974a4f365875f66ad43fd270bee4413830b",
           "kernel/hook/setuid_hook.c": "sha256:dd7f40fa454fdea2d997ee219f3aed2892a71efa8ad2b69a5f2d6aca86ada1e5",
           "kernel/hook/syscall_table_hook_arm64.c": "sha256:c85696cddeadca3f43d9d1b0f32710a54a70c69d4e9dc12cc1bd8985d953a82f",
@@ -24,7 +24,7 @@
           "kernel/selinux/selinux.c": "sha256:c22331a2db5ee3bbb53234e51c04e98054281cb1a4d06550bb1413c817b985dc",
           "kernel/selinux/selinux.h": "sha256:d2477e1f5c208554246ade801a039a459fe401a86f7077bca71b225c40ba566d",
           "kernel/supercall/dispatch.c": "sha256:c4477edc7aaa1adbe92c0fa58a169f18b7b59eac35d3bfe5fb546282052ab21c",
-          "kernel/supercall/supercall.c": "sha256:7fcf757a0a04399312365556be47120d7ce95d8c6229d08534d1c9559449f01e"
+          "kernel/supercall/supercall.c": "sha256:23168fec52acba8aa3843771c0c5505253c195f9365b846b252a17c562a61253"
         }
       },
       "susfs_gki": {
