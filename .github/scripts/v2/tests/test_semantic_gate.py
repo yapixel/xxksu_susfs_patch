@@ -287,6 +287,24 @@ class TestSemanticGateInvariants(unittest.TestCase):
                  for u in _new_unknowns(inv.units, set())]
         self.assertEqual(texts, ["unreviewed_code_call();"])
 
+    def test_susfs_sus_path_in_namei_and_readdir_recognized(self):
+        from v2.engine.diff_parser import parse_patch
+        from v2.semantic.gate import _new_unknowns
+        from v2.semantic.inventory import inventory_patch
+        patch_text = (
+            "diff --git a/fs/readdir.c b/fs/readdir.c\n"
+            "--- a/fs/readdir.c\n"
+            "+++ b/fs/readdir.c\n"
+            "@@ -1,1 +1,4 @@\n"
+            " int a;\n"
+            "+extern __attribute__((hot)) bool susfs_is_inode_sus_path(struct inode *inode);\n"
+            "+inode = ilookup(buf->sb, ino);\n"
+            "+if (susfs_is_inode_sus_path(inode)) {\n"
+        )
+        inv = inventory_patch(parse_patch(patch_text), source_identity="new", source_type="official_50")
+        unknowns = _new_unknowns(inv.units, set())
+        self.assertEqual(len(unknowns), 0)
+
 
 if __name__ == "__main__":
     unittest.main()
