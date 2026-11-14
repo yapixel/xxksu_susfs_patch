@@ -69,14 +69,6 @@ jobs:
 
           PYTHONPATH=.github/scripts python3 -m v2.watch.cli "${ARGS[@]}"
 
-      - name: Upload Candidate Patches (if generated)
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: upstream-candidate-patches
-          path: candidate_patches/
-          if-no-files-found: ignore
-
       - name: Auto-Dispatch Production Pipelines for Safe Candidates
         if: success() && (github.event.inputs.dry_run || 'false') != 'true'
         env:

@@ -297,6 +297,20 @@ class DashboardTests(unittest.TestCase):
         combined = combine_recent_events(seed_events, transitions)
         self.assertEqual(combined, seed_events)
 
+        # SAFE_REGEN_CANDIDATE and REFERENCE_DRIFT must not append noisy events
+        noisy_report = WatchReport(
+            results=(
+                SourceResult("backslashxx_kernelsu", "authoritative", WatchClassification.SAFE_REGEN_CANDIDATE, "a", "b", "h1", "h2", candidate_patch_name="11.patch"),
+                SourceResult("ref", "reference", WatchClassification.REFERENCE_DRIFT, "c", "d", "h3", "h4"),
+                SourceResult("susfs_gki", "authoritative", WatchClassification.ANCHOR_DRIFT, "11111111", "22222222", "h5", "h6"),
+            ),
+            timestamp="2026-09-24T22:00:00Z",
+        )
+        drift_events = extract_transition_events(noisy_report, "2026-09-24")
+        self.assertEqual(len(drift_events), 1)
+        self.assertEqual(drift_events[0]["source_id"], "susfs_gki")
+        self.assertIn("ANCHOR_DRIFT", drift_events[0]["text"])
+
     # 13. repeated watcher runs do not cause unbounded body growth
     def test_repeated_render_bytes_and_size_limit(self):
         with self.subTest(case='13_repeated_watcher_runs_do_not_cause_unbounded_body_growth'):

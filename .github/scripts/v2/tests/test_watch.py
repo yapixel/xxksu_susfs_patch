@@ -365,27 +365,29 @@ class SuSFSWatcherRegressionTests(unittest.TestCase):
         self.watcher = UpstreamWatcher(repo_root=REPO_ROOT, state_path=STATE_FILE)
 
     def test_deinline_target_isolation(self):
-        from deinline_50_to_51 import deinline_patch_content
+        from v2.policy.patch51_source import get_adapter
 
-        sample_patch = """diff --git a/fs/statfs.c b/fs/statfs.c
---- a/fs/statfs.c
-+++ b/fs/statfs.c
-@@ -10,1 +10,2 @@
- int foo;
-+int bar;
-"""
-        gki_cand = deinline_patch_content(sample_patch, target="gki-android16-6.12")
-        self.assertIn("drivers/input/input.c", gki_cand)
-        self.assertIn("354", gki_cand)
-        self.assertNotIn("387", gki_cand)
-        self.assertNotIn("diff --git a/fs/susfs.c", gki_cand)
-        self.assertNotIn("diff --git a/include/linux/susfs.h", gki_cand)
+        gki = get_adapter("gki-android16-6.12-r38-patch51")
+        sultan = get_adapter("sultan-android14-6.1-patch51")
+        self.assertNotEqual(gki.target_id, sultan.target_id)
+        self.assertNotEqual(gki.source_state_key, sultan.source_state_key)
+        self.assertNotEqual(gki.commit_fixture_relpath, sultan.commit_fixture_relpath)
 
-        sultan_cand = deinline_patch_content(sample_patch, target="sultan-android14-6.1")
-        self.assertNotIn("drivers/input/input.c", sultan_cand)
-        self.assertNotIn("ksu_input_hook_key_false", sultan_cand)
-        self.assertIn("diff --git a/fs/susfs.c", sultan_cand)
-        self.assertIn("diff --git a/include/linux/susfs.h", sultan_cand)
+        sample_super = (
+            '#include "internal.h"\n\n'
+            "static void dummy(void) {}\n\n"
+            "#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT\n"
+            "extern bool susfs_is_current_ksu_domain(void);\n"
+            "extern struct static_key_true susfs_is_sdcard_android_data_not_decrypted;\n"
+            "#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT\n\n"
+        )
+        gki_super = gki.apply_target_adaptation("fs/super.c", sample_super)
+        sultan_super = sultan.apply_target_adaptation("fs/super.c", sample_super)
+        self.assertEqual(sultan_super, sample_super)
+        self.assertLess(
+            gki_super.index("extern bool susfs_is_current_ksu_domain"),
+            gki_super.index("static void dummy"),
+        )
 
     @patch("v2.watch.checker.fetch_remote_commit")
     @patch("v2.watch.checker.fetch_git_files")

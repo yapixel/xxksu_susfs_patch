@@ -11,8 +11,6 @@ from v2.validation.exact_patch import validate_patch_syntax
 
 from v2.model.provenance import HashDigest
 from v2.model.result import ValidationStatus
-from v2.profiles.matrix import get_profile_definition
-from v2.profiles.composition import compose_profile
 from v2.source.baseline import BASELINE_SCHEMA, InvalidBaselineContract, UnsupportedBaselineSchema, get_baseline_path, load_authoritative_bundle, load_baseline_record
 from v2.source.bundle import SourceBundle
 from v2.source.patch_apply import apply_patch_to_bundle
@@ -158,28 +156,6 @@ class AuthoritativeBundleVerificationTests(unittest.TestCase):
             sym_results = validate_symbols(patch=patch_text)
             for res in sym_results:
                 self.assertEqual(res.status, ValidationStatus.PASS)
-
-
-    def test_sultan_profiles_consume_authoritative_patch_11(self) -> None:
-        xxksu_bundle = load_authoritative_bundle("xxksu", REPO_ROOT)
-        patch_11_path = REPO_ROOT / "patches" / "xxksu" / "11_enable_susfs_for_ksu.patch"
-        patch_11_text = patch_11_path.read_text(encoding="utf-8")
-
-        p51_path = REPO_ROOT / "patches" / "sultan-android14-6.1" / "51_deinlined_susfs_hooks_sultan-android14-6.1.patch"
-        patch_51_text = p51_path.read_text(encoding="utf-8")
-
-        for profile_id in ("sultan-android14-6.1-manual", "sultan-android14-6.1-lsm_bl"):
-            prof_def = get_profile_definition(profile_id)
-            target_bundle = load_authoritative_bundle(prof_def.target_id, REPO_ROOT)
-            result = compose_profile(
-                profile_id=profile_id,
-                target_bundle=target_bundle,
-                patch_11=patch_11_text,
-                patch_51=patch_51_text,
-                xxksu_bundle=xxksu_bundle,
-                raise_on_failure=True,
-            )
-            self.assertEqual(result.validation_report.status, ValidationStatus.PASS)
 
 
 if __name__ == "__main__":

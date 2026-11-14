@@ -147,15 +147,6 @@ class ProvenanceTests(unittest.TestCase):
         self.assertEqual(first, self.fresh(SULTAN, self.sultan))
         self.assert_production_postimages(SULTAN, first)
         source = self.sultan / "50_add_susfs_in_gki-android14-6.1.patch"
-        # The standalone converter must not reuse an existing output Date either.
-        output = self.root / "legacy.patch"
-        output.write_text("Date: Wed, 01 Jan 2020 00:00:00 +0000\\n")
-        subprocess.run([sys.executable, str(self.root / ".github/scripts/deinline_50_to_51.py"),
-                        "--input", str(source), "--output", str(output),
-                        "--target", "sultan-android14-6.1"], cwd=self.root,
-                       env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
-                       check=True, capture_output=True)
-        self.assertIn(re.search(rb"(?m)^Date:.*$", expected).group().decode(), output.read_text())
         original = source.read_text()
         source.unlink()
         with self.assertRaises(CandidateGenerationError):

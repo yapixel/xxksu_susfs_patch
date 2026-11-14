@@ -19,8 +19,7 @@ A source-driven system that publishes reviewed Patch 11 / Patch 51 artifacts for
 
 - **Generation:** deterministic shared Patch 11; target-specific Sultan 6.1 and GKI 6.12 r38 Patch 51 reconstruction.
 - **Verification:** fresh-runner clean-room, ownership/symbol/ABI/config checks, and real Kbuild object compilation with SuSFS symbol closure.
-- **Profiles:** four current composition profiles: two kernel targets × MANUAL / LSM + Branch-Link. Six-profile build orchestration is not implemented in the current manifests.
-- **CI acceptance:** full-kernel build/runtime acceptance across the complete profile matrix remains pending; the existing production gates are bounded object/closure checks.
+- **CI acceptance:** existing production gates are bounded Kbuild object/symbol-closure and semantic/lifecycle checks; full-kernel build and device runtime acceptance remain downstream responsibilities.
 
 ## Production Patches
 
@@ -50,13 +49,12 @@ This project produces reviewed, de-inlined integration patches that retain SuSFS
 Official Patch 10 / SuSFS APIs → semantic policy (lineage/reference)
 Accepted xxKSU source + reviewed policy → shared Patch 11
 Accepted Patch 50 + authenticated target/core → source adaptation → native Git → Patch 51
-Patch 11 + Patch 51 + profile fixtures → profile composition → static validation
-  → configured Kbuild object/symbol-closure gates → Actions publication
-  → downstream full build and runtime validation
+Patch 11 + Patch 51 → semantic/static validation → Kbuild object/symbol-closure gates
+  → Actions publication → downstream full build and runtime validation
 ```
 
-Official Patch 10 is not a runtime byte-generation input. Profile composition and
-static validation do not imply full-matrix kernel build or runtime acceptance.
+Official Patch 10 is not a runtime byte-generation input. Static validation and bounded
+Kbuild object checks do not replace full-kernel build or device runtime acceptance.
 
 ## Verification
 
@@ -150,10 +148,9 @@ Sensitive drift fails closed for source review before acceptance and publication
 <details>
 <summary>V2 evolution</summary>
 
-V2 established explicit source/provenance records, target adaptation, profile
-composition, and semantic validation. Production Patch 51 now uses complete source
-postimages, native Git diffs, independent round trips, real Kbuild objects, and
-symbol closure. Clean-room verifies reproduction independently. Further changes
+V2 established explicit source/provenance records, target adaptation, and semantic
+validation. Production Patch 51 now uses complete source postimages, native Git diffs,
+independent round trips, real Kbuild objects, and symbol closure. Clean-room verifies reproduction independently. Further changes
 follow stable maintenance policy; historical milestones are not current support claims.
 
 </details>

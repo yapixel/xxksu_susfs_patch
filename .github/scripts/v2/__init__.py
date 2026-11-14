@@ -15,10 +15,6 @@ from .validation import (
     validate_symbols, validate_abi, validate_ownership, validate_all,
     validate_config, parse_kconfig, FinalConfigMismatch, KconfigConflict, MissingPrerequisite,
 )
-from .profiles import (
-    ProfileDefinition, ProfileCompositionResult, compose_profile, compose_all_profiles,
-    get_profile_definition, get_profile_manifest, list_profile_definitions,
-)
 
 __all__ = ["parse_patch", "emit_patch", "load_manifest_set", "load_profile_manifest",
            "load_target_manifest", "HashDigest", "InputRef", "PreparedInput", "Provenance",
@@ -28,6 +24,4 @@ __all__ = ["parse_patch", "emit_patch", "load_manifest_set", "load_profile_manif
            "ValidationStatus", "ValidationResult", "ValidationReport", "ValidationError",
            "validate_symbols", "validate_abi", "validate_ownership", "validate_all",
            "validate_config", "parse_kconfig", "FinalConfigMismatch", "KconfigConflict",
-           "MissingPrerequisite", "ProfileDefinition", "ProfileCompositionResult",
-           "compose_profile", "compose_all_profiles", "get_profile_definition",
-           "get_profile_manifest", "list_profile_definitions"]
+           "MissingPrerequisite"]

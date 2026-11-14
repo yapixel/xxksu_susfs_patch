@@ -161,9 +161,9 @@ checkout immutability. It is read-only: no promotion, commits, pushes, or issue
 updates. Its concurrency is separate from publication. Local WSL checks do not
 substitute for a successful real Actions run.
 
-Issue #5 is the compact current-state dashboard. Update only through the existing
-watcher/renderer, preserving bounded events; machine-readable records remain truth.
-Use supported extra events for verified operational evidence, never fabricate results.
+Issue #5 is the compact current-state dashboard, updated solely via `upstream-watch.yml`
+(`v2.watch.cli`), preserving bounded drift/lifecycle events; machine-readable records remain
+truth. Use supported extra events for verified operational evidence, never fabricate results.
 
 Useful local checks (Python 3.11; GCC required by C regressions):
 

@@ -279,19 +279,6 @@ def extract_transition_events(report: WatchReport, date_str: str) -> list[dict[s
                 "source_id": r.source_id,
                 "text": f"Drift detected: {r.classification.value} (old: `{r.old_identity[:8]}`, new: `{r.new_identity[:8]}`)",
             })
-        elif r.classification == WatchClassification.SAFE_REGEN_CANDIDATE:
-            cand_name = r.candidate_patch_name or "candidate"
-            events.append({
-                "timestamp": date_str,
-                "source_id": r.source_id,
-                "text": f"Candidate patch generated (`{cand_name}`)",
-            })
-        elif r.classification == WatchClassification.REFERENCE_DRIFT:
-            events.append({
-                "timestamp": date_str,
-                "source_id": r.source_id,
-                "text": f"Reference patch content drift detected (`{r.new_content_hash[:12]}`)",
-            })
     return events
 
 

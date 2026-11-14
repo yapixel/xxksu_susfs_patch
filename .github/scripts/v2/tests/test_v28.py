@@ -445,3 +445,34 @@ class V28NegativeValidationTests(unittest.TestCase):
         )
         self.assertEqual(report.status, ValidationStatus.RUNTIME_REQUIRED)
         self.assertTrue(any(r.status == ValidationStatus.RUNTIME_REQUIRED for r in report.results))
+
+
+class ConfigValidationTests(unittest.TestCase):
+    """Focused Kconfig parsing and validation checks."""
+
+    def test_valid_and_failing_kconfig_modes(self):
+        from v2.model.manifest import LSM_KCONFIG, MANUAL_KCONFIG
+        from v2.model.result import FinalConfigMismatch, KconfigConflict, MissingPrerequisite
+        from v2.validation import parse_kconfig, validate_config
+
+        manual_text = "\n".join([f"{k}={v}" for k, v in MANUAL_KCONFIG.items()])
+        lsm_text = "\n".join([f"{k}={v}" for k, v in LSM_KCONFIG.items()]) + "\nCONFIG_ARM64=y\nCONFIG_KALLSYMS=y\n"
+
+        self.assertEqual(validate_config(expected=MANUAL_KCONFIG, resolved=manual_text, mode="manual", raise_on_failure=True).status, ValidationStatus.PASS)
+        self.assertEqual(validate_config(expected=LSM_KCONFIG, resolved=lsm_text, mode="lsm_bl", prerequisites={"arch": "arm64", "kallsyms": True}, raise_on_failure=True).status, ValidationStatus.PASS)
+
+        bad_manual = dict(MANUAL_KCONFIG, CONFIG_KSU_LSM_SECURITY_HOOKS="y")
+        with self.assertRaises(FinalConfigMismatch):
+            validate_config(expected=MANUAL_KCONFIG, resolved=bad_manual, mode="manual", raise_on_failure=True)
+
+        conflict_lsm = dict(LSM_KCONFIG, CONFIG_ARM64="y", CONFIG_KALLSYMS="y", CONFIG_KSU_TAMPER_SYSCALL_TABLE="y")
+        with self.assertRaises(KconfigConflict):
+            validate_config(expected=LSM_KCONFIG, resolved=conflict_lsm, mode="lsm_bl", raise_on_failure=True)
+
+        missing_arm64 = dict(LSM_KCONFIG, CONFIG_ARM64="n", CONFIG_KALLSYMS="y")
+        with self.assertRaises(MissingPrerequisite):
+            validate_config(expected=LSM_KCONFIG, resolved=missing_arm64, mode="lsm_bl", prerequisites={"arch": "arm64", "kallsyms": True}, raise_on_failure=True)
+
+        with self.assertRaises(KconfigConflict):
+            parse_kconfig("CONFIG_KSU=y\nCONFIG_KSU=n\n")
+
