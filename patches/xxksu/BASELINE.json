@@ -32,7 +32,7 @@
     "kernel/Kconfig": "sha256:3a30954bbff10ec57c9897fd17d856877c0b9db9f71692b3e0430639c99c9ec8",
     "kernel/downstream/ksu_hostsredirect.h": "sha256:1888892bebf9c1555c1b48296cf363ed1dc568da24ff03e51fd9e0693233e908",
     "kernel/feature/kernel_umount.c": "sha256:ba964ec6c27fcbfe348a333fec94073c9cb0843b8604a94c7ef66c0823e89790",
-    "kernel/feature/sucompat.c": "sha256:0512ca428c66f8f954b199d98277c782e0efc896265650fbd3edda3c2ba64524",
+    "kernel/feature/sucompat.c": "sha256:99ac3fd7d5151d12c112b6e8a8e9379ef1bd3321daed7fc0822ec5d6d5c9bbc1",
     "kernel/hook/setuid_hook.c": "sha256:dd7f40fa454fdea2d997ee219f3aed2892a71efa8ad2b69a5f2d6aca86ada1e5",
     "kernel/hook/syscall_table_hook_arm64.c": "sha256:c85696cddeadca3f43d9d1b0f32710a54a70c69d4e9dc12cc1bd8985d953a82f",
     "kernel/ksu.c": "sha256:f088385dd0e64cfaa8401c67ddb14ea4b5306b21300c88b1e38497e8f08053b2",
@@ -48,17 +48,17 @@
   "source_bundle": {
     "artifact_path": ".github/fixtures/v2/v29-baselines/xxksu.json",
     "file_count": 14,
-    "identity": "sha256:a52511435f3c3c7f1f337c6c4b58cf52dcdb2efea643187ed5c948f8a585f967",
+    "identity": "sha256:e1ddad6b61e97553f37981994cd0f972bca1e3d1d72eebd0109b64008fc51aed",
     "schema": "xxksu-susfs-source-bundle/v1"
   },
   "status": "VERIFIED",
   "target_id": "xxksu",
   "upstream": {
-    "archive_sha256": "71287aad9a68a27aef083126665f60abc7141254c4f8f3ba40df7aa48ad08d32",
-    "archive_url": "https://codeload.github.com/backslashxx/KernelSU/tar.gz/a95f2ce5c55e785f9656e1f0432fdb3523f40e1c",
+    "archive_sha256": "eb26cc669e9e51948aca383257c74062c24c8faaf8fdac9498400c32dcb97132",
+    "archive_url": "https://codeload.github.com/backslashxx/KernelSU/tar.gz/0d8eea21863372e3f7743a0967c631637c4db2a0",
     "ref": "master",
     "repository": "https://github.com/backslashxx/KernelSU",
-    "resolved_commit": "a95f2ce5c55e785f9656e1f0432fdb3523f40e1c",
-    "tree": "6b71c19e52c7b523f945d648e5a7e38f1231c029"
+    "resolved_commit": "0d8eea21863372e3f7743a0967c631637c4db2a0",
+    "tree": "e55543c1bbff17d901031872e1987bbf4cd3e48a"
   }
 }

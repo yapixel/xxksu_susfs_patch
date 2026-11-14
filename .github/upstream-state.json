@@ -3,19 +3,19 @@
   "sources": {
     "authoritative": {
       "backslashxx_kernelsu": {
-        "commit": "a95f2ce5c55e785f9656e1f0432fdb3523f40e1c",
+        "commit": "0d8eea21863372e3f7743a0967c631637c4db2a0",
         "ref": "master",
-        "relevant_content_hash": "sha256:aa57b87c416905484c1cb0d8930c7d6e62b240539feda94ee5cdbf37e6bf97f9",
+        "relevant_content_hash": "sha256:3a6bcefd037b7f94266c424e839ff9685cd84350011bbc13e8225e6361f1c188",
         "repository": "https://github.com/backslashxx/KernelSU.git",
         "tracked_files": {
           "kernel/Kconfig": "sha256:3a30954bbff10ec57c9897fd17d856877c0b9db9f71692b3e0430639c99c9ec8",
           "kernel/downstream/ksu_hostsredirect.h": "sha256:1888892bebf9c1555c1b48296cf363ed1dc568da24ff03e51fd9e0693233e908",
           "kernel/feature/kernel_umount.c": "sha256:ba964ec6c27fcbfe348a333fec94073c9cb0843b8604a94c7ef66c0823e89790",
-          "kernel/feature/sucompat.c": "sha256:0512ca428c66f8f954b199d98277c782e0efc896265650fbd3edda3c2ba64524",
-          "kernel/hook/lsm_hooks_list.c": "sha256:c22b5d6cbb84d3defa1153471c4c8ead7678b4781675e5f54d7ddd5b04b9cbfe",
+          "kernel/feature/sucompat.c": "sha256:99ac3fd7d5151d12c112b6e8a8e9379ef1bd3321daed7fc0822ec5d6d5c9bbc1",
+          "kernel/hook/lsm_hooks_list.c": "sha256:973ed13b4082fc37771c86d48b3376fd9b0e43757c241cdef25e21a478ad9d38",
           "kernel/hook/setuid_hook.c": "sha256:dd7f40fa454fdea2d997ee219f3aed2892a71efa8ad2b69a5f2d6aca86ada1e5",
           "kernel/hook/syscall_table_hook_arm64.c": "sha256:c85696cddeadca3f43d9d1b0f32710a54a70c69d4e9dc12cc1bd8985d953a82f",
-          "kernel/kernel_compat.h": "sha256:f23e4a6317b59a301b2de81a85ac08e3513e5a6d88cffcc6ca044178f5144b4e",
+          "kernel/kernel_compat.h": "sha256:e1d739fd68c6b630a9bcb0b8ce0594f7090da7f5f039f2416cc44a97be5b55cc",
           "kernel/kernel_includes.h": "sha256:97475ba18f642eb46c3be0b149d3a73e759e1b5e14781b1ed187186acd428e33",
           "kernel/ksu.c": "sha256:f088385dd0e64cfaa8401c67ddb14ea4b5306b21300c88b1e38497e8f08053b2",
           "kernel/manager/pkg_observer.c": "sha256:1e4dc1fce8c534f84fc114985f840ec3330623762ea6f1a077f507461d8ec596",
