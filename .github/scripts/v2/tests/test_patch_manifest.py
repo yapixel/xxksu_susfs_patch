@@ -104,6 +104,20 @@ class PatchManifestTests(unittest.TestCase):
             self.assertFalse(valid)
             self.assertTrue(any("not found on disk" in e or "failed to generate" in e.lower() for e in errors))
 
+    def test_verify_detects_patch11_size_mismatch_fail_closed(self) -> None:
+        import shutil
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            shutil.copytree(REPO_ROOT / "patches", root / "patches")
+            baseline_path = root / "patches" / "xxksu" / "BASELINE.json"
+            data = json.loads(baseline_path.read_text(encoding="utf-8"))
+            data["patch_11"]["size"] = int(data["patch_11"]["size"]) - 1
+            baseline_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+            valid, errors = verify_patch_manifest(root)
+            self.assertFalse(valid)
+            self.assertTrue(any("size mismatch" in e.lower() for e in errors), errors)
+
 
 if __name__ == "__main__":
     unittest.main()

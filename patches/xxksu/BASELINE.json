@@ -16,7 +16,7 @@
   "patch_11": {
     "patch_file": "patches/xxksu/11_enable_susfs_for_ksu.patch",
     "patch_sha256": "sha256:90ccad5d4ce4d52a801bbc23a04b2d816a21285c31a369df6034e3ed266955fb",
-    "size": 17207,
+    "size": 17208,
     "strict_apply": "PASS"
   },
   "policy": {

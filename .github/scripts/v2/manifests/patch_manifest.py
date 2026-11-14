@@ -50,6 +50,11 @@ def generate_patch_manifest(repo_root: Optional[Path] = None) -> dict[str, Any]:
     expected_p11 = xxksu_baseline.patch_11["patch_sha256"].removeprefix("sha256:")
     if p11_sha != expected_p11:
         raise ValueError(f"xxKSU Patch 11 SHA mismatch: expected {expected_p11}, got {p11_sha}")
+    expected_p11_size = xxksu_baseline.patch_11.get("size")
+    if expected_p11_size is not None:
+        actual_p11_size = p11_file.stat().st_size
+        if actual_p11_size != expected_p11_size:
+            raise ValueError(f"xxKSU Patch 11 size mismatch: expected {expected_p11_size}, got {actual_p11_size}")
 
     p11_entry = {
         "apply_target": xxksu_baseline.upstream["ref"],

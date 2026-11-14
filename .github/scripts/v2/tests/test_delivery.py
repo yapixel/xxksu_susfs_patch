@@ -359,6 +359,16 @@ class TestPipelineDelivery(unittest.TestCase):
             deliver_multi_candidates({patch_id: res.candidate_path}, repo_root=self.repo_root)
         commit_fixture.write_bytes(good)
 
+        core_fixture = res.candidate_path.parent / "fs_susfs.c"
+        good_core = core_fixture.read_bytes()
+        core_fixture.write_bytes(good_core + b"/* tampered */\n")
+        with self.assertRaises(pipeline.PromotionError):
+            deliver_multi_candidates({patch_id: res.candidate_path}, repo_root=self.repo_root)
+        core_fixture.unlink()
+        with self.assertRaises(pipeline.PromotionError):
+            deliver_multi_candidates({patch_id: res.candidate_path}, repo_root=self.repo_root)
+        core_fixture.write_bytes(good_core)
+
         _, pushed, commit_sha, _ = deliver_multi_candidates(
             {patch_id: res.candidate_path}, repo_root=self.repo_root, write_back=True, verify_raw_url=False)
         self.assertTrue(pushed)

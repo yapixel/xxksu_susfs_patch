@@ -195,7 +195,7 @@ jobs:
           set -euo pipefail
           echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
           PYTHONPATH=.github/scripts python3 - <<'PY' >> "$GITHUB_ENV"
-          import os, re, json
+          import os, re
           from v2.manifests.defaults import accepted_sources
           sources = accepted_sources()
           ksu = os.environ.get("KSU_OVERRIDE") or sources["backslashxx_kernelsu"]["commit"]
@@ -207,9 +207,6 @@ jobs:
               if not re.fullmatch(r"[0-9a-f]{40}", susfs):
                   raise ValueError("SuSFS override must be an exact discovered SHA, not a moving ref")
               print(f"{name}_SUSFS_COMMIT={susfs}")
-          target = json.load(open("patches/sultan-android14-6.1/BASELINE.json"))["upstream"]
-          print("SULTAN_KERNEL_COMMIT=" + target["resolved_commit"])
-          print("SULTAN_KERNEL_REPO=" + target["repository"])
           PY
 
       - name: Verify Initial Patches Manifest Consistency

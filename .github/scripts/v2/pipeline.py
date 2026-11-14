@@ -265,11 +265,17 @@ def _read_susfs_acceptance(patch_id: str, candidate_dir: Path, repo_root: Path):
         fixtures[provenance] = (json.dumps(data, indent=2) + "\n").encode()
     sultan_bundle_files = {}
     if patch_id == "sultan-android14-6.1-patch51":
-        c_path = candidate_dir / "fs_susfs.c"
-        h_path = candidate_dir / "include_susfs.h"
-        if c_path.is_file() and h_path.is_file():
-            sultan_bundle_files["fs/susfs.c"] = c_path.read_text(encoding="utf-8")
-            sultan_bundle_files["include/linux/susfs.h"] = h_path.read_text(encoding="utf-8")
+        for name, rel, bundle_rel in (
+            ("fs_susfs.c", "kernel_patches/fs/susfs.c", "fs/susfs.c"),
+            ("include_susfs.h", "kernel_patches/include/linux/susfs.h", "include/linux/susfs.h"),
+        ):
+            path = candidate_dir / name
+            if not path.is_file():
+                raise PromotionError(f"{patch_id} missing SuSFS core evidence file: {name}")
+            raw_core = path.read_bytes()
+            if tracked[rel] != "sha256:" + hashlib.sha256(raw_core).hexdigest():
+                raise PromotionError(f"{patch_id} {name} evidence does not match its tracked hash")
+            sultan_bundle_files[bundle_rel] = raw_core.decode("utf-8")
     return commit, tracked, fixtures, sultan_bundle_files
 
 
@@ -290,6 +296,7 @@ def _plan_metadata_updates(
     candidate_shas: Mapping[str, str], upstream_commits: Mapping[str, str],
     repo_root: Path, source_tree: Optional[Path] = None,
     susfs_dirs: Optional[Mapping[str, Path]] = None,
+    candidate_sizes: Optional[Mapping[str, int]] = None,
 ) -> dict[Path, bytes]:
     """Read-only plan for the existing baseline/provenance synchronization fields.
 
@@ -315,6 +322,8 @@ def _plan_metadata_updates(
         data = copy.deepcopy(before)
         key = "patch_11" if patch_id == "xxksu-patch11" else "patch_51"
         data.setdefault(key, {})["patch_sha256"] = f"sha256:{candidate_sha}"
+        if candidate_sizes and patch_id in candidate_sizes and "size" in data.get(key, {}):
+            data[key]["size"] = candidate_sizes[patch_id]
         if patch_id == "gki-android16-6.12-r38-patch51":
             compat = data.setdefault("metadata", {}).setdefault("compatibility_patches", {}).setdefault("gki-android16-6.12-r38", {})
             compat["patch_sha256"] = f"sha256:{candidate_sha}"
@@ -696,8 +705,11 @@ def deliver_multi_candidates(
 
     susfs_dirs = {pid: path.parent for pid, path in candidate_targets.items()
                   if (path.parent / SUSFS_ACCEPTANCE).is_file()}
-    metadata_updates = _plan_metadata_updates(candidate_shas, upstream_commits or {}, repo_root,
-                                              susfs_dirs=susfs_dirs)
+    metadata_updates = _plan_metadata_updates(
+        candidate_shas, upstream_commits or {}, repo_root,
+        susfs_dirs=susfs_dirs,
+        candidate_sizes={pid: len(b) for pid, (_, b, _) in candidate_data.items()},
+    )
     if not changed_targets and not metadata_updates and _manifest_is_current(repo_root):
         # FULL_STATE_NOOP: validation is complete; no publication work is needed.
         if write_back and verify_raw_url:
@@ -990,6 +1002,7 @@ def run_pipeline(
             {patch_id: candidate_sha},
             {patch_id: upstream_commit} if upstream_commit else {}, repo_root,
             source_tree=upstream_input if patch_id == "xxksu-patch11" else None,
+            candidate_sizes={patch_id: len(candidate_bytes)},
         )
         patch_changed = public_bytes_before != candidate_bytes
         old_substantive = (substantive_patch_text(public_bytes_before.decode("utf-8"))

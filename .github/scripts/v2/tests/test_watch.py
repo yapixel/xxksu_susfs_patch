@@ -623,6 +623,50 @@ class XxksuDependencyRewriteTests(unittest.TestCase):
                 self.assertEqual(data["ksu_commit"], "2222222222222222222222222222222222222222")
                 self.assertFalse(data["dispatch_51"])
 
+    def test_escalate_issue_avoids_substring_title_collision(self):
+        from v2.watch.escalation import escalate_issue
+        issues = [{"number": 99, "title": "[AGY-REQUIRED] Upstream Drift: susfs_gki_v2 (SEMANTIC_DRIFT)",
+                   "url": "https://github.com/yapixel/xxksu_susfs_patch/issues/99"}]
+        res = SourceResult(
+            source_id="susfs_gki",
+            source_type="authoritative",
+            classification=WatchClassification.SEMANTIC_DRIFT,
+            old_identity="a" * 40,
+            new_identity="b" * 40,
+            old_content_hash="h1",
+            new_content_hash="h2",
+            details="drift",
+        )
+        with patch("v2.watch.escalation.shutil.which", return_value="gh"), \
+             patch("v2.watch.escalation.subprocess.run", side_effect=[
+                 MagicMock(stdout=json.dumps(issues)),
+                 MagicMock(stdout="https://github.com/yapixel/xxksu_susfs_patch/issues/100\n"),
+             ]) as run:
+            url = escalate_issue(res)
+        self.assertEqual(url, "https://github.com/yapixel/xxksu_susfs_patch/issues/100")
+        self.assertEqual(run.call_args_list[1].args[0][:3], ["gh", "issue", "create"])
+
+    def test_cli_returns_nonzero_when_escalation_fails(self):
+        from v2.watch.cli import main
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            cand_dir = Path(td) / "candidate_patches"
+            mock_res = SourceResult(
+                source_id="susfs_gki",
+                source_type="authoritative",
+                classification=WatchClassification.SEMANTIC_DRIFT,
+                old_identity="1" * 40,
+                new_identity="2" * 40,
+                old_content_hash="sha256:0000",
+                new_content_hash="sha256:1111",
+                details="semantic drift",
+            )
+            mock_report = WatchReport(results=(mock_res,), timestamp="2026-10-14T00:00:00Z")
+            with patch("v2.watch.checker.UpstreamWatcher.run_all", return_value=mock_report), \
+                 patch("v2.watch.cli.escalate_issue", return_value=None):
+                ret = main(["--escalate", "--candidate-dir", str(cand_dir), "--no-dashboard"])
+            self.assertEqual(ret, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

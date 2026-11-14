@@ -87,7 +87,7 @@ def escalate_issue(
         list_proc = subprocess.run(list_cmd, capture_output=True, text=True, check=True)
         open_issues = json.loads(list_proc.stdout)
         for issue in open_issues:
-            if result.source_id in issue.get("title", ""):
+            if f"Upstream Drift: {result.source_id} (" in issue.get("title", ""):
                 issue_num = issue["number"]
                 issue_url = issue["url"]
                 logger.info("Found existing open issue #%s for %s; updating with comment.", issue_num, result.source_id)

@@ -27,6 +27,7 @@ A source-driven system that publishes reviewed Patch 11 / Patch 51 artifacts for
 | Target | Kernel | Artifact | Status |
 | :--- | :--- | :--- | :--- |
 | **xxKSU** | — | [Patch 11](patches/xxksu/11_enable_susfs_for_ksu.patch) · [Raw](https://raw.githubusercontent.com/yapixel/xxksu_susfs_patch/main/patches/xxksu/11_enable_susfs_for_ksu.patch) | Verified |
+| **Sultan** | Android 14 / Linux 6.1 | [Patch 51](patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch) · [Raw](https://raw.githubusercontent.com/yapixel/xxksu_susfs_patch/main/patches/sultan-android14-6.1/51_deinlined_susfs_hooks_sultan-android14-6.1.patch) | Verified |
 | **GKI** | Android 16 / Linux 6.12 r38 | [Patch 51](patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch) · [Raw](https://raw.githubusercontent.com/yapixel/xxksu_susfs_patch/main/patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch) | Verified |
 
 Complete artifact checksums, source identities, and compatibility targets are maintained in [patches/manifest.json](patches/manifest.json).

@@ -90,6 +90,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # Handle escalations
     escalations = []
+    escalation_failed = False
     if args.escalate:
         repo_slug = os.environ.get("GITHUB_REPOSITORY", "yapixel/xxksu_susfs_patch")
         for r in report.results:
@@ -97,6 +98,9 @@ def main(argv: list[str] | None = None) -> int:
                 issue_url = escalate_issue(r, repo=repo_slug)
                 if issue_url:
                     escalations.append({"source_id": r.source_id, "url": issue_url})
+                else:
+                    logger.error("Failed to create/update escalation issue for %s", r.source_id)
+                    escalation_failed = True
             else:
                 close_resolved_issues(r, repo=repo_slug)
 
@@ -139,7 +143,7 @@ def main(argv: list[str] | None = None) -> int:
         logger.error("patches/manifest.json verification failed: %s", manifest_errs)
         return 1
 
-    return 0
+    return 1 if escalation_failed else 0
 
 
 if __name__ == "__main__":
