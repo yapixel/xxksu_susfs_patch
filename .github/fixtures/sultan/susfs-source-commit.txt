@@ -1,59 +1,8 @@
-tree 421f604bad920b91f65ee0d2fb0e58272aa32bc9
-parent 2841cbbc12ad11e1fa79df821f68fb4c51f8c255
-author simonpunk <simonpunk2016@gmail.com> 1794589818 +0800
-committer simonpunk <simonpunk2016@gmail.com> 1794589818 +0800
+tree 0b483397170a4b86b469568c7a65ae1806ccc90b
+parent 571a73e451372ff7f10d2f0236ef8dc057ec70b2
+author simonpunk <simonpunk2016@gmail.com> 1794634673 +0800
+committer simonpunk <simonpunk2016@gmail.com> 1794634673 +0800
 
-kernel & ksu_susfs: Add sus_path_uid_filter feature
+kernel: More fixes for selinux_hide
 
-Allow restricting sus_path visibility to a user-defined set of apps.
-When the filter is set, only the listed apps can see the added sus paths;
-all other processes with uid >= 10000 will not see them.
-
-ksu_susfs (CLI)
-- Add "set_sus_path_uid_filter <app_pkg_names_separated_by_comma>" command.
-- New ksu_susfs/jni/features/sus_path_uid_filter.{c,h}.
-- Register the command in features.h, and add its help + dispatch entries
-  in main.c right after add_sus_path.
-
-ksu_module_susfs
-- Update ksu_module_susfs/boot-completed.sh for example of using
-  "set_sus_path_uid_filter".
-- Remove deprecated code example for kernel umount as it is not needed anymore since v2.2.0+.
-
-kernel
-- include/linux/susfs_def.h: add CMD_SUSFS_SET_SUS_PATH_UID_FILTER (0x55554),
-  include <linux/bitops.h>, and add shared uid-filter macros
-  (SUSFS_APP_STR_BUF_SIZE, SUSFS_UID_FILTER_MIN/MAX_UID, _UID_NUM,
-  _BITMAP_LEN).
-- include/linux/susfs.h: add struct st_susfs_sus_path_uid_filter and the
-  susfs_set_sus_path_uid_filter()/susfs_parse_sus_path_app_strings()
-  declarations, all under CONFIG_KSU_SUSFS_SUS_PATH. Make the priority
-  uid filter reuse the shared macros and drop the now-unused
-  getname_safe()/putname_safe() macros.
-- fs/susfs.c: implement the filter as an RCU-published bitmap of allowed
-  uids, protected by a mutex. App names are validated and resolved to uids
-  from /data/system/packages.list with the KSU selinux domain temporarily
-  switched on; the raw app string is stored so the bitmap can be rebuilt
-  by a kthread when apps are installed/uninstalled.
-- fs/susfs.c: add susfs_is_uid_allowed_for_sus_path() and rework
-  susfs_is_inode_sus_path() to gate hiding on the caller uid (hide when
-  uid >= 10000 and not in the allow-list) instead of the previous
-  umounted-app + inode-owner check. The function no longer needs the
-  LINUX_VERSION_CODE idmap variants, so its signature is unified to
-  susfs_is_inode_sus_path(struct inode *inode) and marked hot. Also drop
-  the now-unused susfs_get_data_path().
-- fs/susfs.c: refactor the priority uid filter to use the shared uid-filter
-  macros.
-
-KernelSU patch
-- kernel/supercall/dispatch.c: dispatch CMD_SUSFS_SET_SUS_PATH_UID_FILTER
-  to susfs_set_sus_path_uid_filter(), gated on CONFIG_KSU_SUSFS_SUS_PATH.
-- kernel/manager/pkg_observer.c: renew the sus path uid bitmap on package
-  events with susfs_parse_sus_path_app_strings(), likewise gated on
-  CONFIG_KSU_SUSFS_SUS_PATH.
-
-50_add_susfs_in_gki-android14-6.1.patch
-- Preprocessor cleanup: unify the include/guard conditions to
-  CONFIG_KSU_SUSFS, add missing "#endif // ..." comments, mark the
-  susfs_is_inode_sus_path() extern as __attribute__((hot)), and refresh
-  the affected hunk headers.
+- See https://github.com/tiann/KernelSU/pull/3996
