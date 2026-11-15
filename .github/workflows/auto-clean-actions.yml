@@ -24,6 +24,8 @@ jobs:
         run: |
           echo "🧹 Starting automated cleanup for $GH_REPO..."
           WORKFLOWS=$(gh workflow list --json id -q '.[].id')
+          # Keep failed/cancelled runs 30 days so failures stay inspectable and citable.
+          OLD="map(select(.createdAt < \"$(date -u -d '30 days ago' +%Y-%m-%dT%H:%M:%SZ)\")) | .[].databaseId"
           for wf in $WORKFLOWS; do
             echo "🔍 Cleaning workflow $wf..."
             gh run list --workflow="$wf" --status=success --json databaseId -q '.[5:][].databaseId' | while read -r run_id; do
@@ -32,15 +34,15 @@ jobs:
                 gh run delete "$run_id" || true
               fi
             done
-            gh run list --workflow="$wf" --status=failure --json databaseId -q '.[].databaseId' | while read -r run_id; do
+            gh run list --workflow="$wf" --status=failure --json databaseId,createdAt -q "$OLD" | while read -r run_id; do
               if [ -n "$run_id" ]; then
-                echo "Deleting failed run: $run_id"
+                echo "Deleting failed run older than 30 days: $run_id"
                 gh run delete "$run_id" || true
               fi
             done
-            gh run list --workflow="$wf" --status=cancelled --json databaseId -q '.[].databaseId' | while read -r run_id; do
+            gh run list --workflow="$wf" --status=cancelled --json databaseId,createdAt -q "$OLD" | while read -r run_id; do
               if [ -n "$run_id" ]; then
-                echo "Deleting cancelled run: $run_id"
+                echo "Deleting cancelled run older than 30 days: $run_id"
                 gh run delete "$run_id" || true
               fi
             done
