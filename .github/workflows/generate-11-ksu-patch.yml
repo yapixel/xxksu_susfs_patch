@@ -79,13 +79,11 @@ jobs:
           set -euo pipefail
           TARGET_COMMIT="${{ env.KSU_COMMIT }}"
           echo "📥 Fetching authoritative KernelSU source from ${{ env.KSU_REPO }} @ $TARGET_COMMIT..."
-          git init clean_ksu
+          PYTHONPATH=.github/scripts python3 -c 'import sys; from pathlib import Path; from v2.clean_room import fetch_git; fetch_git({"repository": sys.argv[1], "commit": sys.argv[2]}, Path("clean_ksu"))' \
+            "https://github.com/${{ env.KSU_REPO }}.git" "$TARGET_COMMIT"
           cd clean_ksu
           git config user.name "yapixel"
           git config user.email "yapixel@users.noreply.github.com"
-          git remote add origin "https://github.com/${{ env.KSU_REPO }}.git"
-          git fetch --depth=1 origin "$TARGET_COMMIT"
-          git checkout FETCH_HEAD
 
       - name: Run Patch 11 Authoritative Pipeline (Generate -> Candidate -> Validate -> Promote -> Deliver)
         run: |

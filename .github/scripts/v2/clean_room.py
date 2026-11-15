@@ -29,6 +29,18 @@ def command(*args, cwd=None):
     return subprocess.check_output(args, cwd=cwd, text=True).strip()
 
 
+BUNDLE_ARCHIVE = "https://github.com/yapixel/gki-build-assets/releases/download/git-{0}/{0}.bundle"
+
+
+def fetch_archived_bundle(dest, commit):
+    # Upstream force-pushes orphan accepted commits; identity is still enforced by fetch_git's checks.
+    bundle = dest / ".git" / "archived.bundle"
+    subprocess.run(["curl", "--fail", "--location", "--retry", "3", "-sS",
+                    BUNDLE_ARCHIVE.format(commit), "-o", str(bundle)], check=True)
+    command("git", "-C", str(dest), "fetch", str(bundle), commit)
+    bundle.unlink()
+
+
 def fetch_git(info, dest, retries=3):
     dest.mkdir()
     command("git", "init", "-q", str(dest))
@@ -40,7 +52,8 @@ def fetch_git(info, dest, retries=3):
             break
         except subprocess.CalledProcessError:
             if attempt == retries - 1:
-                raise
+                fetch_archived_bundle(dest, commit)
+                break
             time.sleep(2 ** attempt)
     command("git", "-C", str(dest), "checkout", "-q", "--detach", "FETCH_HEAD")
     require(command("git", "-C", str(dest), "rev-parse", "HEAD") == commit,
