@@ -140,3 +140,11 @@ jobs:
           git apply --stat patches/xxksu/11_enable_susfs_for_ksu.patch >> report_11.md
           echo '```' >> report_11.md
           cat report_11.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Report Production Failure as Issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PYTHONPATH=.github/scripts python3 -m v2.watch.escalation "${{ github.workflow }}" \
+            "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" "${{ github.repository }}"

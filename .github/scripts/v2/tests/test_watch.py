@@ -449,6 +449,23 @@ class SuSFSWatcherRegressionTests(unittest.TestCase):
         self.assertTrue(res.requires_escalation())
         self.assertIn("Candidate Patch 51 generation failed", res.details)
 
+    def test_pipeline_failure_comments_on_open_issue_else_creates(self):
+        from v2.watch.escalation import report_pipeline_failure
+        title = "[AGY-REQUIRED] Production pipeline failed: 11 Patch"
+        open_issue = [{"number": 7, "title": title, "url": "u7"},
+                      {"number": 8, "title": "[AGY-REQUIRED] Upstream Drift: susfs_gki (X)", "url": "u8"}]
+        with patch("v2.watch.escalation.subprocess.run",
+                   return_value=MagicMock(stdout=json.dumps(open_issue))) as run:
+            self.assertEqual(report_pipeline_failure("11 Patch", "run-url", "o/r"), "u7")
+            self.assertEqual(run.call_args.args[0][:4], ["gh", "issue", "comment", "7"])
+        with patch("v2.watch.escalation.subprocess.run",
+                   side_effect=[MagicMock(stdout="[]"), MagicMock(stdout="new-url\n")]) as run:
+            self.assertEqual(report_pipeline_failure("11 Patch", "run-url", "o/r"), "new-url")
+            create = run.call_args.args[0]
+            self.assertEqual(create[:3], ["gh", "issue", "create"])
+            self.assertEqual(create[create.index("--title") + 1], title)
+            self.assertIn("run-url", create[create.index("--body") + 1])
+
     def test_current_content_closes_only_that_sources_escalations(self):
         from v2.watch.escalation import close_resolved_issues
         issues = [{"number": 19, "title": "[AGY-REQUIRED] Upstream Drift: susfs_sultan (SEMANTIC_DRIFT)"},

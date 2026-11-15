@@ -147,3 +147,25 @@ __all__ = [
     "escalate_issue",
     "close_resolved_issues",
 ]
+
+
+def report_pipeline_failure(workflow: str, run_url: str, repo: str) -> str:
+    """Open (or comment on) one 'agy-required' issue per failed production workflow."""
+    title = f"[AGY-REQUIRED] Production pipeline failed: {workflow}"
+    body = (f"Production run failed: {run_url}\n\nAutomatic patch delivery is stalled until this is fixed; "
+            "the watcher will keep re-dispatching the same candidate.")
+    proc = subprocess.run(["gh", "issue", "list", "--repo", repo, "--state", "open", "--label", "agy-required",
+                           "--json", "number,title,url"], capture_output=True, text=True, check=True)
+    for issue in json.loads(proc.stdout):
+        if issue.get("title") == title:
+            subprocess.run(["gh", "issue", "comment", str(issue["number"]), "--repo", repo, "--body", body],
+                           capture_output=True, text=True, check=True)
+            return issue["url"]
+    proc = subprocess.run(["gh", "issue", "create", "--repo", repo, "--title", title, "--label", "agy-required",
+                           "--body", body], capture_output=True, text=True, check=True)
+    return proc.stdout.strip()
+
+
+if __name__ == "__main__":
+    import sys
+    print(report_pipeline_failure(*sys.argv[1:4]))
