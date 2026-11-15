@@ -3,12 +3,12 @@
   "sources": {
     "authoritative": {
       "backslashxx_kernelsu": {
-        "commit": "040eeb9ca19bc19753ab70dcb1ef14f679a94ed2",
+        "commit": "1686a462b6f0831d9f0e51ac8f0a7a1c9715b00b",
         "ref": "master",
-        "relevant_content_hash": "sha256:3d434dd5748b737d78628f45ff05d7dbe48c5b45ab7a7dc2b8ccb5ec74f7c1c3",
+        "relevant_content_hash": "sha256:7d28d7abaec56e94bc4294c1a35b4ed2acbc94056b5a3768155f458eded0d0ca",
         "repository": "https://github.com/backslashxx/KernelSU.git",
         "tracked_files": {
-          "kernel/Kconfig": "sha256:6e06dd58224a8b3b32400040972b658f1a71188c334f3b4810dbd3070a9212f7",
+          "kernel/Kconfig": "sha256:fa2cabd9c316e1eb2562f0abb5af7b1d73c6a665ad94af94c8f919f2ce3a449f",
           "kernel/downstream/ksu_hostsredirect.h": "sha256:1888892bebf9c1555c1b48296cf363ed1dc568da24ff03e51fd9e0693233e908",
           "kernel/feature/kernel_umount.c": "sha256:ba964ec6c27fcbfe348a333fec94073c9cb0843b8604a94c7ef66c0823e89790",
           "kernel/feature/sucompat.c": "sha256:f426ca8345255bb9254e8f9adae25996398a34c7c5f869569e00a5da97d4b8f5",
@@ -17,7 +17,7 @@
           "kernel/hook/syscall_table_hook_arm64.c": "sha256:c85696cddeadca3f43d9d1b0f32710a54a70c69d4e9dc12cc1bd8985d953a82f",
           "kernel/kernel_compat.h": "sha256:e1d739fd68c6b630a9bcb0b8ce0594f7090da7f5f039f2416cc44a97be5b55cc",
           "kernel/kernel_includes.h": "sha256:97475ba18f642eb46c3be0b149d3a73e759e1b5e14781b1ed187186acd428e33",
-          "kernel/ksu.c": "sha256:995c1c3a2073aa908dc412e9a704ff973ae177bd24e11c005b7c57cda47363c0",
+          "kernel/ksu.c": "sha256:06a7e6aefc43db7b33722a139b8403a8864376f15e61d5572ed0ee5e3b49dca7",
           "kernel/manager/pkg_observer.c": "sha256:1e4dc1fce8c534f84fc114985f840ec3330623762ea6f1a077f507461d8ec596",
           "kernel/runtime/ksud_integration.c": "sha256:b3c62d1d57a733e213fc46ed8d32478e4c2766b2d1930c30482300f4ac932fe1",
           "kernel/selinux/rules.c": "sha256:a18ed06f18df96ed37caecabe3870ef83c20ce14f87f8ecbb5684cbde8ddfc39",
