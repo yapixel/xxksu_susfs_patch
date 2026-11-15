@@ -55,9 +55,9 @@
         "repository": "https://android.googlesource.com/kernel/common"
       },
       "relative_path": "patches/gki-android16-6.12/51_deinlined_susfs_hooks_android16-6.12-2025-09_r38.patch",
-      "sha256": "f803e49e0d54bce76dc52f32a5f87ff813926d6e254e6bdeefd17289a67cc609",
+      "sha256": "098df216718ea9f85e972fe31aa86b76e0f454bfb274d7cb878351be5ab7a4e4",
       "susfs_lineage": {
-        "commit": "1f59001c081dcb221e2fb0f777835084a8b4f542",
+        "commit": "9b0b13f069673b9b07b713a5c66977de4d62b175",
         "ref": "gki-android16-6.12",
         "repository": "https://gitlab.com/simonpunk/susfs4ksu"
       },
