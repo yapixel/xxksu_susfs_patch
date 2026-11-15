@@ -29,7 +29,8 @@ def command(*args, cwd=None):
     return subprocess.check_output(args, cwd=cwd, text=True).strip()
 
 
-BUNDLE_ARCHIVE = "https://github.com/yapixel/gki-build-assets/releases/download/git-{0}/{0}.bundle"
+# Published by generate-11-ksu-patch.yml for each accepted xxKSU commit.
+BUNDLE_ARCHIVE = "https://github.com/yapixel/xxksu_susfs_patch/releases/download/git-{0}/{0}.bundle"
 
 
 def fetch_archived_bundle(dest, commit):

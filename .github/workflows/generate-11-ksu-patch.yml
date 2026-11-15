@@ -111,6 +111,25 @@ jobs:
           fi
           echo "✅ Patch 11 applied cleanly on clean KernelSU with 0 rejects across 9 files!"
 
+      - name: Archive KernelSU Commit as Git Bundle (force-push fallback for fetch_git)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="git-${KSU_COMMIT}"
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Already archived: $TAG"
+            exit 0
+          fi
+          git -C clean_ksu fetch -q --unshallow origin "$KSU_COMMIT"
+          git -C clean_ksu update-ref refs/heads/archived "$KSU_COMMIT"
+          git -C clean_ksu bundle create "$RUNNER_TEMP/${KSU_COMMIT}.bundle" refs/heads/archived
+          git bundle verify "$RUNNER_TEMP/${KSU_COMMIT}.bundle"
+          gh release create "$TAG" -R "$GITHUB_REPOSITORY" --target "${{ github.sha }}" \
+            --title "xxKSU archived commit ${KSU_COMMIT}" \
+            --notes "Git bundle of ${KSU_REPO}@${KSU_COMMIT}, fallback for fetch_git if upstream force-push orphans it." \
+            "$RUNNER_TEMP/${KSU_COMMIT}.bundle"
+
       - name: Generate 11 Patch Statistics Report
         run: |
           echo "## 📊 Universal 11 Patch (xxKSU) Verification Report" > report_11.md
