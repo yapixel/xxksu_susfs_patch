@@ -1,8 +1,16 @@
-tree 0b483397170a4b86b469568c7a65ae1806ccc90b
-parent 571a73e451372ff7f10d2f0236ef8dc057ec70b2
-author simonpunk <simonpunk2016@gmail.com> 1794634673 +0800
-committer simonpunk <simonpunk2016@gmail.com> 1794634673 +0800
+tree 00c50fdfebfb3436c9fb5b78568bed9504d42104
+parent ba4fd71b91b85ce1f2eb1b7c78a84b66e31e5e20
+author simonpunk <simonpunk2016@gmail.com> 1794684752 +0800
+committer simonpunk <simonpunk2016@gmail.com> 1794684752 +0800
 
-kernel: More fixes for selinux_hide
+kernel: selinux_hide: use dedicated handlers for inode_setxattr
 
-- See https://github.com/tiann/KernelSU/pull/3996
+- Copy selinux_inode_setxattr() and selinux_inode_post_setxattr() into
+  susfs_selinux_inode_setxattr() / susfs_selinux_inode_post_setxattr(),
+  which resolve contexts through susfs_security_context_to_sid()/_force().
+- Add handle_selinux_inode_setxattr() / handle_selinux_inode_post_setxattr()
+  to dispatch to the susfs copies for uid >= 10000 when
+  ksu_selinux_hide_running is set, otherwise call the original hooks.
+- Register the handlers in selinux_hooks[] under CONFIG_KSU_SUSFS, matching
+  the existing handle_selinux_setprocattr() wiring, and drop the inline
+  #ifdef/goto changes from the original functions.

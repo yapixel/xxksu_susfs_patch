@@ -1761,21 +1761,27 @@ index a709aa63a..1698d4665 100644
  }
  
 diff --git a/fs/readdir.c b/fs/readdir.c
-index c44e1afe1..4ad21db44 100644
+index c44e1afe1..9417460cd 100644
 --- a/fs/readdir.c
 +++ b/fs/readdir.c
-@@ -24,6 +24,10 @@
+@@ -21,9 +21,16 @@
+ #include <linux/unistd.h>
+ #include <linux/compat.h>
+ #include <linux/uaccess.h>
++#ifdef CONFIG_KSU_SUSFS
++#include <linux/susfs_def.h>
++#endif // #ifdef CONFIG_KSU_SUSFS
  
  #include <asm/unaligned.h>
  
-+#ifdef CONFIG_KSU_SUSFS
-+#include <linux/susfs_def.h>
++#ifdef CONFIG_KSU_SUSFS_SUS_PATH
 +extern __attribute__((hot)) bool susfs_is_inode_sus_path(struct inode *inode);
-+#endif // #ifdef CONFIG_KSU_SUSFS
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_PATH
++
  /*
   * Note the "unsafe_put_user() semantics: we goto a
   * label for errors.
-@@ -137,6 +141,9 @@ struct old_linux_dirent {
+@@ -137,6 +144,9 @@ struct old_linux_dirent {
  struct readdir_callback {
  	struct dir_context ctx;
  	struct old_linux_dirent __user * dirent;
@@ -1785,7 +1791,7 @@ index c44e1afe1..4ad21db44 100644
  	int result;
  };
  
-@@ -147,6 +154,9 @@ static bool fillonedir(struct dir_context *ctx, const char *name, int namlen,
+@@ -147,6 +157,9 @@ static bool fillonedir(struct dir_context *ctx, const char *name, int namlen,
  		container_of(ctx, struct readdir_callback, ctx);
  	struct old_linux_dirent __user * dirent;
  	unsigned long d_ino;
@@ -1795,7 +1801,7 @@ index c44e1afe1..4ad21db44 100644
  
  	if (buf->result)
  		return false;
-@@ -158,6 +168,18 @@ static bool fillonedir(struct dir_context *ctx, const char *name, int namlen,
+@@ -158,6 +171,18 @@ static bool fillonedir(struct dir_context *ctx, const char *name, int namlen,
  		buf->result = -EOVERFLOW;
  		return false;
  	}
@@ -1814,7 +1820,7 @@ index c44e1afe1..4ad21db44 100644
  	buf->result++;
  	dirent = buf->dirent;
  	if (!user_write_access_begin(dirent,
-@@ -190,6 +212,9 @@ SYSCALL_DEFINE3(old_readdir, unsigned int, fd,
+@@ -190,6 +215,9 @@ SYSCALL_DEFINE3(old_readdir, unsigned int, fd,
  	if (!f.file)
  		return -EBADF;
  
@@ -1824,7 +1830,7 @@ index c44e1afe1..4ad21db44 100644
  	error = iterate_dir(f.file, &buf.ctx);
  	if (buf.result)
  		error = buf.result;
-@@ -214,6 +239,9 @@ struct linux_dirent {
+@@ -214,6 +242,9 @@ struct linux_dirent {
  struct getdents_callback {
  	struct dir_context ctx;
  	struct linux_dirent __user * current_dir;
@@ -1834,7 +1840,7 @@ index c44e1afe1..4ad21db44 100644
  	int prev_reclen;
  	int count;
  	int error;
-@@ -229,6 +257,9 @@ static bool filldir(struct dir_context *ctx, const char *name, int namlen,
+@@ -229,6 +260,9 @@ static bool filldir(struct dir_context *ctx, const char *name, int namlen,
  	int reclen = ALIGN(offsetof(struct linux_dirent, d_name) + namlen + 2,
  		sizeof(long));
  	int prev_reclen;
@@ -1844,7 +1850,7 @@ index c44e1afe1..4ad21db44 100644
  
  	buf->error = verify_dirent_name(name, namlen);
  	if (unlikely(buf->error))
-@@ -244,6 +275,19 @@ static bool filldir(struct dir_context *ctx, const char *name, int namlen,
+@@ -244,6 +278,19 @@ static bool filldir(struct dir_context *ctx, const char *name, int namlen,
  	prev_reclen = buf->prev_reclen;
  	if (prev_reclen && signal_pending(current))
  		return false;
@@ -1864,7 +1870,7 @@ index c44e1afe1..4ad21db44 100644
  	dirent = buf->current_dir;
  	prev = (void __user *) dirent - prev_reclen;
  	if (!user_write_access_begin(prev, reclen + prev_reclen))
-@@ -283,6 +327,9 @@ SYSCALL_DEFINE3(getdents, unsigned int, fd,
+@@ -283,6 +330,9 @@ SYSCALL_DEFINE3(getdents, unsigned int, fd,
  	if (!f.file)
  		return -EBADF;
  
@@ -1874,7 +1880,7 @@ index c44e1afe1..4ad21db44 100644
  	error = iterate_dir(f.file, &buf.ctx);
  	if (error >= 0)
  		error = buf.error;
-@@ -302,6 +349,9 @@ SYSCALL_DEFINE3(getdents, unsigned int, fd,
+@@ -302,6 +352,9 @@ SYSCALL_DEFINE3(getdents, unsigned int, fd,
  struct getdents_callback64 {
  	struct dir_context ctx;
  	struct linux_dirent64 __user * current_dir;
@@ -1884,7 +1890,7 @@ index c44e1afe1..4ad21db44 100644
  	int prev_reclen;
  	int count;
  	int error;
-@@ -406,6 +456,9 @@ static bool filldir64(struct dir_context *ctx, const char *name, int namlen,
+@@ -406,6 +459,9 @@ static bool filldir64(struct dir_context *ctx, const char *name, int namlen,
  	int reclen = ALIGN(offsetof(struct linux_dirent64, d_name) + namlen + 1,
  		sizeof(u64));
  	int prev_reclen;
@@ -1894,7 +1900,7 @@ index c44e1afe1..4ad21db44 100644
  
  	buf->error = verify_dirent_name(name, namlen);
  	if (unlikely(buf->error))
-@@ -418,6 +471,19 @@ static bool filldir64(struct dir_context *ctx, const char *name, int namlen,
+@@ -418,6 +474,19 @@ static bool filldir64(struct dir_context *ctx, const char *name, int namlen,
  	prev_reclen = buf->prev_reclen;
  	if (prev_reclen && signal_pending(current))
  		return false;
@@ -1914,7 +1920,7 @@ index c44e1afe1..4ad21db44 100644
  	dirent = buf->current_dir;
  	prev = (void __user *)dirent - prev_reclen;
  	if (!user_write_access_begin(prev, reclen + prev_reclen))
-@@ -458,6 +524,9 @@ SYSCALL_DEFINE3(getdents64, unsigned int, fd,
+@@ -458,6 +527,9 @@ SYSCALL_DEFINE3(getdents64, unsigned int, fd,
  	if (!f.file)
  		return -EBADF;
  
@@ -1924,7 +1930,7 @@ index c44e1afe1..4ad21db44 100644
  	error = iterate_dir(f.file, &buf.ctx);
  	if (error >= 0)
  		error = buf.error;
-@@ -486,6 +555,9 @@ struct compat_old_linux_dirent {
+@@ -486,6 +558,9 @@ struct compat_old_linux_dirent {
  struct compat_readdir_callback {
  	struct dir_context ctx;
  	struct compat_old_linux_dirent __user *dirent;
@@ -1934,7 +1940,7 @@ index c44e1afe1..4ad21db44 100644
  	int result;
  };
  
-@@ -497,6 +569,9 @@ static bool compat_fillonedir(struct dir_context *ctx, const char *name,
+@@ -497,6 +572,9 @@ static bool compat_fillonedir(struct dir_context *ctx, const char *name,
  		container_of(ctx, struct compat_readdir_callback, ctx);
  	struct compat_old_linux_dirent __user *dirent;
  	compat_ulong_t d_ino;
@@ -1944,7 +1950,7 @@ index c44e1afe1..4ad21db44 100644
  
  	if (buf->result)
  		return false;
-@@ -508,6 +583,18 @@ static bool compat_fillonedir(struct dir_context *ctx, const char *name,
+@@ -508,6 +586,18 @@ static bool compat_fillonedir(struct dir_context *ctx, const char *name,
  		buf->result = -EOVERFLOW;
  		return false;
  	}
@@ -1963,7 +1969,7 @@ index c44e1afe1..4ad21db44 100644
  	buf->result++;
  	dirent = buf->dirent;
  	if (!user_write_access_begin(dirent,
-@@ -540,6 +627,9 @@ COMPAT_SYSCALL_DEFINE3(old_readdir, unsigned int, fd,
+@@ -540,6 +630,9 @@ COMPAT_SYSCALL_DEFINE3(old_readdir, unsigned int, fd,
  	if (!f.file)
  		return -EBADF;
  
@@ -1973,7 +1979,7 @@ index c44e1afe1..4ad21db44 100644
  	error = iterate_dir(f.file, &buf.ctx);
  	if (buf.result)
  		error = buf.result;
-@@ -558,6 +648,9 @@ struct compat_linux_dirent {
+@@ -558,6 +651,9 @@ struct compat_linux_dirent {
  struct compat_getdents_callback {
  	struct dir_context ctx;
  	struct compat_linux_dirent __user *current_dir;
@@ -1983,7 +1989,7 @@ index c44e1afe1..4ad21db44 100644
  	int prev_reclen;
  	int count;
  	int error;
-@@ -573,6 +666,9 @@ static bool compat_filldir(struct dir_context *ctx, const char *name, int namlen
+@@ -573,6 +669,9 @@ static bool compat_filldir(struct dir_context *ctx, const char *name, int namlen
  	int reclen = ALIGN(offsetof(struct compat_linux_dirent, d_name) +
  		namlen + 2, sizeof(compat_long_t));
  	int prev_reclen;
@@ -1993,7 +1999,7 @@ index c44e1afe1..4ad21db44 100644
  
  	buf->error = verify_dirent_name(name, namlen);
  	if (unlikely(buf->error))
-@@ -588,6 +684,18 @@ static bool compat_filldir(struct dir_context *ctx, const char *name, int namlen
+@@ -588,6 +687,18 @@ static bool compat_filldir(struct dir_context *ctx, const char *name, int namlen
  	prev_reclen = buf->prev_reclen;
  	if (prev_reclen && signal_pending(current))
  		return false;
@@ -2012,7 +2018,7 @@ index c44e1afe1..4ad21db44 100644
  	dirent = buf->current_dir;
  	prev = (void __user *) dirent - prev_reclen;
  	if (!user_write_access_begin(prev, reclen + prev_reclen))
-@@ -626,6 +734,9 @@ COMPAT_SYSCALL_DEFINE3(getdents, unsigned int, fd,
+@@ -626,6 +737,9 @@ COMPAT_SYSCALL_DEFINE3(getdents, unsigned int, fd,
  	if (!f.file)
  		return -EBADF;
  
@@ -2560,7 +2566,7 @@ index d93af9249..0f9e0f00c 100644
  	audit_log_format(ab, " tclass=%s", tclass);
  
 diff --git a/security/selinux/hooks.c b/security/selinux/hooks.c
-index 957fccb73..5e7477e35 100644
+index 957fccb73..02b855789 100644
 --- a/security/selinux/hooks.c
 +++ b/security/selinux/hooks.c
 @@ -105,6 +105,15 @@
@@ -2579,65 +2585,169 @@ index 957fccb73..5e7477e35 100644
  
  /* SECMARK reference count */
  static atomic_t selinux_secmark_refcount = ATOMIC_INIT(0);
-@@ -3216,8 +3225,18 @@ static int selinux_inode_setxattr(struct user_namespace *mnt_userns,
- 	if (rc)
- 		return rc;
+@@ -3310,6 +3319,161 @@ static void selinux_inode_post_setxattr(struct dentry *dentry, const char *name,
+ 	spin_unlock(&isec->lock);
+ }
  
 +#ifdef CONFIG_KSU_SUSFS
-+	if ((likely(current_uid().val >= 10000 && ksu_selinux_hide_running))) {
-+		rc = susfs_security_context_to_sid(&selinux_state, value, size, &newsid,
-+				     GFP_KERNEL);
-+		goto bypass_orig_flow1;
++static int susfs_selinux_inode_setxattr(struct user_namespace *mnt_userns,
++				  struct dentry *dentry, const char *name,
++				  const void *value, size_t size, int flags)
++{
++	struct inode *inode = d_backing_inode(dentry);
++	struct inode_security_struct *isec;
++	struct superblock_security_struct *sbsec;
++	struct common_audit_data ad;
++	u32 newsid, sid = current_sid();
++	int rc = 0;
++
++	if (strcmp(name, XATTR_NAME_SELINUX)) {
++		rc = cap_inode_setxattr(dentry, name, value, size, flags);
++		if (rc)
++			return rc;
++
++		/* Not an attribute we recognize, so just check the
++		   ordinary setattr permission. */
++		return dentry_has_perm(current_cred(), dentry, FILE__SETATTR);
 +	}
-+#endif // #ifdef CONFIG_KSU_SUSFS
- 	rc = security_context_to_sid(&selinux_state, value, size, &newsid,
- 				     GFP_KERNEL);
-+#ifdef CONFIG_KSU_SUSFS
-+bypass_orig_flow1:
-+#endif // #ifdef CONFIG_KSU_SUSFS
- 	if (rc == -EINVAL) {
- 		if (!has_cap_mac_admin(true)) {
- 			struct audit_buffer *ab;
-@@ -3245,9 +3264,19 @@ static int selinux_inode_setxattr(struct user_namespace *mnt_userns,
- 
- 			return rc;
- 		}
-+#ifdef CONFIG_KSU_SUSFS
-+		if ((likely(current_uid().val >= 10000 && ksu_selinux_hide_running))) {
-+			rc = susfs_security_context_to_sid_force(&selinux_state, value,
-+							size, &newsid);
-+			goto bypass_orig_flow2;
++
++	if (!selinux_initialized(&selinux_state))
++		return (inode_owner_or_capable(mnt_userns, inode) ? 0 : -EPERM);
++
++	sbsec = selinux_superblock(inode->i_sb);
++	if (!(sbsec->flags & SBLABEL_MNT))
++		return -EOPNOTSUPP;
++
++	if (!inode_owner_or_capable(mnt_userns, inode))
++		return -EPERM;
++
++	ad.type = LSM_AUDIT_DATA_DENTRY;
++	ad.u.dentry = dentry;
++
++	isec = backing_inode_security(dentry);
++	rc = avc_has_perm(&selinux_state,
++			  sid, isec->sid, isec->sclass,
++			  FILE__RELABELFROM, &ad);
++	if (rc)
++		return rc;
++
++	rc = susfs_security_context_to_sid(&selinux_state, value, size, &newsid,
++				     GFP_KERNEL);
++	if (rc == -EINVAL) {
++		if (!has_cap_mac_admin(true)) {
++			struct audit_buffer *ab;
++			size_t audit_size;
++
++			/* We strip a nul only if it is at the end, otherwise the
++			 * context contains a nul and we should audit that */
++			if (value) {
++				const char *str = value;
++
++				if (str[size - 1] == '\0')
++					audit_size = size - 1;
++				else
++					audit_size = size;
++			} else {
++				audit_size = 0;
++			}
++			ab = audit_log_start(audit_context(),
++					     GFP_ATOMIC, AUDIT_SELINUX_ERR);
++			if (!ab)
++				return rc;
++			audit_log_format(ab, "op=setxattr invalid_context=");
++			audit_log_n_untrustedstring(ab, value, audit_size);
++			audit_log_end(ab);
++
++			return rc;
 +		}
-+#endif // #ifdef CONFIG_KSU_SUSFS
- 		rc = security_context_to_sid_force(&selinux_state, value,
- 						   size, &newsid);
- 	}
-+#ifdef CONFIG_KSU_SUSFS
-+bypass_orig_flow2:
-+#endif // #ifdef CONFIG_KSU_SUSFS
- 	if (rc)
- 		return rc;
- 
-@@ -3293,8 +3322,18 @@ static void selinux_inode_post_setxattr(struct dentry *dentry, const char *name,
- 		return;
- 	}
- 
-+#ifdef CONFIG_KSU_SUSFS
-+		if ((likely(current_uid().val >= 10000 && ksu_selinux_hide_running))) {
-+			rc = susfs_security_context_to_sid_force(&selinux_state, value, size,
++		rc = susfs_security_context_to_sid_force(&selinux_state, value,
++						   size, &newsid);
++	}
++	if (rc)
++		return rc;
++
++	rc = avc_has_perm(&selinux_state,
++			  sid, newsid, isec->sclass,
++			  FILE__RELABELTO, &ad);
++	if (rc)
++		return rc;
++
++	rc = security_validate_transition(&selinux_state, isec->sid, newsid,
++					  sid, isec->sclass);
++	if (rc)
++		return rc;
++
++	return avc_has_perm(&selinux_state,
++			    newsid,
++			    sbsec->sid,
++			    SECCLASS_FILESYSTEM,
++			    FILESYSTEM__ASSOCIATE,
++			    &ad);
++}
++
++static void susfs_selinux_inode_post_setxattr(struct dentry *dentry, const char *name,
++					const void *value, size_t size,
++					int flags)
++{
++	struct inode *inode = d_backing_inode(dentry);
++	struct inode_security_struct *isec;
++	u32 newsid;
++	int rc;
++
++	if (strcmp(name, XATTR_NAME_SELINUX)) {
++		/* Not an attribute we recognize, so nothing to do. */
++		return;
++	}
++
++	if (!selinux_initialized(&selinux_state)) {
++		/* If we haven't even been initialized, then we can't validate
++		 * against a policy, so leave the label as invalid. It may
++		 * resolve to a valid label on the next revalidation try if
++		 * we've since initialized.
++		 */
++		return;
++	}
++
++	rc = susfs_security_context_to_sid_force(&selinux_state, value, size,
 +					   &newsid);
-+			goto bypass_orig_flow;
-+		}
++	if (rc) {
++		pr_err("SELinux:  unable to map context to SID"
++		       "for (%s, %lu), rc=%d\n",
++		       inode->i_sb->s_id, inode->i_ino, -rc);
++		return;
++	}
++
++	isec = backing_inode_security(dentry);
++	spin_lock(&isec->lock);
++	isec->sclass = inode_mode_to_security_class(inode->i_mode);
++	isec->sid = newsid;
++	isec->initialized = LABEL_INITIALIZED;
++	spin_unlock(&isec->lock);
++}
++
++static int handle_selinux_inode_setxattr(struct user_namespace *mnt_userns,
++				  struct dentry *dentry, const char *name,
++				  const void *value, size_t size, int flags)
++{
++	if (likely(current_uid().val >= 10000 && ksu_selinux_hide_running))
++		return susfs_selinux_inode_setxattr(mnt_userns, dentry, name, value, size, flags);
++	return selinux_inode_setxattr(mnt_userns, dentry, name, value, size, flags);
++}
++
++static void handle_selinux_inode_post_setxattr(struct dentry *dentry, const char *name,
++					const void *value, size_t size,
++					int flags)
++{
++	if (likely(current_uid().val >= 10000 && ksu_selinux_hide_running))
++		return susfs_selinux_inode_post_setxattr(dentry, name, value, size, flags);
++	return selinux_inode_post_setxattr(dentry, name, value, size, flags);
++}
 +#endif // #ifdef CONFIG_KSU_SUSFS
- 	rc = security_context_to_sid_force(&selinux_state, value, size,
- 					   &newsid);
-+#ifdef CONFIG_KSU_SUSFS
-+bypass_orig_flow:
-+#endif // #ifdef CONFIG_KSU_SUSFS
- 	if (rc) {
- 		pr_err("SELinux:  unable to map context to SID"
- 		       "for (%s, %lu), rc=%d\n",
-@@ -6587,6 +6626,161 @@ static int selinux_setprocattr(const char *name, void *value, size_t size)
++
+ static int selinux_inode_getxattr(struct dentry *dentry, const char *name)
+ {
+ 	const struct cred *cred = current_cred();
+@@ -6587,6 +6751,161 @@ static int selinux_setprocattr(const char *name, void *value, size_t size)
  	return error;
  }
  
@@ -2799,7 +2909,21 @@ index 957fccb73..5e7477e35 100644
  static int selinux_ismaclabel(const char *name)
  {
  	return (strcmp(name, XATTR_SELINUX_SUFFIX) == 0);
-@@ -7222,8 +7416,11 @@ static struct security_hook_list selinux_hooks[] __lsm_ro_after_init = {
+@@ -7147,8 +7466,13 @@ static struct security_hook_list selinux_hooks[] __lsm_ro_after_init = {
+ 	LSM_HOOK_INIT(inode_permission, selinux_inode_permission),
+ 	LSM_HOOK_INIT(inode_setattr, selinux_inode_setattr),
+ 	LSM_HOOK_INIT(inode_getattr, selinux_inode_getattr),
++#ifdef CONFIG_KSU_SUSFS
++	LSM_HOOK_INIT(inode_setxattr, handle_selinux_inode_setxattr),
++	LSM_HOOK_INIT(inode_post_setxattr, handle_selinux_inode_post_setxattr),
++#else
+ 	LSM_HOOK_INIT(inode_setxattr, selinux_inode_setxattr),
+ 	LSM_HOOK_INIT(inode_post_setxattr, selinux_inode_post_setxattr),
++#endif // #ifdef CONFIG_KSU_SUSFS
+ 	LSM_HOOK_INIT(inode_getxattr, selinux_inode_getxattr),
+ 	LSM_HOOK_INIT(inode_listxattr, selinux_inode_listxattr),
+ 	LSM_HOOK_INIT(inode_removexattr, selinux_inode_removexattr),
+@@ -7222,8 +7546,11 @@ static struct security_hook_list selinux_hooks[] __lsm_ro_after_init = {
  	LSM_HOOK_INIT(d_instantiate, selinux_d_instantiate),
  
  	LSM_HOOK_INIT(getprocattr, selinux_getprocattr),
