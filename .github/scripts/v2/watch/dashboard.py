@@ -422,10 +422,7 @@ def update_dashboard_issue(repo: str, issue_number: int, body: str) -> str:
 
 def get_git_revision(repo_root: Path) -> tuple[str, str]:
     """Retrieve current commit hash and branch name."""
-    rev = os.environ.get("GITHUB_SHA")
-    branch = os.environ.get("GITHUB_REF_NAME")
-    if rev and branch:
-        return rev[:7], branch
+    rev = None
     try:
         rev_proc = subprocess.run(
             ["git", "-C", str(repo_root), "rev-parse", "--short=7", "HEAD"],
@@ -435,7 +432,11 @@ def get_git_revision(repo_root: Path) -> tuple[str, str]:
         )
         rev = rev_proc.stdout.strip()
     except Exception:
-        rev = "unknown"
+        pass
+    if not rev:
+        rev = (os.environ.get("GITHUB_SHA") or "unknown")[:7]
+
+    branch = None
     try:
         branch_proc = subprocess.run(
             ["git", "-C", str(repo_root), "branch", "--show-current"],
@@ -443,9 +444,12 @@ def get_git_revision(repo_root: Path) -> tuple[str, str]:
             text=True,
             check=True,
         )
-        branch = branch_proc.stdout.strip() or "main"
+        branch = branch_proc.stdout.strip()
     except Exception:
-        branch = "main"
+        pass
+    if not branch:
+        branch = os.environ.get("GITHUB_REF_NAME") or "main"
+
     return rev, branch
 
 

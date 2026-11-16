@@ -141,6 +141,14 @@ jobs:
           echo '```' >> report_11.md
           cat report_11.md >> $GITHUB_STEP_SUMMARY
 
+      - name: Synchronize Upstream Watch Dashboard
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          PYTHONPATH=.github/scripts python3 -m v2.watch.cli
+
       - name: Report Production Failure as Issue
         if: failure()
         env:

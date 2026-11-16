@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import unittest
 from unittest.mock import MagicMock, patch
@@ -630,6 +631,21 @@ class DashboardTests(unittest.TestCase):
         for perm in itertools.permutations(test_events):
             res = combine_recent_events([], list(perm))
             self.assertEqual([e["timestamp"] for e in res], reference_order)
+
+    def test_get_git_revision_prefers_git_head_over_env(self):
+        from v2.watch.dashboard import get_git_revision
+        with patch.dict(os.environ, {"GITHUB_SHA": "old1234567890", "GITHUB_REF_NAME": "old_branch"}):
+            rev, branch = get_git_revision(REPO_ROOT)
+            # Should prefer the actual git repo's HEAD over GITHUB_SHA
+            self.assertNotEqual(rev, "old1234")
+
+    def test_get_git_revision_falls_back_to_env(self):
+        from v2.watch.dashboard import get_git_revision
+        with patch("v2.watch.dashboard.subprocess.run", side_effect=Exception("no git")):
+            with patch.dict(os.environ, {"GITHUB_SHA": "abc1234567890", "GITHUB_REF_NAME": "test_ref"}):
+                rev, branch = get_git_revision(Path("/nonexistent"))
+                self.assertEqual(rev, "abc1234")
+                self.assertEqual(branch, "test_ref")
 
 
 if __name__ == "__main__":
