@@ -3,16 +3,16 @@
   "sources": {
     "authoritative": {
       "backslashxx_kernelsu": {
-        "commit": "9339aca9339574361f32672c67601f7377b20cda",
+        "commit": "980dd1c9ff0d9d9cdb0de43b95b70b16c073522d",
         "ref": "master",
-        "relevant_content_hash": "sha256:7390e805a246cd5c4c6fc2a5f446b37a1359bf8fcb8af8b99e4015f0a3d43d80",
+        "relevant_content_hash": "sha256:403b3fac488344076448624c131f75bf3553f42ef5c9d5ee58b6a4923676bdf9",
         "repository": "https://github.com/backslashxx/KernelSU.git",
         "tracked_files": {
           "kernel/Kconfig": "sha256:fa2cabd9c316e1eb2562f0abb5af7b1d73c6a665ad94af94c8f919f2ce3a449f",
           "kernel/downstream/ksu_hostsredirect.h": "sha256:1888892bebf9c1555c1b48296cf363ed1dc568da24ff03e51fd9e0693233e908",
           "kernel/feature/kernel_umount.c": "sha256:ba964ec6c27fcbfe348a333fec94073c9cb0843b8604a94c7ef66c0823e89790",
           "kernel/feature/sucompat.c": "sha256:59a7df821eac0fdee5453db6111855a4966511f3ea1f22382f78cfa1ca1bd744",
-          "kernel/hook/lsm_hooks_list.c": "sha256:7e8057766bdf095d8c7955dc3cefbc5b2fe51672b9c9582fba1eda70c5e1883e",
+          "kernel/hook/lsm_hooks_list.c": "sha256:bb97e64a09d7bab321e2f04b9cf0a6889646d14400a1e9ece98abaf57b1c948b",
           "kernel/hook/setuid_hook.c": "sha256:dd7f40fa454fdea2d997ee219f3aed2892a71efa8ad2b69a5f2d6aca86ada1e5",
           "kernel/hook/syscall_table_hook_arm64.c": "sha256:c85696cddeadca3f43d9d1b0f32710a54a70c69d4e9dc12cc1bd8985d953a82f",
           "kernel/kernel_compat.h": "sha256:e1d739fd68c6b630a9bcb0b8ce0594f7090da7f5f039f2416cc44a97be5b55cc",
