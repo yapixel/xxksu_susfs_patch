@@ -14,7 +14,7 @@
         "repository": "https://gitlab.com/simonpunk/susfs4ksu"
       },
       "target_lineage": {
-        "commit": "980dd1c9ff0d9d9cdb0de43b95b70b16c073522d",
+        "commit": "76f266c91a90b57cb1d7a7c68df3ccd53a828564",
         "ref": "master",
         "repository": "https://github.com/backslashxx/KernelSU"
       },
