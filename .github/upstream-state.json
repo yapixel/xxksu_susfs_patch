@@ -3,21 +3,21 @@
   "sources": {
     "authoritative": {
       "backslashxx_kernelsu": {
-        "commit": "65e00fe957000cf84c996b3f4d1298c135bd6d2e",
+        "commit": "1b8ce9e15a9402aa2192aed5d381366cf2150f0f",
         "ref": "master",
-        "relevant_content_hash": "sha256:cb1ccb73d3249078ab85ebe59f8bea587e587fedb3f27647d72e59ba6c8e4c5c",
+        "relevant_content_hash": "sha256:2a452e9b4f603707e226c54b826f0b6679151bf0a9f7bf2f3cf401ccc3199e61",
         "repository": "https://github.com/backslashxx/KernelSU.git",
         "tracked_files": {
           "kernel/Kconfig": "sha256:c6c1eedbcbfa9a7402837ed3f14db69865ab4b2f16fe7e553c192de8aa224f6b",
           "kernel/downstream/ksu_hostsredirect.h": "sha256:1888892bebf9c1555c1b48296cf363ed1dc568da24ff03e51fd9e0693233e908",
           "kernel/feature/kernel_umount.c": "sha256:ba964ec6c27fcbfe348a333fec94073c9cb0843b8604a94c7ef66c0823e89790",
-          "kernel/feature/sucompat.c": "sha256:59a7df821eac0fdee5453db6111855a4966511f3ea1f22382f78cfa1ca1bd744",
+          "kernel/feature/sucompat.c": "sha256:3f2a606dbd6725ad8b09dc88764b833799063ec9b2e2e3fd53c8ae1dd73ba9b9",
           "kernel/hook/lsm_hooks_list.c": "sha256:bb97e64a09d7bab321e2f04b9cf0a6889646d14400a1e9ece98abaf57b1c948b",
           "kernel/hook/setuid_hook.c": "sha256:dd7f40fa454fdea2d997ee219f3aed2892a71efa8ad2b69a5f2d6aca86ada1e5",
           "kernel/hook/syscall_table_hook_arm64.c": "sha256:c85696cddeadca3f43d9d1b0f32710a54a70c69d4e9dc12cc1bd8985d953a82f",
           "kernel/kernel_compat.h": "sha256:f3b16e624c5936f371bc45edd116638da59768db8df2b37a248d106fb4f1e0d8",
           "kernel/kernel_includes.h": "sha256:97475ba18f642eb46c3be0b149d3a73e759e1b5e14781b1ed187186acd428e33",
-          "kernel/ksu.c": "sha256:8df83fc1248575a871b69468e7cc9b8195742523f85faed7073ffc2d995af149",
+          "kernel/ksu.c": "sha256:3cecb073e22892b10ecabca60d580893b5a5e9ae2dabe23858d873784779d167",
           "kernel/manager/pkg_observer.c": "sha256:c4d4820f302abdd6a50f0921de9faea1986101e3c7a6bb77f7881942d7f0d7f2",
           "kernel/runtime/ksud_integration.c": "sha256:b3c62d1d57a733e213fc46ed8d32478e4c2766b2d1930c30482300f4ac932fe1",
           "kernel/selinux/rules.c": "sha256:a18ed06f18df96ed37caecabe3870ef83c20ce14f87f8ecbb5684cbde8ddfc39",

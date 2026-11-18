@@ -15,7 +15,7 @@
   },
   "patch_11": {
     "patch_file": "patches/xxksu/11_enable_susfs_for_ksu.patch",
-    "patch_sha256": "sha256:ae2f62d43e1362191b3174a77ac56f64fe96ce51ae14d1e5c0ce750da03f9896",
+    "patch_sha256": "sha256:858ac096a80e58672c82b823e8bd569445382ec143b5e3ff6eba3047e109b082",
     "size": 17207,
     "strict_apply": "PASS"
   },
@@ -32,10 +32,10 @@
     "kernel/Kconfig": "sha256:c6c1eedbcbfa9a7402837ed3f14db69865ab4b2f16fe7e553c192de8aa224f6b",
     "kernel/downstream/ksu_hostsredirect.h": "sha256:1888892bebf9c1555c1b48296cf363ed1dc568da24ff03e51fd9e0693233e908",
     "kernel/feature/kernel_umount.c": "sha256:ba964ec6c27fcbfe348a333fec94073c9cb0843b8604a94c7ef66c0823e89790",
-    "kernel/feature/sucompat.c": "sha256:59a7df821eac0fdee5453db6111855a4966511f3ea1f22382f78cfa1ca1bd744",
+    "kernel/feature/sucompat.c": "sha256:3f2a606dbd6725ad8b09dc88764b833799063ec9b2e2e3fd53c8ae1dd73ba9b9",
     "kernel/hook/setuid_hook.c": "sha256:dd7f40fa454fdea2d997ee219f3aed2892a71efa8ad2b69a5f2d6aca86ada1e5",
     "kernel/hook/syscall_table_hook_arm64.c": "sha256:c85696cddeadca3f43d9d1b0f32710a54a70c69d4e9dc12cc1bd8985d953a82f",
-    "kernel/ksu.c": "sha256:8df83fc1248575a871b69468e7cc9b8195742523f85faed7073ffc2d995af149",
+    "kernel/ksu.c": "sha256:3cecb073e22892b10ecabca60d580893b5a5e9ae2dabe23858d873784779d167",
     "kernel/manager/pkg_observer.c": "sha256:c4d4820f302abdd6a50f0921de9faea1986101e3c7a6bb77f7881942d7f0d7f2",
     "kernel/runtime/ksud_integration.c": "sha256:b3c62d1d57a733e213fc46ed8d32478e4c2766b2d1930c30482300f4ac932fe1",
     "kernel/selinux/rules.c": "sha256:a18ed06f18df96ed37caecabe3870ef83c20ce14f87f8ecbb5684cbde8ddfc39",
@@ -48,17 +48,17 @@
   "source_bundle": {
     "artifact_path": ".github/fixtures/v2/v29-baselines/xxksu.json",
     "file_count": 14,
-    "identity": "sha256:4d4fe42ef3ce5f7658816d2fdfd3415e3af0524e8aae1cea494f99e8c4b07670",
+    "identity": "sha256:2e0b6748fdc4b8b953d4ef15ba7338c47423a14a98cc1c55aa85ad075c99317e",
     "schema": "xxksu-susfs-source-bundle/v1"
   },
   "status": "VERIFIED",
   "target_id": "xxksu",
   "upstream": {
-    "archive_sha256": "dc9e73aa78353d3249b04f05b2c4cc6ad69aff251de64de6ae7c9de0d7e34d69",
-    "archive_url": "https://codeload.github.com/backslashxx/KernelSU/tar.gz/65e00fe957000cf84c996b3f4d1298c135bd6d2e",
+    "archive_sha256": "419b86da8b15e167987b2c3d0f6ed504bbc810c0e3b200e44a2f3352d09ce110",
+    "archive_url": "https://codeload.github.com/backslashxx/KernelSU/tar.gz/1b8ce9e15a9402aa2192aed5d381366cf2150f0f",
     "ref": "master",
     "repository": "https://github.com/backslashxx/KernelSU",
-    "resolved_commit": "65e00fe957000cf84c996b3f4d1298c135bd6d2e",
-    "tree": "e1a5c274d470e7b74c08a09c998f7299ad873327"
+    "resolved_commit": "1b8ce9e15a9402aa2192aed5d381366cf2150f0f",
+    "tree": "ef658be52e1d75d1cdcd1d28edb5c18ecb92a6e6"
   }
 }
