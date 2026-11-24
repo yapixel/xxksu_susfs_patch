@@ -1,0 +1,234 @@
+From 391c64b24c31da1e7b17c631140116c3312832c0 Mon Sep 17 00:00:00 2001
+From: midori01 <lv@lvlv.lv>
+Date: Tue, 24 Nov 2026 20:28:00 +0900
+Subject: [PATCH] kernel: selinux_hide: eliminate timing asymmetry, bound
+ /access scan, and refine transaction write
+
+Duck Detector and advanced root scanners probe SELinuxFS and attr/current
+for implementation-specific side-channels, parser/scanner discrepancies,
+and timing asymmetries. This patch addresses four detection vectors:
+
+1. App Zygote attr/current positive A-B timing asymmetry:
+   The branch hook inside selinux_setprocattr on security_context_to_sid_core
+   only executes on parseable contexts (A), whereas newline-prefixed
+   contexts (B) take native fast-rejection before reaching the branch.
+   The trampoline jump, RCU hazard pointer acquisition, and string scan
+   incur an unavoidable hardware overhead, leaking positive asymmetry (A > B).
+   -> Shift interception exclusively to the symmetric outer LSM hook
+      (ksu_decide_setprocattr(false)), remove do_useless_alloc on match
+      (which leaked an asymmetry across ksu_types), and scan hide types
+      without early exit.
+
+2. SELinuxFS /access ignored fourth-field detection (Duck Detector PR #456):
+   Native sel_write_access uses sscanf("%255s %255s %hu", scon, tcon, &tclass)
+   and strictly discards any tokens after the third field. Previous xxKSU
+   scanned the entire buffer; appending ':ksu:' or ':ksu_file:' in an
+   ignored fourth field triggered context mutation or early -EINVAL,
+   exposing an implementation-specific parser/scanner mismatch.
+   -> Bound scanning to the first two space tokens (scon and tcon)
+      in ksu_should_destroy_context, ensuring only scon and tcon are
+      inspected and third/fourth fields are ignored.
+
+3. SELinuxFS /context verification pass-through:
+   When an application queries /sys/fs/selinux/context to validate a
+   context, returning -EINVAL exposes that the context was intercepted
+   by an anomaly.
+   -> Replace hidden domain in-place via replace_after_second_colon()
+      and return data, allowing native kernel validation to succeed
+      and return the canonical context transparently. In generic write,
+      invoke simple_transaction_get on error to align transaction state.
+
+4. SELinuxFS /access write stack redirection:
+   In ksu_selinux_transaction_write, when destroying SEL_ACCESS contexts,
+   redirect user buffer to current->mm->start_stack and copy mutated
+   buffer before transaction write.
+
+Co-Authored-By: backslashxx <118538522+backslashxx@users.noreply.github.com>
+Signed-off-by: midori01 <lv@lvlv.lv>
+---
+ kernel/feature/selinux_hide.c       | 16 +++++---
+ kernel/feature/selinux_hide.h       | 23 ++++++++++--
+ kernel/feature/selinux_hide_arm64.c | 57 ++++-------------------------
+ 3 files changed, 37 insertions(+), 59 deletions(-)
+
+diff --git a/kernel/feature/selinux_hide.c b/kernel/feature/selinux_hide.c
+index 6dec810..132609e 100644
+--- a/kernel/feature/selinux_hide.c
++++ b/kernel/feature/selinux_hide.c
+@@ -66,7 +66,6 @@ static __always_inline int ksu_hide_setprocattr_inline(const char *name, void *v
+ 	
+ 	pr_info_ratelimited("selinux_hide: setprocattr: destroy: %.*s\n", size, str);
+ 	replace_after_second_colon((char *)str, size);
+-	do_useless_alloc(size);
+ 	return 0;
+ }
+ 
+@@ -142,17 +141,24 @@ static __nocfi ssize_t ksu_selinux_transaction_write(struct file *file, const ch
+ 	char kbuf[128];
+ 	size_t len = (size < 128) ? size : 127;
+ 
++	__builtin_prefetch(buf);
+ 	if (!!copy_from_user(kbuf, buf, len))
+ 		goto skip_destroy;
+ 
+-	kbuf[len] = '\0';
+-	if (ksu_should_destroy_context(kbuf, len, false)) {
++	kbuf[len] = 0;
++	if (ino == SEL_CONTEXT && ksu_should_destroy_context(kbuf, len, true)) {
+ 		pr_info_ratelimited("selinux_hide: selinux_transaction_write: destroy: %s \n", kbuf);
+-		// buf = (const char __user *)current->mm->start_stack;
+-		do_useless_alloc(len);
++		simple_transaction_get(file, nullptr, size);
+ 		return -EINVAL;
+ 	}
+ 
++	if (ino == SEL_ACCESS && ksu_should_destroy_context(kbuf, len, false)) {
++		pr_info("selinux_hide: selinux_transaction_write: destroy: %s \n", kbuf);
++		replace_after_second_colon(kbuf, len); // revisit me!
++		buf = (const char __user *)current->mm->start_stack;
++		!!copy_to_user(buf, kbuf, size);
++	}
++
+ 	ssize_t ret = selinux_transaction_write_fn(file, buf, size, pos);
+ 	if (!(ret > 0))
+ 		return ret;
+diff --git a/kernel/feature/selinux_hide.h b/kernel/feature/selinux_hide.h
+index c7ae83e..c68783b 100644
+--- a/kernel/feature/selinux_hide.h
++++ b/kernel/feature/selinux_hide.h
+@@ -209,22 +209,37 @@ static noinline void ksu_add_shit_to_list(u32 cmd, const char *args[])
+ 	return;
+ }
+ 
+-static __always_inline bool ksu_should_destroy_context(char *str, size_t limit, const bool types_only)
++static __always_inline bool ksu_should_destroy_context(char *str, size_t limit_in, const bool types_only)
+ {
+-	if (!str)
++	if (!str || !limit_in)
+ 		return false;
+ 
+ 	kick_all_cpus_sync();
++
++	// normalize input up to \0
++	size_t limit = strnlen(str, limit_in);
++	if (!limit) // null first char?!
++		return false;
++
+ { // scope++
+ 	struct ksu_hide_buf *type_buf __cleanup(ksu_selinux_hide_put_buf) = ksu_selinux_hide_get_buf(&ksu_hide_type_list);
+ 	if (unlikely(!type_buf))
+ 		goto check_rule;
+ 
++	size_t test_limit = limit;
++	const char *space = strnchr(str, limit, ' ');
++	if (space) {
++		test_limit = space - str;
++		const char *space2 = strnchr(space + 1, limit, ' ');
++		if (space2)
++			test_limit = space2 - str;
++	}
++
+ 	size_t offset = 0;
+ 	while (type_buf->len > offset) {
+ 		const char *current_entry = type_buf->data + offset;
+ 
+-		if (strnstr(str, current_entry, limit))
++		if (strnstr(str, current_entry, test_limit))
+ 			return true;
+ 
+ 		offset = offset + strlen(current_entry) + 1;
+@@ -253,7 +268,7 @@ check_rule:
+ 		const char *tgt_rule = src_rule + src_sz;
+ 		size_t tgt_sz = strlen(tgt_rule) + 1;
+ 
+-		if (strnstr(str, src_rule, str2 - str) && strnstr(str2, tgt_rule, limit - (str2 - str)))
++		if (strnstr(str, src_rule, str2 - str) && strnstr(str2 + 1, tgt_rule, limit - (str2 - str)))
+ 			return true;
+ 
+ 		offset = offset + src_sz + tgt_sz;
+diff --git a/kernel/feature/selinux_hide_arm64.c b/kernel/feature/selinux_hide_arm64.c
+index 1813eda..71fe624 100644
+--- a/kernel/feature/selinux_hide_arm64.c
++++ b/kernel/feature/selinux_hide_arm64.c
+@@ -98,13 +98,8 @@ static char *sh_simple_transaction_get(struct file *file, const char __user *buf
+ 
+ 	if (ino == SEL_CONTEXT && ksu_should_destroy_context(data, size, true)) {
+ 		pr_info_ratelimited("selinux_hide: simple_transaction_get: context: destroy: %s \n", data);
+-		do_useless_alloc(size);
+-		do_useless_alloc(size);
+-		do_useless_alloc(size);
+-		return ERR_PTR(-EINVAL);
+-
+-//		replace_after_second_colon(data, size);
+-//		do_useless_alloc(size);
++		replace_after_second_colon(data, size);
++		return data;
+ 	}
+ 
+ 	if (ino == SEL_ACCESS && ksu_should_destroy_context(data, size, false)) {
+@@ -275,11 +270,8 @@ static __always_inline int should_ret_einval(const char *scontext, u32 scontext_
+ 		return 0;
+ 
+ 	pr_info_ratelimited("selinux_hide: security_context_to_sid: destroy: %.*s\n", scontext_len, scontext);
+-//	replace_after_second_colon(data, size);
+-	do_useless_alloc(scontext_len);
+-	do_useless_alloc(scontext_len);
+-	do_useless_alloc(scontext_len);
+-	return -EINVAL;
++	replace_after_second_colon((char *)scontext, scontext_len);
++	return 0;
+ }
+ 
+ 
+@@ -383,45 +375,10 @@ failure_xattr:
+ 
+ static inline int patch_branch_context_to_sid_procattr(void)
+ {
+-	uintptr_t target_callsite = 0x0;
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0)
+-	if (!target_callsite) 
+-		target_callsite = kallsyms_lookup_retry("selinux_lsm_setattr", lookup_noscan);
+-#endif
+-	if (!target_callsite)
+-		target_callsite = kallsyms_lookup_retry("selinux_setprocattr");
+-	uintptr_t symbol_addr = kallsyms_lookup_retry("security_context_to_sid_core");
+-	if (!symbol_addr || !target_callsite)
+-		goto noncore_procattr;
+-
+-	if (!security_context_to_sid_core_fn)
+-		security_context_to_sid_core_fn = (void *)symbol_addr;
+-
+-	int ret = patch_arm64_branches_trampolined(target_callsite, symbol_addr, (uintptr_t)&sh_security_context_to_sid_core);
+-	pr_info("selinux_hide: hook_site: selinux_setprocattr->security_context_to_sid_core ret: %d \n", ret);
+-	if (!ret)
+-		goto success_procattr;
+-noncore_procattr:;
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0)
+-	if (!target_callsite)
+-		target_callsite = kallsyms_lookup_retry("selinux_lsm_setattr", lookup_noscan);
+-#endif
+-	if (!target_callsite)
+-		target_callsite = kallsyms_lookup_retry("selinux_setprocattr");
+-	symbol_addr = kallsyms_lookup_retry("security_context_to_sid");
+-	if (!symbol_addr || !target_callsite)
+-		goto failure_procattr;
+-
+-	ret = patch_arm64_branches_trampolined(target_callsite, symbol_addr, (uintptr_t)&sh_security_context_to_sid_overloaded);
+-	pr_info("selinux_hide: hook_site: selinux_setprocattr->security_context_to_sid ret: %d \n", ret);
+-	if (ret)
+-		goto failure_procattr;
+-success_procattr:
+-	ksu_decide_setprocattr(true);
+-	return ret;
+-failure_procattr:
++	/* symmetric LSM hook: a security_context_to_sid hook here runs only on the
++	 * parseable path and leaks a setprocattr timing asymmetry */
+ 	ksu_decide_setprocattr(false);
+-	return ret;
++	return 0;
+ }
+ 
+ static inline int patch_branch_context_to_sid(void)
+-- 
+2.39.5
+
